@@ -20,8 +20,6 @@ return {
 
         -- install linters
         "eslint_d", -- fast eslint daemon
-        "shellcheck", -- shell script linter
-        "markdownlint", -- markdown linter
 
         -- install debuggers
         "debugpy",

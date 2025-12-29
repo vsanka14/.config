@@ -10,8 +10,6 @@ return {
     opts.sources = require("astrocore").list_insert_unique(opts.sources, {
       -- Linters
       null_ls.builtins.diagnostics.eslint_d, -- JS/TS linting (fast daemon version)
-      null_ls.builtins.diagnostics.shellcheck, -- Shell script linting
-      null_ls.builtins.diagnostics.markdownlint, -- Markdown linting
     })
   end,
 }
