@@ -1,0 +1,44 @@
+# Sensitive and private files
+.ssh/
+.gnupg/
+.aws/
+.azure/
+.kube/
+.npmrc
+.python_history
+.zsh_sessions/
+.vscode-insiders/
+.npm/
+.pnpm-state/
+.cache/
+.vim/
+
+# OS files
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Session and history files
+.zcompdump
+.bash_history
+.zsh_history
+.bash_profile_history
