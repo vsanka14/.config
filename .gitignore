@@ -1,3 +1,9 @@
+# Parent directory contents
+../*
+
+# Yarn global node_modules (can be regenerated from package.json)
+yarn/global/node_modules/
+
 # Sensitive and private files
 .ssh/
 .gnupg/
