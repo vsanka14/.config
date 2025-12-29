@@ -192,6 +192,33 @@ return {
     },
   },
 
+  -- Markdown preview in terminal using glow
+  {
+    "ellisonleao/glow.nvim",
+    cmd = "Glow",
+    ft = { "markdown", "mdx" },
+    opts = {
+      border = "rounded",
+      width_ratio = 0.8,
+      height_ratio = 0.8,
+      width = 120,
+      height = 100,
+    },
+  },
+
+  -- Browser-based markdown preview (live reload)
+  {
+    "iamcco/markdown-preview.nvim",
+    cmd = { "MarkdownPreviewToggle", "MarkdownPreview", "MarkdownPreviewStop" },
+    ft = { "markdown", "mdx" },
+    build = "cd app && npm install",
+    init = function()
+      vim.g.mkdp_filetypes = { "markdown", "mdx" }
+      vim.g.mkdp_auto_close = 0 -- Don't auto-close when switching buffers
+      vim.g.mkdp_theme = "dark"
+    end,
+  },
+
   -- Show hidden files by default in Neo-tree
   {
     "nvim-neo-tree/neo-tree.nvim",

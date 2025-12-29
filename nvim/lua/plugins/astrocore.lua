@@ -101,6 +101,12 @@ return {
         ["<Leader>gu"] = { function() require("gitsigns").reset_hunk() end, desc = "Undo Stage Hunk" },
         ["]h"] = { function() require("gitsigns").nav_hunk "next" end, desc = "Next Git Hunk" },
         ["[h"] = { function() require("gitsigns").nav_hunk "prev" end, desc = "Previous Git Hunk" },
+
+        -- Markdown preview keymaps
+        ["<Leader>m"] = { desc = "Markdown" },
+        ["<Leader>mp"] = { "<cmd>Glow<cr>", desc = "Preview in terminal (Glow)" },
+        ["<Leader>mb"] = { "<cmd>MarkdownPreview<cr>", desc = "Preview in browser" },
+        ["<Leader>ms"] = { "<cmd>MarkdownPreviewStop<cr>", desc = "Stop browser preview" },
       },
       v = {
         -- Visual mode git operations
