@@ -1,5 +1,3 @@
-if true then return {} end -- WARN: REMOVE THIS LINE TO ACTIVATE THIS FILE
-
 -- AstroCore provides a central place to modify mappings, vim options, autocommands, and more!
 -- Configuration documentation can be found with `:h astrocore`
 -- NOTE: We highly recommend setting up the Lua Language Server (`:LspInstall lua_ls`)
@@ -79,6 +77,28 @@ return {
 
         -- setting a mapping to false will disable it
         -- ["<C-S>"] = false,
+
+        -- GitLens-like functionality keymaps
+        ["<Leader>g"] = { desc = "Git" },
+        ["<Leader>gb"] = { "<cmd>GitBlameToggle<cr>", desc = "Toggle Git Blame" },
+        ["<Leader>gB"] = { function() require("gitsigns").blame_line({ full = true }) end, desc = "Git Blame Line" },
+        ["<Leader>gd"] = { "<cmd>DiffviewOpen<cr>", desc = "Open Diff View" },
+        ["<Leader>gh"] = { "<cmd>DiffviewFileHistory %<cr>", desc = "File History" },
+        ["<Leader>gH"] = { "<cmd>DiffviewFileHistory<cr>", desc = "Project History" },
+        ["<Leader>gg"] = { "<cmd>Neogit<cr>", desc = "Open Neogit" },
+        ["<Leader>gp"] = { function() require("gitsigns").preview_hunk() end, desc = "Preview Hunk" },
+        ["<Leader>gr"] = { function() require("gitsigns").reset_hunk() end, desc = "Reset Hunk" },
+        ["<Leader>gR"] = { function() require("gitsigns").reset_buffer() end, desc = "Reset Buffer" },
+        ["<Leader>gs"] = { function() require("gitsigns").stage_hunk() end, desc = "Stage Hunk" },
+        ["<Leader>gS"] = { function() require("gitsigns").stage_buffer() end, desc = "Stage Buffer" },
+        ["<Leader>gu"] = { function() require("gitsigns").undo_stage_hunk() end, desc = "Undo Stage Hunk" },
+        ["]h"] = { function() require("gitsigns").next_hunk() end, desc = "Next Git Hunk" },
+        ["[h"] = { function() require("gitsigns").prev_hunk() end, desc = "Previous Git Hunk" },
+      },
+      v = {
+        -- Visual mode git operations
+        ["<Leader>gs"] = { function() require("gitsigns").stage_hunk{vim.fn.line("."), vim.fn.line("v")} end, desc = "Stage Selected Hunk" },
+        ["<Leader>gr"] = { function() require("gitsigns").reset_hunk{vim.fn.line("."), vim.fn.line("v")} end, desc = "Reset Selected Hunk" },
       },
     },
   },
