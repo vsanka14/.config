@@ -182,6 +182,16 @@ return {
     },
   },
 
+  -- Add Astro icon support to mini.icons
+  {
+    "echasnovski/mini.icons",
+    opts = {
+      extension = {
+        astro = { glyph = "󱓞", hl = "MiniIconsOrange" },
+      },
+    },
+  },
+
   -- Show hidden files by default in Neo-tree
   {
     "nvim-neo-tree/neo-tree.nvim",
