@@ -15,6 +15,7 @@ return {
       yaml = { "prettier" },
       markdown = { "prettier" },
       lua = { "stylua" },
+      gitignore = { "trim_whitespace" },
     },
     format_on_save = {
       timeout_ms = 1000,
