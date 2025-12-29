@@ -77,7 +77,7 @@ end)
 config.background = {
 	{
 		source = {
-			File = "/Users/vasishtshankar/Downloads/tokyo-coffee-shop.png",
+			File = "/Users/vasishtshankar/Documents/pics/tokyo-coffee-shop.png",
 		},
 		-- The background image will be scaled to fill the window
 		width = "100%",
