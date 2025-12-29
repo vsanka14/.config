@@ -19,7 +19,7 @@ return {
         "prettier",
 
         -- install linters
-        "eslint_d", -- fast eslint daemon
+        "eslint-lsp", -- eslint as LSP server
 
         -- install debuggers
         "debugpy",
