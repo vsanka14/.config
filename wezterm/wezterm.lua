@@ -55,18 +55,23 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 		foreground = "#FFFFFF"
 	end
 
-	local title = "  " .. tab.tab_index + 1 .. ": " .. tab.active_pane.title .. "  "
+	local title = tab.active_pane.title
+	-- Truncate title if it's too long
+	local max = 20
+	if #title > max then
+		title = title:sub(1, max - 3) .. "..."
+	end
+
+	title = " " .. tab.tab_index + 1 .. ": " .. title .. " "
 
 	return {
 		{ Background = { Color = background } },
 		{ Foreground = { Color = foreground } },
 		{ Text = title },
-		{ Background = { Color = "#000000" } },
 		{ Foreground = { Color = edge_foreground } },
 		{ Text = "|" },
 	}
 end)
-
 
 -- Background image and transparency
 config.background = {
@@ -103,7 +108,7 @@ config.window_padding = {
 -- Tab bar
 config.hide_tab_bar_if_only_one_tab = true
 config.tab_bar_at_bottom = false
-config.tab_max_width = 50 -- Increase max tab width (default is 16)
+config.tab_max_width = 32
 config.use_fancy_tab_bar = false -- Retro tab bar renders inside terminal grid, avoiding pixel misalignment
 
 -- Cursor
