@@ -73,6 +73,12 @@ config.window_padding = {
 	bottom = 0,
 }
 
+-- Stretch the last row to fill any remaining space at the bottom
+-- This eliminates the gap caused by window height not being divisible by cell height
+config.use_resize_increments = true
+
+
+
 -- Tab bar
 config.hide_tab_bar_if_only_one_tab = true
 config.tab_bar_at_bottom = false
