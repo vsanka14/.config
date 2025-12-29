@@ -84,7 +84,7 @@ config.background = {
 		height = "100%",
 		opacity = 1.0, -- Fully opaque image
 		-- Further dim the image
-		hsb = { brightness = 0.05 },
+		hsb = { brightness = 0.04 },
 	},
 	-- Overlays a darker semi-transparent gradient to improve contrast
 }
