@@ -96,6 +96,9 @@ config.keys = {
 			window:copy_to_clipboard(txt:match("^%s*(.-)%s*$")) -- trim leading and trailing whitespace
 		end),
 	},
+	-- Option + Arrow keys for word navigation
+	{ key = "LeftArrow", mods = "OPT", action = wezterm.action.SendString("\x1bb") },
+	{ key = "RightArrow", mods = "OPT", action = wezterm.action.SendString("\x1bf") },
 }
 
 -- CTRL+ALT + number to move tab to that position

@@ -42,7 +42,10 @@ return {
         number = true, -- sets vim.opt.number
         spell = false, -- sets vim.opt.spell
         signcolumn = "yes", -- sets vim.opt.signcolumn to yes
-        wrap = false, -- sets vim.opt.wrap
+        wrap = true, -- enable word wrap for better markdown editing
+        linebreak = true, -- wrap at word boundaries
+        textwidth = 0, -- disable auto line breaks
+        wrapmargin = 0, -- disable wrap margin
       },
       g = { -- vim.g.<key>
         -- configure global vim variables (vim.g)
@@ -108,6 +111,22 @@ return {
         ["<Leader>gr"] = {
           function() require("gitsigns").reset_hunk { vim.fn.line ".", vim.fn.line "v" } end,
           desc = "Reset Selected Hunk",
+        },
+      },
+    },
+    -- Add autocmds for better markdown editing
+    autocmds = {
+      markdown_settings = {
+        {
+          event = "FileType",
+          pattern = "markdown",
+          callback = function()
+            vim.opt_local.wrap = true
+            vim.opt_local.linebreak = true
+            vim.opt_local.conceallevel = 2
+            vim.opt_local.concealcursor = "nc"
+          end,
+          desc = "Set markdown-specific options for better editing",
         },
       },
     },
