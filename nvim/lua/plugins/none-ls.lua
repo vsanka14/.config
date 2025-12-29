@@ -1,23 +1,17 @@
-
--- Customize None-ls sources
+-- Customize None-ls sources (linters)
 
 ---@type LazySpec
 return {
   "nvimtools/none-ls.nvim",
   opts = function(_, opts)
-    -- opts variable is the default configuration table for the setup function call
-    -- local null_ls = require "null-ls"
-
-    -- Check supported formatters and linters
-    -- https://github.com/nvimtools/none-ls.nvim/tree/main/lua/null-ls/builtins/formatting
-    -- https://github.com/nvimtools/none-ls.nvim/tree/main/lua/null-ls/builtins/diagnostics
+    local null_ls = require "null-ls"
 
     -- Only insert new sources, do not replace the existing ones
-    -- (If you wish to replace, use `opts.sources = {}` instead of the `list_insert_unique` function)
     opts.sources = require("astrocore").list_insert_unique(opts.sources, {
-      -- Set a formatter
-      -- null_ls.builtins.formatting.stylua,
-      -- null_ls.builtins.formatting.prettier,
+      -- Linters
+      null_ls.builtins.diagnostics.eslint_d, -- JS/TS linting (fast daemon version)
+      null_ls.builtins.diagnostics.shellcheck, -- Shell script linting
+      null_ls.builtins.diagnostics.markdownlint, -- Markdown linting
     })
   end,
 }

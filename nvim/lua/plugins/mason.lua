@@ -1,4 +1,3 @@
-
 -- Customize Mason
 
 ---@type LazySpec
@@ -17,6 +16,12 @@ return {
 
         -- install formatters
         "stylua",
+        "prettier",
+
+        -- install linters
+        "eslint_d", -- fast eslint daemon
+        "shellcheck", -- shell script linter
+        "markdownlint", -- markdown linter
 
         -- install debuggers
         "debugpy",

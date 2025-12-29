@@ -1,4 +1,4 @@
--- -- AstroCommunity: import any community modules here
+-- AstroCommunity: import any community modules here
 -- We import this file in `lazy_setup.lua` before the `plugins/` folder.
 -- This guarantees that the specs are processed before any user plugins.
 
@@ -6,8 +6,5 @@
 return {
   "AstroNvim/astrocommunity",
   { import = "astrocommunity.pack.lua" },
-  { import = "astrocommunity.git.git-blame-nvim" },
-  { import = "astrocommunity.git.diffview-nvim" },
-  { import = "astrocommunity.git.neogit" },
-  -- import/override with your plugins folder
+  -- Git plugins configured in plugins/user.lua with custom options
 }
