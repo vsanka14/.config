@@ -73,17 +73,11 @@ config.window_padding = {
 	bottom = 0,
 }
 
--- Stretch the last row to fill any remaining space at the bottom
--- This eliminates the gap caused by window height not being divisible by cell height
-config.use_resize_increments = true
-
-
-
 -- Tab bar
 config.hide_tab_bar_if_only_one_tab = true
 config.tab_bar_at_bottom = false
 config.tab_max_width = 50 -- Increase max tab width (default is 16)
-config.use_fancy_tab_bar = true
+config.use_fancy_tab_bar = false -- Retro tab bar renders inside terminal grid, avoiding pixel misalignment
 
 -- Cursor
 config.default_cursor_style = "BlinkingBar"
@@ -128,7 +122,7 @@ return config
   - "One Dark"
   - "Solarized Dark"
   - "Kanagawa"
-  
+
   Run `wezterm ls-fonts --list-system` to see available fonts
   Full scheme list: https://wezfurlong.org/wezterm/colorschemes/index.html
 ]]
