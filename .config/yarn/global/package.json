@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "create-astro": "^4.10.0",
+    "create-vite": "^6.4.1"
+  }
+}
