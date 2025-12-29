@@ -77,6 +77,7 @@ config.window_padding = {
 config.hide_tab_bar_if_only_one_tab = true
 config.tab_bar_at_bottom = false
 config.tab_max_width = 50 -- Increase max tab width (default is 16)
+config.tab_min_width = 20
 config.use_fancy_tab_bar = true
 
 -- Cursor
