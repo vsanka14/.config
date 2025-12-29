@@ -77,7 +77,6 @@ config.window_padding = {
 config.hide_tab_bar_if_only_one_tab = true
 config.tab_bar_at_bottom = false
 config.tab_max_width = 50 -- Increase max tab width (default is 16)
-config.tab_min_width = 20
 config.use_fancy_tab_bar = true
 
 -- Cursor
@@ -87,6 +86,7 @@ config.default_cursor_style = "BlinkingBar"
 config.keys = {
 	{ key = "LeftArrow", mods = "CMD|SHIFT", action = wezterm.action.MoveTabRelative(-1) },
 	{ key = "RightArrow", mods = "CMD|SHIFT", action = wezterm.action.MoveTabRelative(1) },
+	{ key = "k", mods = "CMD", action = wezterm.action.ClearScrollback("ScrollbackAndViewport") },
 	{
 		key = "a",
 		mods = "CMD",
