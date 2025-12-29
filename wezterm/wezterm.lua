@@ -41,6 +41,33 @@ config.colors = {
 	},
 }
 
+-- Custom tab title formatting for clear borders
+wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_width)
+	local background = "#1a1a1a"
+	local foreground = "#A0FFFF"
+	local edge_foreground = "#444444" -- Color for the vertical separator
+
+	if tab.is_active then
+		background = "#00FFFF"
+		foreground = "#000000"
+	elseif hover then
+		background = "#333333"
+		foreground = "#FFFFFF"
+	end
+
+	local title = "  " .. tab.tab_index + 1 .. ": " .. tab.active_pane.title .. "  "
+
+	return {
+		{ Background = { Color = background } },
+		{ Foreground = { Color = foreground } },
+		{ Text = title },
+		{ Background = { Color = "#000000" } },
+		{ Foreground = { Color = edge_foreground } },
+		{ Text = "|" },
+	}
+end)
+
+
 -- Background image and transparency
 config.background = {
 	{
