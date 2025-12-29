@@ -18,5 +18,3 @@ alias tree='eza --tree --icons --color=always'
 # %F{color} sets foreground color, %K{color} sets background color, %f/%k resets
 # Uses whatever path format your system already shows but adds visual styling
 PROMPT='%K{black}%F{yellow} ▌%(!.%1~.%~) ▐%f%k %F{cyan}$ %f'
-
-test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh" || true
