@@ -2,6 +2,16 @@
 
 ---@type LazySpec
 return {
+  -- Add MDX icon support via mini.icons (AstroNvim's default icon provider)
+  {
+    "echasnovski/mini.icons",
+    opts = {
+      extension = {
+        mdx = { glyph = "󰍔", hl = "MiniIconsAzure" },
+      },
+    },
+  },
+
   -- Filetype detection and treesitter config for MDX
   {
     "nvim-treesitter/nvim-treesitter",
