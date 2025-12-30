@@ -14,6 +14,7 @@ return {
       json = { "prettier" },
       yaml = { "prettier" },
       markdown = { "prettier" },
+      mdx = { "prettier" },
       lua = { "stylua" },
       gitignore = { "trim_whitespace" },
     },
