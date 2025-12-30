@@ -7,9 +7,7 @@
 vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "CursorHold" }, {
   pattern = "*",
   callback = function()
-    if package.loaded["neo-tree.sources.manager"] then
-      require("neo-tree.sources.manager").refresh("filesystem")
-    end
+    if package.loaded["neo-tree.sources.manager"] then require("neo-tree.sources.manager").refresh "filesystem" end
   end,
 })
 
@@ -21,9 +19,6 @@ vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "CursorHold" }, {
 
 -- Storage for files edited by OpenCode
 _G.opencode_edited_files = _G.opencode_edited_files or {}
-
--- Namespace for virtual text/signs
-local opencode_ns = vim.api.nvim_create_namespace("opencode_changes")
 
 -- Listen for file edits from OpenCode
 vim.api.nvim_create_autocmd("User", {
@@ -140,13 +135,9 @@ vim.api.nvim_create_user_command("OpencodeEdits", function()
   -- Use vim.ui.select to pick a file to open
   vim.ui.select(files, {
     prompt = "OpenCode edited files:",
-    format_item = function(item)
-      return item.time_str .. " - " .. vim.fn.fnamemodify(item.filepath, ":~:.")
-    end,
+    format_item = function(item) return item.time_str .. " - " .. vim.fn.fnamemodify(item.filepath, ":~:.") end,
   }, function(choice)
-    if choice then
-      vim.cmd("edit " .. vim.fn.fnameescape(choice.filepath))
-    end
+    if choice then vim.cmd("edit " .. vim.fn.fnameescape(choice.filepath)) end
   end)
 end, { desc = "List files edited by OpenCode" })
 
@@ -155,6 +146,6 @@ vim.api.nvim_create_user_command("OpencodeClearEdits", function()
   local count = vim.tbl_count(_G.opencode_edited_files)
   _G.opencode_edited_files = {}
   -- Clear all signs
-  vim.fn.sign_unplace("opencode_signs")
+  vim.fn.sign_unplace "opencode_signs"
   vim.notify("Cleared " .. count .. " OpenCode edit marker(s)", vim.log.levels.INFO, { title = "OpenCode" })
 end, { desc = "Clear all OpenCode edit tracking" })
