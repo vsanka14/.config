@@ -137,7 +137,7 @@ return {
         ["<Leader>gd"] = { "<cmd>DiffviewOpen<cr>", desc = "Open Diff View" },
         ["<Leader>gh"] = { "<cmd>DiffviewFileHistory %<cr>", desc = "File History" },
         ["<Leader>gH"] = { "<cmd>DiffviewFileHistory<cr>", desc = "Project History" },
-        ["<Leader>gg"] = { "<cmd>Neogit<cr>", desc = "Open Neogit" },
+        ["<Leader>gg"] = { function() Snacks.lazygit() end, desc = "Open Lazygit" },
         ["<Leader>gp"] = { function() require("gitsigns").preview_hunk() end, desc = "Preview Hunk" },
         ["<Leader>gr"] = { function() require("gitsigns").reset_hunk() end, desc = "Reset Hunk" },
         ["<Leader>gR"] = { function() require("gitsigns").reset_buffer() end, desc = "Reset Buffer" },

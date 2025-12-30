@@ -18,6 +18,7 @@ return {
   {
     "folke/snacks.nvim",
     opts = {
+      lazygit = { enabled = true },
       dashboard = {
         preset = {
           header = (function()
@@ -131,40 +132,6 @@ return {
         fold_closed = "",
         fold_open = "",
         done = "✓",
-      },
-    },
-  },
-
-  -- Comprehensive git interface similar to GitLens
-  {
-    "NeogitOrg/neogit",
-    dependencies = {
-      "nvim-lua/plenary.nvim",
-      "sindrets/diffview.nvim",
-      "nvim-telescope/telescope.nvim",
-    },
-    cmd = "Neogit",
-    opts = {
-      disable_signs = false,
-      disable_hint = false,
-      disable_context_highlighting = false,
-      disable_commit_confirmation = false,
-      auto_refresh = true,
-      disable_builtin_notifications = false,
-      use_magit_keybindings = false,
-      commit_popup = {
-        kind = "split",
-      },
-      popup = {
-        kind = "split",
-      },
-      signs = {
-        section = { ">", "v" },
-        item = { ">", "v" },
-        hunk = { "", "" },
-      },
-      integrations = {
-        diffview = true,
       },
     },
   },
