@@ -138,20 +138,20 @@ config.keys = {
 	{ key = "_", mods = "CMD|SHIFT", action = wezterm.action.SplitVertical({ domain = "CurrentPaneDomain" }) },
 
 	-- Navigate panes
-	{ key = "LeftArrow", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Left") },
-	{ key = "RightArrow", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Right") },
-	{ key = "UpArrow", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Up") },
-	{ key = "DownArrow", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Down") },
+	{ key = "h", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Left") },
+	{ key = "l", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Right") },
+	{ key = "k", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Up") },
+	{ key = "j", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Down") },
 
 	-- Manage panes
 	{ key = "w", mods = "CMD|SHIFT", action = wezterm.action.CloseCurrentPane({ confirm = true }) },
 	{ key = "z", mods = "CMD|SHIFT", action = wezterm.action.TogglePaneZoomState },
 
 	-- Resize panes
-	{ key = "LeftArrow", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Left", 5 }) },
-	{ key = "RightArrow", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Right", 5 }) },
-	{ key = "UpArrow", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Up", 5 }) },
-	{ key = "DownArrow", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Down", 5 }) },
+	{ key = "h", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Left", 5 }) },
+	{ key = "l", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Right", 5 }) },
+	{ key = "k", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Up", 5 }) },
+	{ key = "j", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Down", 5 }) },
 }
 
 -- CTRL+ALT + number to move tab to that position
