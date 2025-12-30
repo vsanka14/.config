@@ -146,6 +146,9 @@ return {
         ["<Leader>gu"] = { function() require("gitsigns").reset_hunk() end, desc = "Undo Stage Hunk" },
         ["]h"] = { function() require("gitsigns").nav_hunk "next" end, desc = "Next Git Hunk" },
         ["[h"] = { function() require("gitsigns").nav_hunk "prev" end, desc = "Previous Git Hunk" },
+
+        -- Screenkey toggle
+        ["<Leader>uK"] = { "<cmd>Screenkey<cr>", desc = "Toggle Screenkey" },
       },
       v = {
         -- Visual mode git operations

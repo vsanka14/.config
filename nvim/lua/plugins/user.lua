@@ -218,6 +218,14 @@ return {
     end,
   },
 
+  -- Screenkey - display keypresses on screen (for demos/recordings)
+  -- Starts off by default, toggle with <Leader>uS
+  {
+    "NStefan002/screenkey.nvim",
+    cmd = "Screenkey", -- Lazy load on command
+    version = "*",
+  },
+
   -- Show hidden files by default in Neo-tree
   {
     "nvim-neo-tree/neo-tree.nvim",
