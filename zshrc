@@ -18,3 +18,7 @@ alias tree='eza --tree --icons --color=always'
 # %F{color} sets foreground color, %K{color} sets background color, %f/%k resets
 # Uses whatever path format your system already shows but adds visual styling
 PROMPT='%K{black}%F{yellow} ▌%(!.%1~.%~) ▐%f%k %F{cyan}$ %f'
+
+# Zsh plugins
+source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
