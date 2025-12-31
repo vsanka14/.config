@@ -5,6 +5,7 @@ return {
   cmd = { "ConformInfo" },
   opts = {
     formatters_by_ft = {
+      astro = { "prettier" },
       javascript = { "prettier" },
       typescript = { "prettier" },
       javascriptreact = { "prettier" },
