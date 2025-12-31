@@ -79,14 +79,13 @@ config.background = {
 		source = {
 			File = "/Users/vasishtshankar/Documents/pics/tokyo-coffee-shop.png",
 		},
-		-- The background image will be scaled to fill the window
-		width = "100%",
-		height = "100%",
+		-- Preserve aspect ratio while filling the window (may crop edges)
+		width = "Cover",
+		height = "Cover",
 		opacity = 1.0, -- Fully opaque image
 		-- Further dim the image
 		hsb = { brightness = 0.1 },
 	},
-	-- Overlays a darker semi-transparent gradient to improve contrast
 }
 config.window_background_opacity = 1.0 -- Fully opaque window - no additional transparency
 config.macos_window_background_blur = 0 -- No blur at all - crisp, clear image
