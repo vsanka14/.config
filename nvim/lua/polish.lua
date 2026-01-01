@@ -2,6 +2,13 @@
 -- This is just pure lua so anything that doesn't
 -- fit in the normal config locations above can go here
 
+-- Auto-save when leaving insert mode
+vim.api.nvim_create_autocmd("InsertLeave", {
+  pattern = "*",
+  command = "silent! update",
+  desc = "Auto-save on leaving insert mode",
+})
+
 -- Auto-refresh Neo-tree git status when Neovim regains focus
 -- This fixes stale git status after external git operations (push, commit, etc.)
 vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "CursorHold" }, {

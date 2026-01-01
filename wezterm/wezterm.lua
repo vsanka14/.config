@@ -84,7 +84,7 @@ config.background = {
 		height = "Cover",
 		opacity = 1.0, -- Fully opaque image
 		-- Further dim the image
-		hsb = { brightness = 0.1 },
+		hsb = { brightness = 0.08 },
 	},
 }
 config.window_background_opacity = 1.0 -- Fully opaque window - no additional transparency
