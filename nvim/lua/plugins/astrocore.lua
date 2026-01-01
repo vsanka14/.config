@@ -52,8 +52,7 @@ return {
     mappings = {
       -- first key is the mode
       i = {
-        -- Insert mode mappings
-        ["jk"] = { "<Esc>", desc = "Exit insert mode" },
+        -- Insert mode mappings (better-escape.nvim handles jk/jj escape)
       },
       n = {
         -- second key is the lefthand side of the map
@@ -193,6 +192,29 @@ return {
     },
     -- Add autocmds for better markdown editing
     autocmds = {
+      -- Auto-save when leaving insert mode
+      auto_save = {
+        {
+          event = "InsertLeave",
+          pattern = "*",
+          command = "silent! update",
+          desc = "Auto-save on leaving insert mode",
+        },
+      },
+      -- Auto-refresh Neo-tree git status when Neovim regains focus
+      neotree_git_refresh = {
+        {
+          event = { "FocusGained", "BufEnter", "CursorHold" },
+          pattern = "*",
+          callback = function()
+            if package.loaded["neo-tree.sources.manager"] then
+              require("neo-tree.sources.manager").refresh "filesystem"
+            end
+          end,
+          desc = "Refresh Neo-tree git status on focus",
+        },
+      },
+      -- Markdown-specific settings
       markdown_settings = {
         {
           event = "FileType",
@@ -205,6 +227,151 @@ return {
           end,
           desc = "Set markdown-specific options for better editing",
         },
+      },
+      -- OpenCode: Track files edited by OpenCode
+      opencode_file_edited = {
+        {
+          event = "User",
+          pattern = "OpencodeEvent:file.edited",
+          callback = function(args)
+            -- Initialize storage if needed
+            _G.opencode_edited_files = _G.opencode_edited_files or {}
+            local event = args.data and args.data.event
+            if event and event.properties then
+              local filepath = event.properties.file or event.properties.path
+              if filepath then
+                filepath = vim.fn.fnamemodify(filepath, ":p")
+                _G.opencode_edited_files[filepath] = {
+                  time = os.time(),
+                  session_port = args.data.port,
+                }
+              end
+            end
+          end,
+          desc = "Track files edited by OpenCode",
+        },
+      },
+      -- OpenCode: Show notification when opening an OpenCode-edited file
+      opencode_buf_enter = {
+        {
+          event = "BufEnter",
+          callback = function(args)
+            _G.opencode_edited_files = _G.opencode_edited_files or {}
+            local filepath = vim.api.nvim_buf_get_name(args.buf)
+            if filepath == "" then return end
+
+            filepath = vim.fn.fnamemodify(filepath, ":p")
+            local edit_info = _G.opencode_edited_files[filepath]
+
+            if edit_info then
+              local seconds_ago = os.time() - edit_info.time
+              local time_str
+              if seconds_ago < 60 then
+                time_str = seconds_ago .. " seconds ago"
+              elseif seconds_ago < 3600 then
+                time_str = math.floor(seconds_ago / 60) .. " minutes ago"
+              else
+                time_str = math.floor(seconds_ago / 3600) .. " hours ago"
+              end
+
+              vim.notify(
+                "This file was modified by OpenCode " .. time_str,
+                vim.log.levels.INFO,
+                { title = "OpenCode", timeout = 3000 }
+              )
+
+              vim.fn.sign_define("OpenCodeEdited", { text = "", texthl = "DiagnosticInfo" })
+              vim.fn.sign_place(0, "opencode_signs", "OpenCodeEdited", args.buf, { lnum = 1, priority = 10 })
+            end
+          end,
+          desc = "Notify when opening OpenCode-edited files",
+        },
+      },
+      -- OpenCode: Clear tracking for a file when saved
+      opencode_buf_write = {
+        {
+          event = "BufWritePost",
+          callback = function(args)
+            _G.opencode_edited_files = _G.opencode_edited_files or {}
+            local filepath = vim.api.nvim_buf_get_name(args.buf)
+            if filepath == "" then return end
+
+            filepath = vim.fn.fnamemodify(filepath, ":p")
+            if _G.opencode_edited_files[filepath] then
+              _G.opencode_edited_files[filepath] = nil
+              vim.fn.sign_unplace("opencode_signs", { buffer = args.buf })
+              vim.notify("OpenCode change marker cleared", vim.log.levels.INFO, { title = "OpenCode", timeout = 2000 })
+            end
+          end,
+          desc = "Clear OpenCode tracking on save",
+        },
+      },
+      -- OpenCode: Track session status changes
+      opencode_session_idle = {
+        {
+          event = "User",
+          pattern = "OpencodeEvent:session.idle",
+          callback = function()
+            _G.opencode_edited_files = _G.opencode_edited_files or {}
+            local count = vim.tbl_count(_G.opencode_edited_files)
+            if count > 0 then
+              vim.notify(
+                "OpenCode finished. " .. count .. " file(s) were modified.",
+                vim.log.levels.INFO,
+                { title = "OpenCode" }
+              )
+            end
+          end,
+          desc = "Notify when OpenCode session becomes idle",
+        },
+      },
+    },
+    -- User commands
+    commands = {
+      -- List all OpenCode-edited files
+      OpencodeEdits = {
+        function()
+          _G.opencode_edited_files = _G.opencode_edited_files or {}
+          local files = {}
+          for filepath, info in pairs(_G.opencode_edited_files) do
+            local seconds_ago = os.time() - info.time
+            local time_str
+            if seconds_ago < 60 then
+              time_str = seconds_ago .. "s ago"
+            elseif seconds_ago < 3600 then
+              time_str = math.floor(seconds_ago / 60) .. "m ago"
+            else
+              time_str = math.floor(seconds_ago / 3600) .. "h ago"
+            end
+            table.insert(files, { filepath = filepath, time_str = time_str, time = info.time })
+          end
+
+          if #files == 0 then
+            vim.notify("No files have been edited by OpenCode in this session", vim.log.levels.INFO, { title = "OpenCode" })
+            return
+          end
+
+          table.sort(files, function(a, b) return a.time > b.time end)
+
+          vim.ui.select(files, {
+            prompt = "OpenCode edited files:",
+            format_item = function(item) return item.time_str .. " - " .. vim.fn.fnamemodify(item.filepath, ":~:.") end,
+          }, function(choice)
+            if choice then vim.cmd("edit " .. vim.fn.fnameescape(choice.filepath)) end
+          end)
+        end,
+        desc = "List files edited by OpenCode",
+      },
+      -- Clear all OpenCode edit tracking
+      OpencodeClearEdits = {
+        function()
+          _G.opencode_edited_files = _G.opencode_edited_files or {}
+          local count = vim.tbl_count(_G.opencode_edited_files)
+          _G.opencode_edited_files = {}
+          vim.fn.sign_unplace "opencode_signs"
+          vim.notify("Cleared " .. count .. " OpenCode edit marker(s)", vim.log.levels.INFO, { title = "OpenCode" })
+        end,
+        desc = "Clear all OpenCode edit tracking",
       },
     },
   },

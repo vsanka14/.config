@@ -78,7 +78,7 @@ return {
   },
 
   -- You can disable default plugins as follows:
-  { "max397574/better-escape.nvim", enabled = false },
+  -- { "max397574/better-escape.nvim", enabled = false },
 
   -- == GitLens-like functionality ==
   
@@ -148,12 +148,13 @@ return {
     },
   },
 
-  -- Add Astro icon support to mini.icons
+  -- Add custom icon support to mini.icons
   {
     "echasnovski/mini.icons",
     opts = {
       extension = {
         astro = { glyph = "󱓞", hl = "MiniIconsOrange" },
+        mdx = { glyph = "󰍔", hl = "MiniIconsAzure" },
       },
     },
   },
@@ -210,17 +211,7 @@ return {
   -- OpenCode AI assistant integration
   {
     "NickvanDyke/opencode.nvim",
-    dependencies = {
-      -- snacks.nvim is already configured above, just ensure input/picker/terminal are enabled
-      {
-        "folke/snacks.nvim",
-        opts = {
-          input = { enabled = true },
-          picker = { enabled = true },
-          terminal = { enabled = true },
-        },
-      },
-    },
+    -- Note: snacks.nvim is already configured by AstroNvim with input/picker/terminal enabled
     config = function()
       ---@type opencode.Opts
       vim.g.opencode_opts = {

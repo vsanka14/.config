@@ -2,32 +2,6 @@
 
 ---@type LazySpec
 return {
-  -- Add MDX icon support via mini.icons (AstroNvim's default icon provider)
-  {
-    "echasnovski/mini.icons",
-    opts = {
-      extension = {
-        mdx = { glyph = "󰍔", hl = "MiniIconsAzure" },
-      },
-    },
-  },
-
-  -- Filetype detection and treesitter config for MDX
-  {
-    "nvim-treesitter/nvim-treesitter",
-    opts = function(_, opts)
-      -- Register MDX filetype
-      vim.filetype.add({
-        extension = {
-          mdx = "mdx",
-        },
-      })
-
-      -- Use markdown parser for MDX files
-      vim.treesitter.language.register("markdown", "mdx")
-    end,
-  },
-
   -- Mason: Install MDX language server
   {
     "WhoIsSethDaniel/mason-tool-installer.nvim",
