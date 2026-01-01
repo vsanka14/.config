@@ -1,4 +1,5 @@
 -- Customize Mason
+-- NOTE: Language servers are handled by community packs (lua, typescript, astro, mdx)
 
 ---@type LazySpec
 return {
@@ -9,23 +10,14 @@ return {
     opts = {
       -- Make sure to use the names found in `:Mason`
       ensure_installed = {
-        -- install language servers
-        "lua-language-server",
-        "typescript-language-server",
-        "astro-language-server",
-        "mdx-analyzer",
-
-        -- install formatters
+        -- formatters
         "stylua",
         "prettier",
 
-        -- install linters
-        "eslint-lsp", -- eslint as LSP server
+        -- linters
+        "eslint-lsp",
 
-        -- install debuggers
-        "debugpy",
-
-        -- install any other package
+        -- utilities
         "tree-sitter-cli",
       },
     },

@@ -1,8 +1,7 @@
 
 -- AstroLSP allows you to customize the features in AstroNvim's LSP configuration engine
 -- Configuration documentation can be found with `:h astrolsp`
--- NOTE: We highly recommend setting up the Lua Language Server (`:LspInstall lua_ls`)
---       as this provides autocomplete and documentation while editing
+-- NOTE: Formatting is handled by conform.nvim (see plugins/conform.lua)
 
 ---@type LazySpec
 return {
@@ -14,20 +13,6 @@ return {
       codelens = true, -- enable/disable codelens refresh on start
       inlay_hints = false, -- enable/disable inlay hints on start
       semantic_tokens = true, -- enable/disable semantic token highlighting
-    },
-    -- customize lsp formatting options
-    formatting = {
-      -- control auto formatting on save
-      format_on_save = {
-        enabled = false, -- disabled - using conform.nvim for format on save instead
-        allow_filetypes = {},
-        ignore_filetypes = {},
-      },
-      disabled = { -- disable formatting capabilities for the listed language servers
-        -- disable lua_ls formatting capability if you want to use StyLua to format your lua code
-        -- "lua_ls",
-      },
-      timeout_ms = 1000, -- default format timeout
     },
     -- enable servers that you already have installed without mason
     servers = {
