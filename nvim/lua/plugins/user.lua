@@ -77,8 +77,22 @@ return {
     },
   },
 
-  -- You can disable default plugins as follows:
-  -- { "max397574/better-escape.nvim", enabled = false },
+  -- Configure better-escape.nvim to save on jk escape
+  {
+    "max397574/better-escape.nvim",
+    opts = {
+      timeout = vim.o.timeoutlen,
+      default_mappings = false,
+      mappings = {
+        i = {
+          j = {
+            k = "<Esc>:w<CR>",
+            j = "<Esc>",
+          },
+        },
+      },
+    },
+  },
 
   -- == GitLens-like functionality ==
   
