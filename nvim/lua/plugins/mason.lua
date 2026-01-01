@@ -13,6 +13,7 @@ return {
         "lua-language-server",
         "typescript-language-server",
         "astro-language-server",
+        "mdx-analyzer",
 
         -- install formatters
         "stylua",
