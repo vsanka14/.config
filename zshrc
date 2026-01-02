@@ -1,3 +1,6 @@
+# Add local bin to PATH (for user-installed binaries like nvim, lazygit, etc.)
+export PATH="$HOME/.local/bin:$PATH"
+
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
@@ -7,19 +10,25 @@ export LS_COLORS='di=1;34:ln=1;36:so=1;35:pi=1;33:ex=1;32:bd=1;33:cd=1;33:*.tar=
 
 export LSCOLORS='ExGxFxdaCxDaDahbadacec'
 
-# Eza aliases for colorful file listings with icons
-alias ls='eza --icons --color=always'
-alias ll='eza -lh --icons --color=always --git'
-alias la='eza -lah --icons --color=always --git'
-alias lt='eza --tree --level=2 --icons --color=always'
-alias tree='eza --tree --icons --color=always'
+# Eza aliases for colorful file listings with icons (fallback to regular ls)
+if command -v eza &> /dev/null; then
+  alias ls='eza --icons --color=always'
+  alias ll='eza -lh --icons --color=always --git'
+  alias la='eza -lah --icons --color=always --git'
+  alias lt='eza --tree --level=2 --icons --color=always'
+  alias tree='eza --tree --icons --color=always'
+else
+  alias ll='ls -lh --color=auto'
+  alias la='ls -lah --color=auto'
+fi
 
 # Colorized prompt with border and background for path
 # %F{color} sets foreground color, %K{color} sets background color, %f/%k resets
 # Uses whatever path format your system already shows but adds visual styling
 PROMPT='%K{black}%F{yellow} ▌%(!.%1~.%~) ▐%f%k %F{cyan}$ %f'
 
-# Zsh plugins
-source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-export PATH="$HOME/.local/bin:$PATH"
+# Zsh plugins (works on both macOS and Linux)
+for plugin_dir in /opt/homebrew/share ~/.local/share; do
+  [ -f "$plugin_dir/zsh-autosuggestions/zsh-autosuggestions.zsh" ] && source "$plugin_dir/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  [ -f "$plugin_dir/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ] && source "$plugin_dir/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+done
