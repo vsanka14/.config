@@ -18,18 +18,17 @@ mkdir -p ~/.local/bin
 # 1. Install Neovim (latest stable via AppImage)
 # -----------------------------------------------------------------------------
 echo "[1/6] Installing Neovim..."
-if [ -x ~/.local/bin/nvim ]; then
-    echo "  Neovim already installed, skipping..."
-else
-    curl -Lo /tmp/nvim.appimage https://github.com/neovim/neovim/releases/latest/download/nvim.appimage
-    chmod +x /tmp/nvim.appimage
-    # Extract AppImage (FUSE not always available in containers)
-    cd /tmp && ./nvim.appimage --appimage-extract > /dev/null 2>&1
-    mv /tmp/squashfs-root ~/.local/nvim-appimage
-    ln -sf ~/.local/nvim-appimage/usr/bin/nvim ~/.local/bin/nvim
-    rm /tmp/nvim.appimage
-    echo "  Neovim installed: $(~/.local/bin/nvim --version | head -1)"
-fi
+# Clean up existing installation
+rm -rf ~/.local/nvim-appimage ~/.local/bin/nvim
+# Download and install latest
+curl -Lo /tmp/nvim.appimage https://github.com/neovim/neovim/releases/latest/download/nvim.appimage
+chmod +x /tmp/nvim.appimage
+# Extract AppImage (FUSE not always available in containers)
+cd /tmp && ./nvim.appimage --appimage-extract > /dev/null 2>&1
+mv /tmp/squashfs-root ~/.local/nvim-appimage
+ln -sf ~/.local/nvim-appimage/usr/bin/nvim ~/.local/bin/nvim
+rm /tmp/nvim.appimage
+echo "  Neovim installed: $(~/.local/bin/nvim --version | head -1)"
 echo ""
 
 # -----------------------------------------------------------------------------
