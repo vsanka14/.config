@@ -14,12 +14,19 @@ return {
 
   -- == Examples of Overriding Plugins ==
 
+  -- Disable alpha-nvim (AstroNvim's default dashboard) to use snacks.nvim dashboard instead
+  {
+    "goolord/alpha-nvim",
+    enabled = false,
+  },
+
   -- customize dashboard options
   {
     "folke/snacks.nvim",
     opts = {
       lazygit = { enabled = true },
       dashboard = {
+        enabled = true, -- Explicitly enable dashboard feature
         preset = {
           header = (function()
             local headers = {
@@ -95,7 +102,7 @@ return {
   },
 
   -- == GitLens-like functionality ==
-  
+
   -- Enhanced git signs with blame and diff
   {
     "lewis6991/gitsigns.nvim",
@@ -108,6 +115,7 @@ return {
         changedelete = { text = "~" },
         untracked = { text = "┆" },
       },
+      signs_staged = nil, -- Remove deprecated field from AstroNvim defaults
       current_line_blame = true,
       current_line_blame_opts = {
         virt_text = true,
