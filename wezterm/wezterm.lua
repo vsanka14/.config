@@ -73,22 +73,7 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 	}
 end)
 
--- Background image and transparency
-config.background = {
-	{
-		source = {
-			File = "/Users/vasishtshankar/Documents/pics/tokyo-coffee-shop.png",
-		},
-		-- Preserve aspect ratio while filling the window (may crop edges)
-		width = "Cover",
-		height = "Cover",
-		opacity = 1.0, -- Fully opaque image
-		-- Further dim the image
-		hsb = { brightness = 0.08 },
-	},
-}
-config.window_background_opacity = 1.0 -- Fully opaque window - no additional transparency
-config.macos_window_background_blur = 0 -- No blur at all - crisp, clear image
+config.window_background_opacity = 0.7 -- Slightly transparent window
 config.text_background_opacity = 1.0 -- Ensure text background is opaque
 
 -- Font
@@ -133,7 +118,11 @@ config.keys = {
 	{ key = "RightArrow", mods = "OPT", action = wezterm.action.SendString("\x1bf") },
 
 	-- Split panes
-	{ key = "|", mods = "CMD|SHIFT", action = wezterm.action.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
+	{
+		key = "|",
+		mods = "CMD|SHIFT",
+		action = wezterm.action.SplitHorizontal({ domain = "CurrentPaneDomain" }),
+	},
 	{ key = "_", mods = "CMD|SHIFT", action = wezterm.action.SplitVertical({ domain = "CurrentPaneDomain" }) },
 
 	-- Navigate panes
