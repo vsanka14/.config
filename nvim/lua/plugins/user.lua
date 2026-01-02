@@ -177,6 +177,7 @@ return {
       extension = {
         astro = { glyph = "󱓞", hl = "MiniIconsOrange" },
         mdx = { glyph = "󰍔", hl = "MiniIconsAzure" },
+        hbs = { glyph = "\u{e60f}", hl = "MiniIconsOrange" },
       },
     },
   },
