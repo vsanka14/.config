@@ -77,7 +77,7 @@ config.window_background_opacity = 0.7 -- Slightly transparent window
 config.text_background_opacity = 1.0 -- Ensure text background is opaque
 
 -- Font
-config.font = wezterm.font("JetBrains Mono", { weight = "Bold" })
+config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = "Bold" })
 config.font_size = 15.0
 
 -- Window

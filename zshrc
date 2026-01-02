@@ -22,10 +22,8 @@ else
   alias la='ls -lah --color=auto'
 fi
 
-# Colorized prompt with border and background for path
-# %F{color} sets foreground color, %K{color} sets background color, %f/%k resets
-# Uses whatever path format your system already shows but adds visual styling
-PROMPT='%K{black}%F{yellow} ▌%(!.%1~.%~) ▐%f%k %F{cyan}$ %f'
+# Oh My Posh prompt (tonybaloney theme - customized)
+eval "$(oh-my-posh init zsh --config ~/.config/ohmyposh-theme.json)"
 
 # Zsh plugins (works on both macOS and Linux)
 for plugin_dir in /opt/homebrew/share ~/.local/share; do
