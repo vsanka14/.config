@@ -75,6 +75,22 @@ else
     tar xzf /tmp/eza.tar.gz -C ~/.local/bin
     rm /tmp/eza.tar.gz
 fi
+
+# opencode
+if [ -x ~/.local/bin/opencode ]; then
+    echo "  opencode already installed, skipping..."
+else
+    echo "  Installing opencode..."
+    curl -fsSL https://opencode.ai/install | bash -s -- --dest ~/.local/bin
+fi
+
+# cursor cli
+if command -v cursor &> /dev/null; then
+    echo "  cursor already installed, skipping..."
+else
+    echo "  Installing cursor..."
+    curl -fsSL https://cursor.com/install | bash
+fi
 echo ""
 
 # -----------------------------------------------------------------------------
