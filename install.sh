@@ -18,12 +18,20 @@ mkdir -p ~/.local/bin
 # 1. Install Neovim (latest stable via AppImage)
 # -----------------------------------------------------------------------------
 echo "[1/6] Installing Neovim..."
-# Clean up existing installation
 rm -rf ~/.local/nvim-appimage ~/.local/bin/nvim
-# Download and install latest
-curl -Lo /tmp/nvim.appimage https://github.com/neovim/neovim/releases/latest/download/nvim.appimage
+
+NVIM_URL="https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage"
+curl -fLo /tmp/nvim.appimage "$NVIM_URL" || { echo "Failed to download Neovim"; exit 1; }
+
+# Verify download size (should be ~10MB+)
+SIZE=$(stat -c%s /tmp/nvim.appimage 2>/dev/null || stat -f%z /tmp/nvim.appimage)
+if [ "$SIZE" -lt 1000000 ]; then
+    echo "Download failed - file too small ($SIZE bytes)"
+    cat /tmp/nvim.appimage
+    exit 1
+fi
+
 chmod +x /tmp/nvim.appimage
-# Extract AppImage (FUSE not always available in containers)
 cd /tmp && ./nvim.appimage --appimage-extract > /dev/null 2>&1
 mv /tmp/squashfs-root ~/.local/nvim-appimage
 ln -sf ~/.local/nvim-appimage/usr/bin/nvim ~/.local/bin/nvim
@@ -35,7 +43,10 @@ echo ""
 # 2. Install system packages via dnf
 # -----------------------------------------------------------------------------
 echo "[2/6] Installing system dependencies..."
-sudo dnf install -y git ripgrep fd-find zsh util-linux-user curl tar gzip
+# Try different package names for compatibility across distros
+sudo dnf install -y git ripgrep zsh curl tar gzip || true
+sudo dnf install -y fd-find || sudo dnf install -y fd || true
+sudo dnf install -y util-linux-user || true
 echo ""
 
 # -----------------------------------------------------------------------------
@@ -146,13 +157,20 @@ else
     echo "  Configuring .zshrc..."
     echo "source ~/.config/zshrc" > ~/.zshrc
 fi
+
+# Setup .bash_profile to auto-switch to zsh
+if [ -f ~/.bash_profile ] && grep -q "exec zsh" ~/.bash_profile; then
+    echo "  .bash_profile already configured, skipping..."
+else
+    echo "  Configuring .bash_profile to launch zsh..."
+    echo "exec zsh" >> ~/.bash_profile
+fi
 echo ""
 
 echo "=== Setup Complete ==="
 echo ""
 echo "Next steps:"
-echo "  1. Run 'chsh -s \$(which zsh)' to set zsh as your default shell"
-echo "  2. Start a new shell session or run 'exec zsh'"
-echo "  3. Open nvim - plugins will install automatically on first launch"
-echo "  4. Run ':Copilot auth' in nvim to authenticate GitHub Copilot"
+echo "  1. Start a new shell session (zsh will launch automatically)"
+echo "  2. Open nvim - plugins will install automatically on first launch"
+echo "  3. Run ':Copilot auth' in nvim to authenticate GitHub Copilot"
 echo ""
