@@ -230,6 +230,17 @@ return {
     },
   },
 
+  -- GitHub Copilot - disable for markdown files
+  {
+    "zbirenbaum/copilot.lua",
+    opts = {
+      filetypes = {
+        markdown = false,
+        mdx = false,
+      },
+    },
+  },
+
   -- OpenCode AI assistant integration
   {
     "NickvanDyke/opencode.nvim",
