@@ -254,6 +254,11 @@ return {
         markdown = false,
         mdx = false,
       },
+      suggestion = {
+        keymap = {
+          accept = "<C-l>",
+        },
+      },
     },
   },
 
