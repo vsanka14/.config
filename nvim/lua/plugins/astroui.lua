@@ -15,6 +15,7 @@ return {
     highlights = {
       init = { -- this table overrides highlights in all themes
         -- Normal = { bg = "#000000" },
+        NeoTreeDirectoryName = { fg = "#c9c7cd" }, -- Off-white folder names (icon stays blue)
       },
       astrodark = { -- a table of overrides/changes when applying the astrotheme theme
         -- Normal = { bg = "#000000" },
