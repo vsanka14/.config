@@ -69,9 +69,7 @@ return {
         -- mappings seen under group name "Buffer"
         ["<Leader>bb"] = {
           function()
-            require("astroui.status.heirline").buffer_picker(
-              function(bufnr) vim.api.nvim_set_current_buf(bufnr) end
-            )
+            require("astroui.status.heirline").buffer_picker(function(bufnr) vim.api.nvim_set_current_buf(bufnr) end)
           end,
           desc = "Pick buffer from tabline",
         },
@@ -166,6 +164,10 @@ return {
 
         -- Screenkey toggle
         ["<Leader>uK"] = { "<cmd>Screenkey<cr>", desc = "Toggle Screenkey" },
+
+        -- Markdown preview keymaps
+        ["<Leader>m"] = { desc = "Markdown" },
+        ["<Leader>mb"] = { "<cmd>MarkdownPreview<cr>", desc = "Browser Preview" },
       },
       v = {
         -- Visual mode git operations
