@@ -74,7 +74,7 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 end)
 
 config.window_background_opacity = 0.8 -- Slightly transparent window
-config.text_background_opacity = 1.0   -- Ensure text background is opaque
+config.text_background_opacity = 1.0 -- Ensure text background is opaque
 
 -- Font
 config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = "Bold" })
@@ -100,10 +100,10 @@ config.default_cursor_style = "BlinkingBar"
 
 -- Keybindings
 config.keys = {
-	{ key = "LeftArrow",  mods = "CMD|SHIFT", action = wezterm.action.MoveTabRelative(-1) },
+	{ key = "LeftArrow", mods = "CMD|SHIFT", action = wezterm.action.MoveTabRelative(-1) },
 	{ key = "RightArrow", mods = "CMD|SHIFT", action = wezterm.action.MoveTabRelative(1) },
-	{ key = "k",          mods = "CMD",       action = wezterm.action.ClearScrollback("ScrollbackAndViewport") },
-	{ key = "w",          mods = "CMD",       action = wezterm.action.CloseCurrentTab({ confirm = true }) },
+	{ key = "k", mods = "CMD", action = wezterm.action.ClearScrollback("ScrollbackAndViewport") },
+	{ key = "w", mods = "CMD", action = wezterm.action.CloseCurrentTab({ confirm = true }) },
 	{
 		key = "a",
 		mods = "CMD",
@@ -114,7 +114,7 @@ config.keys = {
 		end),
 	},
 	-- Option + Arrow keys for word navigation
-	{ key = "LeftArrow",  mods = "OPT", action = wezterm.action.SendString("\x1bb") },
+	{ key = "LeftArrow", mods = "OPT", action = wezterm.action.SendString("\x1bb") },
 	{ key = "RightArrow", mods = "OPT", action = wezterm.action.SendString("\x1bf") },
 
 	-- Split panes
@@ -126,20 +126,20 @@ config.keys = {
 	{ key = "_", mods = "CMD|SHIFT", action = wezterm.action.SplitVertical({ domain = "CurrentPaneDomain" }) },
 
 	-- Navigate panes
-	{ key = "h", mods = "CMD|OPT",   action = wezterm.action.ActivatePaneDirection("Left") },
-	{ key = "l", mods = "CMD|OPT",   action = wezterm.action.ActivatePaneDirection("Right") },
-	{ key = "k", mods = "CMD|OPT",   action = wezterm.action.ActivatePaneDirection("Up") },
-	{ key = "j", mods = "CMD|OPT",   action = wezterm.action.ActivatePaneDirection("Down") },
+	{ key = "h", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Left") },
+	{ key = "l", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Right") },
+	{ key = "k", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Up") },
+	{ key = "j", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Down") },
 
 	-- Manage panes
 	{ key = "w", mods = "CMD|SHIFT", action = wezterm.action.CloseCurrentPane({ confirm = true }) },
 	{ key = "z", mods = "CMD|SHIFT", action = wezterm.action.TogglePaneZoomState },
 
 	-- Resize panes
-	{ key = "h", mods = "CMD|CTRL",  action = wezterm.action.AdjustPaneSize({ "Left", 5 }) },
-	{ key = "l", mods = "CMD|CTRL",  action = wezterm.action.AdjustPaneSize({ "Right", 5 }) },
-	{ key = "k", mods = "CMD|CTRL",  action = wezterm.action.AdjustPaneSize({ "Up", 5 }) },
-	{ key = "j", mods = "CMD|CTRL",  action = wezterm.action.AdjustPaneSize({ "Down", 5 }) },
+	{ key = "h", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Left", 5 }) },
+	{ key = "l", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Right", 5 }) },
+	{ key = "k", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Up", 5 }) },
+	{ key = "j", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Down", 5 }) },
 }
 
 -- CTRL+ALT + number to move tab to that position
