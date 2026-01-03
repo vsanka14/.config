@@ -63,6 +63,8 @@ return {
         -- navigate buffer tabs
         ["]b"] = { function() require("astrocore.buffer").nav(vim.v.count1) end, desc = "Next buffer" },
         ["[b"] = { function() require("astrocore.buffer").nav(-vim.v.count1) end, desc = "Previous buffer" },
+        ["<Leader>bn"] = { function() require("astrocore.buffer").nav(vim.v.count1) end, desc = "Next buffer" },
+        ["<Leader>bp"] = { function() require("astrocore.buffer").nav(-vim.v.count1) end, desc = "Previous buffer" },
 
         -- mappings seen under group name "Buffer"
         ["<Leader>bd"] = {
@@ -128,7 +130,12 @@ return {
           desc = "Add tests",
         },
         ["<Leader>ag"] = {
-          function() require("opencode").prompt("Review the following git diff for correctness and readability: @diff", { submit = true }) end,
+          function()
+            require("opencode").prompt(
+              "Review the following git diff for correctness and readability: @diff",
+              { submit = true }
+            )
+          end,
           desc = "Review git diff",
         },
 
@@ -347,7 +354,11 @@ return {
           end
 
           if #files == 0 then
-            vim.notify("No files have been edited by OpenCode in this session", vim.log.levels.INFO, { title = "OpenCode" })
+            vim.notify(
+              "No files have been edited by OpenCode in this session",
+              vim.log.levels.INFO,
+              { title = "OpenCode" }
+            )
             return
           end
 
