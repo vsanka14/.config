@@ -67,6 +67,14 @@ return {
         ["<Leader>bp"] = { function() require("astrocore.buffer").nav(-vim.v.count1) end, desc = "Previous buffer" },
 
         -- mappings seen under group name "Buffer"
+        ["<Leader>bb"] = {
+          function()
+            require("astroui.status.heirline").buffer_picker(
+              function(bufnr) vim.api.nvim_set_current_buf(bufnr) end
+            )
+          end,
+          desc = "Pick buffer from tabline",
+        },
         ["<Leader>bd"] = {
           function()
             require("astroui.status.heirline").buffer_picker(
