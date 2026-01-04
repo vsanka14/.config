@@ -12,6 +12,7 @@ return {
   { import = "astrocommunity.pack.typescript" },
   { import = "astrocommunity.pack.astro" },
   { import = "astrocommunity.pack.mdx" },
+  { import = "astrocommunity.pack.java" },
   -- UI customizations
   { import = "astrocommunity.recipes.heirline-mode-text-statusline" },
   -- Git plugins configured in plugins/user.lua with custom options
