@@ -1,4 +1,3 @@
-
 -- AstroLSP allows you to customize the features in AstroNvim's LSP configuration engine
 -- Configuration documentation can be found with `:h astrolsp`
 -- NOTE: Formatting is handled by conform.nvim (see plugins/conform.lua)
@@ -30,6 +29,7 @@ return {
         settings = {
           typescript = {
             tsserver = {
+              -- set memory limit to 8gb to prevent crashes on large projects
               maxTsServerMemory = 8192,
             },
           },
