@@ -93,7 +93,13 @@ return {
       mappings = {
         i = {
           j = {
-            k = "<Esc>:w<CR>",
+            k = "<Esc>",
+            j = "<Esc>",
+          },
+        },
+        v = {
+          j = {
+            k = "<Esc>",
             j = "<Esc>",
           },
         },

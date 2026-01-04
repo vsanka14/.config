@@ -207,15 +207,6 @@ return {
     },
     -- Add autocmds for better markdown editing
     autocmds = {
-      -- Auto-save when leaving insert mode
-      auto_save = {
-        {
-          event = "InsertLeave",
-          pattern = "*",
-          command = "silent! update",
-          desc = "Auto-save on leaving insert mode",
-        },
-      },
       -- Auto-refresh Neo-tree git status when Neovim regains focus
       neotree_git_refresh = {
         {
