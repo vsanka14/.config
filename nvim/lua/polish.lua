@@ -7,11 +7,11 @@
 -- ============================================================================
 -- Register MDX filetype and use markdown parser for syntax highlighting
 
-vim.filetype.add({
+vim.filetype.add {
   extension = {
     mdx = "mdx",
   },
-})
+}
 
 -- Use markdown treesitter parser for MDX files
 vim.treesitter.language.register("markdown", "mdx")
@@ -31,31 +31,31 @@ vim.api.nvim_create_autocmd("ColorScheme", {
   pattern = "*",
   callback = function()
     -- Comments
-    italicize("Comment")
+    italicize "Comment"
 
     -- Keywords
-    italicize("@keyword")
-    italicize("@keyword.return")
-    italicize("@keyword.function")
-    italicize("@keyword.operator")
-    italicize("@keyword.conditional")
-    italicize("@keyword.repeat")
-    italicize("@keyword.import")
+    italicize "@keyword"
+    italicize "@keyword.return"
+    italicize "@keyword.function"
+    italicize "@keyword.operator"
+    italicize "@keyword.conditional"
+    italicize "@keyword.repeat"
+    italicize "@keyword.import"
 
     -- this/self
-    italicize("@variable.builtin")
+    italicize "@variable.builtin"
   end,
 })
 
 -- Also apply immediately for the current session
 vim.defer_fn(function()
-  italicize("Comment")
-  italicize("@keyword")
-  italicize("@keyword.return")
-  italicize("@keyword.function")
-  italicize("@keyword.operator")
-  italicize("@keyword.conditional")
-  italicize("@keyword.repeat")
-  italicize("@keyword.import")
-  italicize("@variable.builtin")
+  italicize "Comment"
+  italicize "@keyword"
+  italicize "@keyword.return"
+  italicize "@keyword.function"
+  italicize "@keyword.operator"
+  italicize "@keyword.conditional"
+  italicize "@keyword.repeat"
+  italicize "@keyword.import"
+  italicize "@variable.builtin"
 end, 0)
