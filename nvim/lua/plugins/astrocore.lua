@@ -64,29 +64,6 @@ return {
         ["<Leader>bn"] = { function() require("astrocore.buffer").nav(vim.v.count1) end, desc = "Next buffer" },
         ["<Leader>bp"] = { function() require("astrocore.buffer").nav(-vim.v.count1) end, desc = "Previous buffer" },
 
-        -- mappings seen under group name "Buffer"
-        ["<Leader>bb"] = {
-          function()
-            require("astroui.status.heirline").buffer_picker(function(bufnr) vim.api.nvim_set_current_buf(bufnr) end)
-          end,
-          desc = "Pick buffer from tabline",
-        },
-        ["<Leader>bd"] = {
-          function()
-            require("astroui.status.heirline").buffer_picker(
-              function(bufnr) require("astrocore.buffer").close(bufnr) end
-            )
-          end,
-          desc = "Close buffer from tabline",
-        },
-
-        -- tables with just a `desc` key will be registered with which-key if it's installed
-        -- this is useful for naming menus
-        -- ["<Leader>b"] = { desc = "Buffers" },
-
-        -- setting a mapping to false will disable it
-        -- ["<C-S>"] = false,
-
         -- OpenCode AI assistant keymaps
         ["<Leader>a"] = { desc = "AI (OpenCode)" },
         ["<Leader>aa"] = {
