@@ -15,6 +15,7 @@ return {
       "tsx",
       "javascript",
       "typescript",
+      "glimmer",
     },
     matchup = {
       enable = true, -- Enable treesitter integration for vim-matchup
