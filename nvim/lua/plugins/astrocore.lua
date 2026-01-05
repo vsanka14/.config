@@ -184,6 +184,71 @@ return {
     },
     -- Add autocmds for better markdown editing
     autocmds = {
+      glimmer_unicode_fix = {
+        -- Read: convert unicode escapes to actual characters on load to prevent glimmer treesitter from breaking
+        {
+          event = { "BufReadPost", "BufNewFile" },
+          pattern = { "*.glimmer", "*.hbs", "*.handlebars" },
+          callback = function(args)
+            local bufnr = args.buf
+
+            -- Define your unicode escape -> character mappings here
+            local unicode_map = {
+              ["\\u2019"] = "'", -- Right single quotation mark
+              -- Add more mappings below as needed:
+              -- ["\\u2018"] = "'",  -- Left single quotation mark
+              -- ["\\u201C"] = '"',  -- Left double quotation mark
+              -- ["\\u201D"] = '"',  -- Right double quotation mark
+              -- ["\\u2013"] = "–",  -- En dash
+              -- ["\\u2014"] = "—",  -- Em dash
+            }
+
+            -- Get all lines
+            local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+            local modified = false
+
+            -- Replace unicode escapes
+            for i, line in ipairs(lines) do
+              local new_line = line
+              for unicode, char in pairs(unicode_map) do
+                new_line = new_line:gsub(unicode, char)
+              end
+              if new_line ~= line then
+                lines[i] = new_line
+                modified = true
+              end
+            end
+
+            -- Update buffer if changes were made
+            if modified then vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines) end
+            vim.notify(
+              "Replaced unicode escapes with actual characters to prevent glimmer treesitter from breaking",
+              vim.log.levels.INFO
+            )
+          end,
+        },
+        -- Write: convert characters back to unicode escapes on save to preserve original file content
+        {
+          event = "BufWritePre",
+          pattern = { "*.glimmer", "*.hbs", "*.handlebars" },
+          callback = function(args)
+            local bufnr = args.buf
+            local reverse_map = { ["'"] = "\\u2019" }
+
+            local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+
+            for i, line in ipairs(lines) do
+              local new_line = line
+              for char, unicode in pairs(reverse_map) do
+                new_line = new_line:gsub(char, unicode)
+              end
+              lines[i] = new_line
+            end
+
+            vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+          end,
+        },
+      },
       -- Auto-refresh Neo-tree git status when Neovim regains focus
       neotree_git_refresh = {
         {
