@@ -211,16 +211,20 @@ return {
         -- Unicode escape -> character mappings
         _unicode_to_char = {
           ["\\u2019"] = "'", -- Right single quotation mark
+          ["\\u201C"] = '"', -- Left double quotation mark
+          ["\\u201c"] = '"', -- Left double quotation mark (lowercase)
           ["\\u201D"] = '"', -- Right double quotation mark
+          ["\\u201d"] = '"', -- Right double quotation mark (lowercase)
+          ["\\u0022"] = '"', -- Straight double quotation mark
+          ["\\u0026"] = "&", -- Ampersand
           -- Add more mappings below as needed:
           -- ["\\u2018"] = "'",  -- Left single quotation mark
-          -- ["\\u201C"] = '"',  -- Left double quotation mark
           -- ["\\u2013"] = "–",  -- En dash
           -- ["\\u2014"] = "—",  -- Em dash
         },
 
         -- Character -> unicode escape mappings (reverse)
-        _char_to_unicode = { ["'"] = "\\u2019", ['"'] = "\\u201D" },
+        _char_to_unicode = { ["'"] = "\\u2019", ['"'] = "\\u0022", ["&"] = "\\u0026" },
 
         -- Read: convert unicode escapes to actual characters on load to prevent glimmer treesitter from breaking
         -- Only affects the first quoted string in t-def, NOT doc="..." values
