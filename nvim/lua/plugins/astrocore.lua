@@ -185,67 +185,80 @@ return {
     -- Add autocmds for better markdown editing
     autocmds = {
       glimmer_unicode_fix = {
+        -- Helper function to replace characters in t-def first quoted string only
+        -- This handles multiline t-def blocks and ignores doc="..." attributes
+        _replace_in_tdef = function(bufnr, char_map, notify_msg)
+          local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+          local content = table.concat(lines, "\n")
+
+          local new_content = content:gsub('({{t%-def%s+")(.-)(")', function(prefix, str_content, suffix)
+            local replaced_content = str_content
+            for from, to in pairs(char_map) do
+              replaced_content = replaced_content:gsub(from, to)
+            end
+            return prefix .. replaced_content .. suffix
+          end)
+
+          if new_content ~= content then
+            local new_lines = vim.split(new_content, "\n", { plain = true })
+            vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, new_lines)
+            if notify_msg then vim.notify(notify_msg, vim.log.levels.INFO) end
+            return true
+          end
+          return false
+        end,
+
+        -- Unicode escape -> character mappings
+        _unicode_to_char = {
+          ["\\u2019"] = "'", -- Right single quotation mark
+          -- Add more mappings below as needed:
+          -- ["\\u2018"] = "'",  -- Left single quotation mark
+          -- ["\\u201C"] = '"',  -- Left double quotation mark
+          -- ["\\u201D"] = '"',  -- Right double quotation mark
+          -- ["\\u2013"] = "–",  -- En dash
+          -- ["\\u2014"] = "—",  -- Em dash
+        },
+
+        -- Character -> unicode escape mappings (reverse)
+        _char_to_unicode = { ["'"] = "\\u2019" },
+
         -- Read: convert unicode escapes to actual characters on load to prevent glimmer treesitter from breaking
+        -- Only affects the first quoted string in t-def, NOT doc="..." values
         {
           event = { "BufReadPost", "BufNewFile" },
           pattern = { "*.glimmer", "*.hbs", "*.handlebars" },
           callback = function(args)
-            local bufnr = args.buf
-
-            -- Define your unicode escape -> character mappings here
-            local unicode_map = {
-              ["\\u2019"] = "'", -- Right single quotation mark
-              -- Add more mappings below as needed:
-              -- ["\\u2018"] = "'",  -- Left single quotation mark
-              -- ["\\u201C"] = '"',  -- Left double quotation mark
-              -- ["\\u201D"] = '"',  -- Right double quotation mark
-              -- ["\\u2013"] = "–",  -- En dash
-              -- ["\\u2014"] = "—",  -- Em dash
-            }
-
-            -- Get all lines
-            local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-            local modified = false
-
-            -- Replace unicode escapes
-            for i, line in ipairs(lines) do
-              local new_line = line
-              for unicode, char in pairs(unicode_map) do
-                new_line = new_line:gsub(unicode, char)
-              end
-              if new_line ~= line then
-                lines[i] = new_line
-                modified = true
-              end
-            end
-
-            -- Update buffer if changes were made
-            if modified then vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines) end
-            vim.notify(
-              "Replaced unicode escapes with actual characters to prevent glimmer treesitter from breaking",
-              vim.log.levels.INFO
+            local autocmds = require("astrocore").config.autocmds.glimmer_unicode_fix
+            autocmds._replace_in_tdef(
+              args.buf,
+              autocmds._unicode_to_char,
+              "Replaced unicode escapes with actual characters"
             )
           end,
         },
         -- Write: convert characters back to unicode escapes on save to preserve original file content
+        -- Only affects the first quoted string in t-def, NOT doc="..." values
         {
           event = "BufWritePre",
           pattern = { "*.glimmer", "*.hbs", "*.handlebars" },
           callback = function(args)
-            local bufnr = args.buf
-            local reverse_map = { ["'"] = "\\u2019" }
-
-            local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-
-            for i, line in ipairs(lines) do
-              local new_line = line
-              for char, unicode in pairs(reverse_map) do
-                new_line = new_line:gsub(char, unicode)
-              end
-              lines[i] = new_line
-            end
-
-            vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+            local autocmds = require("astrocore").config.autocmds.glimmer_unicode_fix
+            autocmds._replace_in_tdef(args.buf, autocmds._char_to_unicode, nil)
+          end,
+        },
+        -- Post-write: restore buffer to treesitter-friendly state (unicode escapes -> actual chars)
+        -- This runs after the file is saved, so the file on disk has unicode escapes,
+        -- but the buffer displays actual characters for proper treesitter highlighting
+        {
+          event = "BufWritePost",
+          pattern = { "*.glimmer", "*.hbs", "*.handlebars" },
+          callback = function(args)
+            local autocmds = require("astrocore").config.autocmds.glimmer_unicode_fix
+            autocmds._replace_in_tdef(
+              args.buf,
+              autocmds._unicode_to_char,
+              "Restored unicode escapes to actual characters"
+            )
           end,
         },
       },
