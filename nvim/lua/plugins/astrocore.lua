@@ -184,6 +184,9 @@ return {
     },
     -- Add autocmds for better markdown editing
     autocmds = {
+      -- Glimmer treesitter breaks on certain unicode characters in Ember.js .hbs files
+      --  This set of autocmds will convert those unicode escapes to actual characters on buffer load,
+      --  then convert them back to unicode escapes on save to preserve original file content.
       glimmer_unicode_fix = {
         -- Helper function to replace characters in t-def first quoted string only
         -- This handles multiline t-def blocks and ignores doc="..." attributes
@@ -217,10 +220,6 @@ return {
           ["\\u201d"] = '"', -- Right double quotation mark (lowercase)
           ["\\u0022"] = '"', -- Straight double quotation mark
           ["\\u0026"] = "&", -- Ampersand
-          -- Add more mappings below as needed:
-          -- ["\\u2018"] = "'",  -- Left single quotation mark
-          -- ["\\u2013"] = "–",  -- En dash
-          -- ["\\u2014"] = "—",  -- Em dash
         },
 
         -- Character -> unicode escape mappings (reverse)
