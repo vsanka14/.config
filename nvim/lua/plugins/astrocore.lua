@@ -226,7 +226,7 @@ return {
         -- Only affects the first quoted string in t-def, NOT doc="..." values
         {
           event = { "BufReadPost", "BufNewFile" },
-          pattern = { "*.glimmer", "*.hbs", "*.handlebars" },
+          pattern = { "*.hbs" },
           callback = function(args)
             local autocmds = require("astrocore").config.autocmds.glimmer_unicode_fix
             autocmds._replace_in_tdef(
@@ -240,7 +240,7 @@ return {
         -- Only affects the first quoted string in t-def, NOT doc="..." values
         {
           event = "BufWritePre",
-          pattern = { "*.glimmer", "*.hbs", "*.handlebars" },
+          pattern = { "*.hbs" },
           callback = function(args)
             local autocmds = require("astrocore").config.autocmds.glimmer_unicode_fix
             autocmds._replace_in_tdef(args.buf, autocmds._char_to_unicode, nil)
@@ -251,7 +251,7 @@ return {
         -- but the buffer displays actual characters for proper treesitter highlighting
         {
           event = "BufWritePost",
-          pattern = { "*.glimmer", "*.hbs", "*.handlebars" },
+          pattern = { "*.hbs" },
           callback = function(args)
             local autocmds = require("astrocore").config.autocmds.glimmer_unicode_fix
             autocmds._replace_in_tdef(
