@@ -84,29 +84,6 @@ return {
     },
   },
 
-  -- Configure better-escape.nvim to save on jk escape
-  {
-    "max397574/better-escape.nvim",
-    opts = {
-      timeout = vim.o.timeoutlen,
-      default_mappings = false,
-      mappings = {
-        i = {
-          j = {
-            k = "<Esc>",
-            j = "<Esc>",
-          },
-        },
-        v = {
-          j = {
-            k = "<Esc>",
-            j = "<Esc>",
-          },
-        },
-      },
-    },
-  },
-
   -- == GitLens-like functionality ==
 
   -- Enhanced git signs with blame and diff
