@@ -84,8 +84,6 @@ return {
     },
   },
 
-  -- == GitLens-like functionality ==
-
   -- Enhanced git signs with blame and diff
   {
     "lewis6991/gitsigns.nvim",
@@ -305,6 +303,7 @@ return {
     end,
   },
 
+  -- nvim-autopairs with custom rules
   {
     "windwp/nvim-autopairs",
     config = function(plugin, opts)
@@ -333,5 +332,66 @@ return {
         Rule("a", "a", "-vim")
       )
     end,
+  },
+
+  -- Disable blink.cmp completion for markdown and text files
+  {
+    "saghen/blink.cmp",
+    opts = {
+      sources = {
+        default = { "lsp", "path", "snippets", "buffer" },
+        per_filetype = {
+          markdown = {}, -- No completion sources for markdown
+          mdx = {}, -- No completion sources for MDX files
+          text = {}, -- No completion sources for text files
+        },
+      },
+    },
+  },
+
+  -- Markdown, HTML, LaTeX, Typst & YAML previewer
+  {
+    "OXY2DEV/markview.nvim",
+    lazy = false, -- Don't lazy load - plugin is already lazy-loaded internally
+  },
+
+  -- Conform.nvim for code formatting
+  {
+    "stevearc/conform.nvim",
+    event = { "BufWritePre" },
+    cmd = { "ConformInfo" },
+    opts = {
+      formatters_by_ft = {
+        astro = { "prettier" },
+        javascript = { "prettier" },
+        typescript = { "prettier" },
+        javascriptreact = { "prettier" },
+        typescriptreact = { "prettier" },
+        css = { "prettier" },
+        html = { "prettier" },
+        json = { "prettier" },
+        yaml = { "prettier" },
+        markdown = { "prettier" },
+        mdx = { "prettier" },
+        handlebars = { "prettier" },
+        lua = { "stylua" },
+        gitignore = { "trim_whitespace" },
+      },
+      formatters = {
+        prettier = {
+          -- Use project-local prettier if available, otherwise fall back to Mason's prettier
+          command = require("conform.util").from_node_modules "prettier",
+          prepend_args = function(self, ctx)
+            -- Use glimmer parser for .hbs files
+            if vim.fn.expand "%:e" == "hbs" then return { "--parser", "glimmer" } end
+            return {}
+          end,
+        },
+      },
+      format_on_save = {
+        timeout_ms = 1000,
+        lsp_fallback = false,
+      },
+    },
   },
 }
