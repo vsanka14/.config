@@ -19,6 +19,7 @@ return {
       current_job = nil, -- current running job
       loading_notif_id = nil, -- loading notification ID for dismissal
       start_time = nil, -- query start time for elapsed calculation
+      source_dir = nil, -- directory of the SQL file that started the query
     }
 
     -- Temp files
@@ -217,14 +218,14 @@ return {
     -- Results Saving
     -- ============================================================================
 
-    --- Get results directory path (./results/ relative to current buffer's directory)
+    --- Get results directory path (./results/ relative to source SQL file's directory)
     ---@return string
     local function get_results_dir()
-      local buf_path = vim.fn.expand "%:p:h"
-      if buf_path == "" then
-        buf_path = vim.fn.getcwd()
+      local base_path = trino_state.source_dir
+      if not base_path or base_path == "" then
+        base_path = vim.fn.getcwd()
       end
-      return buf_path .. "/results"
+      return base_path .. "/results"
     end
 
     --- Clear all existing CSV files in results directory
@@ -367,6 +368,12 @@ return {
         return
       end
 
+      -- Store the source directory (where the SQL file is)
+      trino_state.source_dir = vim.fn.expand "%:p:h"
+      if trino_state.source_dir == "" then
+        trino_state.source_dir = vim.fn.getcwd()
+      end
+
       -- Write query to temp file
       if not write_file(query_file, sql) then
         vim.notify("Failed to write query file", vim.log.levels.ERROR, { title = "Trino" })
@@ -378,73 +385,67 @@ return {
       write_file(stderr_file, "")
       clear_results_dir()
 
-      -- Step 1: Prompt for password
-      vim.ui.input({
-        prompt = "Trino [" .. trino_state.cluster .. "] - Password: ",
-      }, function(password)
-        if not password or password == "" then
-          vim.notify("Query cancelled - no password provided", vim.log.levels.WARN, { title = "Trino" })
-          return
-        end
+      -- Step 1: Prompt for password (masked input)
+      local password = vim.fn.inputsecret("Trino [" .. trino_state.cluster .. "] - Password: ")
+      if not password or password == "" then
+        vim.notify("Query cancelled - no password provided", vim.log.levels.WARN, { title = "Trino" })
+        return
+      end
 
-        -- Step 2: Prompt for OTP
-        vim.ui.input({
-          prompt = "Trino [" .. trino_state.cluster .. "] - OTP: ",
-        }, function(otp)
-          if not otp or otp == "" then
-            vim.notify("Query cancelled - no OTP provided", vim.log.levels.WARN, { title = "Trino" })
-            return
-          end
+      -- Step 2: Prompt for OTP (masked input)
+      local otp = vim.fn.inputsecret("Trino [" .. trino_state.cluster .. "] - OTP: ")
+      if not otp or otp == "" then
+        vim.notify("Query cancelled - no OTP provided", vim.log.levels.WARN, { title = "Trino" })
+        return
+      end
 
-          -- Record start time
-          trino_state.start_time = vim.loop.hrtime()
+      -- Record start time
+      trino_state.start_time = vim.loop.hrtime()
 
-          -- Show loading notification
-          show_loading_notification()
+      -- Show loading notification
+      show_loading_notification()
 
-          -- Build command (use CSV_HEADER output format)
-          local cmd = {
-            "sh",
-            "-c",
-            string.format(
-              "trino query -c %s -f %s --output-format CSV_HEADER > %s 2>%s",
-              trino_state.cluster,
-              query_file,
-              raw_output_file,
-              stderr_file
-            ),
-          }
+      -- Build command (use CSV_HEADER output format)
+      local cmd = {
+        "sh",
+        "-c",
+        string.format(
+          "trino query -c %s -f %s --output-format CSV_HEADER > %s 2>%s",
+          trino_state.cluster,
+          query_file,
+          raw_output_file,
+          stderr_file
+        ),
+      }
 
-          -- Start job
-          local job_id = vim.fn.jobstart(cmd, {
-            stdin = "pipe",
-            on_exit = function(_, exit_code, _)
-              vim.schedule(function()
-                -- Dismiss loading notification first
-                dismiss_loading_notification()
-
-                trino_state.current_job = nil
-
-                -- Open results
-                open_results()
-              end)
-            end,
-          })
-
-          if job_id <= 0 then
+      -- Start job
+      local job_id = vim.fn.jobstart(cmd, {
+        stdin = "pipe",
+        on_exit = function(_, exit_code, _)
+          vim.schedule(function()
+            -- Dismiss loading notification first
             dismiss_loading_notification()
-            vim.notify("Failed to start Trino query", vim.log.levels.ERROR, { title = "Trino" })
-            return
-          end
 
-          trino_state.current_job = job_id
+            trino_state.current_job = nil
 
-          -- Send password and OTP to stdin (each on separate line)
-          vim.fn.chansend(job_id, password .. "\n")
-          vim.fn.chansend(job_id, otp .. "\n")
-          vim.fn.chanclose(job_id, "stdin")
-        end)
-      end)
+            -- Open results
+            open_results()
+          end)
+        end,
+      })
+
+      if job_id <= 0 then
+        dismiss_loading_notification()
+        vim.notify("Failed to start Trino query", vim.log.levels.ERROR, { title = "Trino" })
+        return
+      end
+
+      trino_state.current_job = job_id
+
+      -- Send password and OTP to stdin (each on separate line)
+      vim.fn.chansend(job_id, password .. "\n")
+      vim.fn.chansend(job_id, otp .. "\n")
+      vim.fn.chanclose(job_id, "stdin")
     end
 
     -- ============================================================================
