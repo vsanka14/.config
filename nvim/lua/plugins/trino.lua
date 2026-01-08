@@ -20,7 +20,14 @@ return {
       loading_notif_id = nil, -- loading notification ID for dismissal
       start_time = nil, -- query start time for elapsed calculation
       source_dir = nil, -- directory of the SQL file that started the query
+      -- Credential cache (5-minute TTL)
+      cached_password = nil,
+      cached_otp = nil,
+      cache_timestamp = nil,
     }
+
+    -- Credential cache TTL in seconds
+    local CREDENTIAL_CACHE_TTL = 300 -- 5 minutes
 
     -- Temp files
     local query_file = "/tmp/trino_query.sql"
@@ -49,6 +56,63 @@ return {
         return content
       end
       return nil
+    end
+
+    -- ============================================================================
+    -- Credential Caching
+    -- ============================================================================
+
+    --- Check if cached credentials are still valid
+    ---@return boolean
+    local function is_cache_valid()
+      if not trino_state.cached_password or not trino_state.cached_otp or not trino_state.cache_timestamp then
+        return false
+      end
+      local elapsed = os.time() - trino_state.cache_timestamp
+      return elapsed < CREDENTIAL_CACHE_TTL
+    end
+
+    --- Get credentials (from cache or prompt user)
+    ---@return string|nil password
+    ---@return string|nil otp
+    local function get_credentials()
+      -- Check if we have valid cached credentials
+      if is_cache_valid() then
+        local remaining = CREDENTIAL_CACHE_TTL - (os.time() - trino_state.cache_timestamp)
+        vim.notify(
+          string.format("Using cached credentials (%ds remaining)", remaining),
+          vim.log.levels.INFO,
+          { title = "Trino" }
+        )
+        return trino_state.cached_password, trino_state.cached_otp
+      end
+
+      -- Prompt for password
+      local password = vim.fn.inputsecret("Trino [" .. trino_state.cluster .. "] - Password: ")
+      if not password or password == "" then
+        return nil, nil
+      end
+
+      -- Prompt for OTP
+      local otp = vim.fn.inputsecret("Trino [" .. trino_state.cluster .. "] - OTP: ")
+      if not otp or otp == "" then
+        return nil, nil
+      end
+
+      -- Cache the credentials
+      trino_state.cached_password = password
+      trino_state.cached_otp = otp
+      trino_state.cache_timestamp = os.time()
+
+      return password, otp
+    end
+
+    --- Clear cached credentials
+    local function clear_credential_cache()
+      trino_state.cached_password = nil
+      trino_state.cached_otp = nil
+      trino_state.cache_timestamp = nil
+      vim.notify("Credential cache cleared", vim.log.levels.INFO, { title = "Trino" })
     end
 
     -- ============================================================================
@@ -385,17 +449,10 @@ return {
       write_file(stderr_file, "")
       clear_results_dir()
 
-      -- Step 1: Prompt for password (masked input)
-      local password = vim.fn.inputsecret("Trino [" .. trino_state.cluster .. "] - Password: ")
-      if not password or password == "" then
-        vim.notify("Query cancelled - no password provided", vim.log.levels.WARN, { title = "Trino" })
-        return
-      end
-
-      -- Step 2: Prompt for OTP (masked input)
-      local otp = vim.fn.inputsecret("Trino [" .. trino_state.cluster .. "] - OTP: ")
-      if not otp or otp == "" then
-        vim.notify("Query cancelled - no OTP provided", vim.log.levels.WARN, { title = "Trino" })
+      -- Get credentials (from cache or prompt)
+      local password, otp = get_credentials()
+      if not password or not otp then
+        vim.notify("Query cancelled - credentials not provided", vim.log.levels.WARN, { title = "Trino" })
         return
       end
 
@@ -421,7 +478,7 @@ return {
       -- Start job
       local job_id = vim.fn.jobstart(cmd, {
         stdin = "pipe",
-        on_exit = function(_, exit_code, _)
+        on_exit = function()
           vim.schedule(function()
             -- Dismiss loading notification first
             dismiss_loading_notification()
@@ -499,6 +556,25 @@ return {
       end
     end
 
+    local function trino_cancel()
+      if not trino_state.current_job then
+        vim.notify("No running query to cancel", vim.log.levels.WARN, { title = "Trino" })
+        return
+      end
+
+      -- Stop the job
+      vim.fn.jobstop(trino_state.current_job)
+      trino_state.current_job = nil
+
+      -- Dismiss loading notification
+      dismiss_loading_notification()
+
+      -- Clear timing
+      trino_state.start_time = nil
+
+      vim.notify("Query cancelled", vim.log.levels.INFO, { title = "Trino" })
+    end
+
     -- ============================================================================
     -- Register Commands and Keymaps
     -- ============================================================================
@@ -520,9 +596,37 @@ return {
       end,
       desc = "Set Trino cluster (holdem, war, faro)",
     }
+    opts.commands.TrinoCancel = {
+      trino_cancel,
+      desc = "Cancel running Trino query",
+    }
+    opts.commands.TrinoClearCache = {
+      clear_credential_cache,
+      desc = "Clear cached Trino credentials",
+    }
 
-    -- Register autocmds for SQL filetype keymaps
+    -- ============================================================================
+    -- Temp File Cleanup
+    -- ============================================================================
+
+    local function cleanup_temp_files()
+      vim.fn.delete(query_file)
+      vim.fn.delete(raw_output_file)
+      vim.fn.delete(stderr_file)
+    end
+
+    -- Register autocmds for SQL filetype keymaps and cleanup
     opts.autocmds = opts.autocmds or {}
+
+    -- Cleanup temp files on Neovim exit
+    opts.autocmds.trino_cleanup = {
+      {
+        event = "VimLeavePre",
+        callback = cleanup_temp_files,
+        desc = "Clean up Trino temp files on exit",
+      },
+    }
+
     opts.autocmds.trino_sql_keymaps = {
       {
         event = "FileType",
@@ -553,17 +657,27 @@ return {
             buffer = bufnr,
             desc = "Trino: Change cluster",
           })
+
+          -- <Leader>qx - Cancel running query
+          vim.keymap.set("n", "<Leader>qx", trino_cancel, {
+            buffer = bufnr,
+            desc = "Trino: Cancel query",
+          })
+
+          -- Add which-key group description (buffer-local)
+          -- This creates a "placeholder" mapping that which-key will pick up as a group
+          vim.keymap.set("n", "<Leader>q", function() end, {
+            buffer = bufnr,
+            desc = "Query (Trino)",
+          })
+          vim.keymap.set("v", "<Leader>q", function() end, {
+            buffer = bufnr,
+            desc = "Query (Trino)",
+          })
         end,
         desc = "Set up Trino keymaps for SQL files",
       },
     }
-
-    -- Add which-key group description
-    opts.mappings = opts.mappings or {}
-    opts.mappings.n = opts.mappings.n or {}
-    opts.mappings.n["<Leader>q"] = { desc = "Query (Trino)" }
-    opts.mappings.v = opts.mappings.v or {}
-    opts.mappings.v["<Leader>q"] = { desc = "Query (Trino)" }
 
     return opts
   end,
