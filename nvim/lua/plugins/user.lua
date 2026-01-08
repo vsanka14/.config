@@ -165,20 +165,6 @@ return {
     },
   },
 
-  -- Markdown preview in terminal using glow
-  {
-    "ellisonleao/glow.nvim",
-    cmd = "Glow",
-    ft = { "markdown", "mdx" },
-    opts = {
-      border = "rounded",
-      width_ratio = 0.8,
-      height_ratio = 0.8,
-      width = 120,
-      height = 100,
-    },
-  },
-
   -- Browser-based markdown preview (live reload)
   {
     "iamcco/markdown-preview.nvim",
