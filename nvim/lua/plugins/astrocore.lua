@@ -64,6 +64,12 @@ return {
         ["<Leader>bn"] = { function() require("astrocore.buffer").nav(vim.v.count1) end, desc = "Next buffer" },
         ["<Leader>bp"] = { function() require("astrocore.buffer").nav(-vim.v.count1) end, desc = "Previous buffer" },
 
+        -- Centered scrolling
+        ["<C-d>"] = { "<C-d>zz", desc = "Scroll down (centered)" },
+        ["<C-u>"] = { "<C-u>zz", desc = "Scroll up (centered)" },
+        ["<C-f>"] = { "<C-f>zz", desc = "Page down (centered)" },
+        ["<C-b>"] = { "<C-b>zz", desc = "Page up (centered)" },
+
         -- OpenCode AI assistant keymaps
         ["<Leader>a"] = { desc = "AI (OpenCode)" },
         ["<Leader>aa"] = {
