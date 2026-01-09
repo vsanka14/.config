@@ -28,7 +28,10 @@ return {
     vim.api.nvim_create_autocmd("FileType", {
       pattern = "csv",
       callback = function()
-        require("csvview").enable()
+        local csvview = require("csvview")
+        if not csvview.is_enabled() then
+          csvview.enable()
+        end
       end,
     })
   end,
