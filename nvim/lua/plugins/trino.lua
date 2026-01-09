@@ -23,6 +23,7 @@ return {
       cached_auth_user = "convtrack",
       cache_timestamp = nil,
       current_job = nil,
+      cancelled = false,
       failed_queries = {},
       total_queries = 0,
       completed_count = 0,
@@ -423,6 +424,11 @@ return {
       local current_index = 1
 
       local function run_next()
+        if trino_state.cancelled then
+          on_all_complete()
+          return
+        end
+
         if current_index > #queries then
           on_all_complete()
           return
@@ -440,6 +446,12 @@ return {
         )
 
         run_single_query(query_info, password, otp, auth_user, function(success, error_msg, csv_lines)
+          -- Don't count cancelled queries as completed
+          if trino_state.cancelled then
+            run_next()
+            return
+          end
+
           trino_state.completed_count = trino_state.completed_count + 1
           if not success then
             table.insert(trino_state.failed_queries, { index = query_info.index, error = error_msg })
@@ -463,6 +475,21 @@ return {
 
     local function show_results()
       dismiss_loading_notification()
+
+      -- Handle cancellation case
+      if trino_state.cancelled then
+        local success_count = #trino_state.result_buffers
+        local cancelled_count = trino_state.total_queries - trino_state.completed_count
+        local msg = string.format(
+          "%d/%d queries completed, %d cancelled",
+          success_count,
+          trino_state.total_queries,
+          cancelled_count
+        )
+        vim.notify(msg, vim.log.levels.WARN, { title = "Trino [" .. trino_state.cluster .. "]" })
+        trino_state.total_queries = 0
+        return
+      end
 
       local success_count = trino_state.total_queries - #trino_state.failed_queries
 
@@ -522,6 +549,7 @@ return {
       end
 
       clear_result_buffers()
+      trino_state.cancelled = false
       trino_state.start_time = vim.loop.hrtime()
       show_loading_notification(string.format("Executing queries on %s...", trino_state.cluster))
 
@@ -577,16 +605,18 @@ return {
     end
 
     local function trino_cancel()
-      if not trino_state.current_job then
+      if not trino_state.current_job and trino_state.total_queries == 0 then
         vim.notify("No running query to cancel", vim.log.levels.WARN, { title = "Trino" })
         return
       end
 
-      vim.fn.jobstop(trino_state.current_job)
-      trino_state.current_job = nil
+      trino_state.cancelled = true
+      if trino_state.current_job then
+        vim.fn.jobstop(trino_state.current_job)
+        trino_state.current_job = nil
+      end
       trino_state.start_time = nil
       dismiss_loading_notification()
-      vim.notify("Query cancelled", vim.log.levels.INFO, { title = "Trino" })
     end
 
     local function trino_auth_user(args)
