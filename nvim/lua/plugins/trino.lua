@@ -1,12 +1,14 @@
 -- Trino query execution plugin for Neovim
--- Executes SQL queries against LinkedIn's Trino clusters and displays results as CSV
+-- Executes SQL queries against LinkedIn's Trino clusters and displays results
 -- Features:
 --   - Tree-sitter based SQL parsing for multi-query support
 --   - Sequential query execution
 --   - Credential caching with TTL
 --   - Loading indicator via Snacks.notifier
---   - Results saved as CSV files in ./results/ directory
---   - Uses csvview.nvim for rendering
+--   - Results displayed in a single split window with csvview.nvim rendering
+--   - Multiple results navigable via <Leader>qn/<Leader>qp within the split
+--   - Commands: TrinoRun, TrinoRunSelection, TrinoCluster, TrinoCancel,
+--               TrinoAuthUser, TrinoClearCache, TrinoClear, TrinoNext, TrinoPrev
 
 ---@type LazySpec
 return {
@@ -23,7 +25,6 @@ return {
     -- ============================================================================
     local trino_state = {
       cluster = "holdem", -- default cluster: holdem, war, faro
-      source_dir = nil, -- directory of the SQL file that started the query
       start_time = nil, -- query start time for elapsed calculation
       loading_notif_id = nil, -- loading notification ID for dismissal
 
@@ -38,6 +39,11 @@ return {
       failed_queries = {}, -- { { index=1, error="..." }, ... }
       total_queries = 0,
       completed_count = 0,
+
+      -- Result buffer tracking
+      result_buffers = {}, -- buffer IDs for cleanup
+      result_win = nil, -- window ID for result split
+      split_height_pct = 50, -- percentage of screen height for splits
     }
 
     -- ============================================================================
@@ -106,9 +112,6 @@ return {
     -- SQL Parsing with Tree-sitter
     -- ============================================================================
 
-    --- Split SQL into individual queries using Tree-sitter
-    ---@param sql string The SQL content to parse
-    ---@return table queries Array of {index, text}
     local function split_queries(sql)
       local ok, parser = pcall(vim.treesitter.get_string_parser, sql, "sql")
       if not ok then
@@ -131,16 +134,11 @@ return {
         local node = root:named_child(i)
         if node:type() == "statement" then
           local text = vim.treesitter.get_node_text(node, sql)
-
-          -- Tree-sitter excludes the semicolon from statement nodes, so add it back
           text = vim.trim(text)
           if not text:match ";$" then text = text .. ";" end
 
           query_index = query_index + 1
-          table.insert(queries, {
-            index = query_index,
-            text = text,
-          })
+          table.insert(queries, { index = query_index, text = text })
         end
       end
 
@@ -185,28 +183,181 @@ return {
     end
 
     -- ============================================================================
-    -- Results Directory Management
+    -- Result Buffer Management
     -- ============================================================================
 
-    local function get_results_dir()
-      local base_path = trino_state.source_dir
-      if not base_path or base_path == "" then base_path = vim.fn.getcwd() end
-      return base_path .. "/results"
+    local function create_result_buffer(index, csv_lines)
+      local buf = vim.api.nvim_create_buf(false, true)
+      if buf == 0 then
+        vim.notify("Failed to create result buffer", vim.log.levels.ERROR, { title = "Trino" })
+        return
+      end
+
+      pcall(vim.api.nvim_buf_set_name, buf, string.format("trino://results/%d", index))
+
+      vim.bo[buf].buftype = "nofile"
+      vim.bo[buf].bufhidden = "hide"
+      vim.bo[buf].swapfile = false
+
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, csv_lines)
+      vim.bo[buf].modifiable = false
+      vim.bo[buf].filetype = "csv"
+
+      table.insert(trino_state.result_buffers, buf)
     end
 
-    local function clear_results_dir()
-      local results_dir = get_results_dir()
-      local files = vim.fn.glob(results_dir .. "/*.csv", false, true)
-      for _, file in ipairs(files) do
-        vim.fn.delete(file)
+    local function get_result_winbar()
+      if #trino_state.result_buffers == 0 then return "" end
+      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
+        return ""
       end
+
+      local current_buf = vim.api.nvim_win_get_buf(trino_state.result_win)
+      local parts = {}
+
+      for i, buf in ipairs(trino_state.result_buffers) do
+        local hl = (buf == current_buf) and "%#TabLineSel#" or "%#TabLine#"
+        table.insert(parts, string.format("%%%d@v:lua.TrinoSelectResult@%s %d %%X%%*", i, hl, i))
+      end
+
+      return table.concat(parts, "%#TabLineFill#│")
+    end
+
+    local function refresh_result_winbar()
+      if trino_state.result_win and vim.api.nvim_win_is_valid(trino_state.result_win) then
+        vim.wo[trino_state.result_win].winbar = get_result_winbar()
+      end
+    end
+
+    local function enable_csvview_on_result()
+      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
+        return
+      end
+
+      vim.schedule(function()
+        if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
+          return
+        end
+
+        local ok, csvview = pcall(require, "csvview")
+        if not ok then return end
+
+        local current_win = vim.api.nvim_get_current_win()
+        vim.api.nvim_set_current_win(trino_state.result_win)
+
+        if csvview.is_enabled() then csvview.disable() end
+        csvview.enable()
+
+        vim.api.nvim_set_current_win(current_win)
+      end)
+    end
+
+    local function switch_to_result(index)
+      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
+        return
+      end
+
+      local buf = trino_state.result_buffers[index]
+      if buf and vim.api.nvim_buf_is_valid(buf) then
+        vim.api.nvim_win_set_buf(trino_state.result_win, buf)
+        refresh_result_winbar()
+        enable_csvview_on_result()
+      end
+    end
+
+    -- Global click handler for winbar tabs
+    _G.TrinoSelectResult = function(minwid) switch_to_result(minwid) end
+
+    local function clear_result_buffers()
+      if trino_state.result_win and vim.api.nvim_win_is_valid(trino_state.result_win) then
+        vim.api.nvim_win_close(trino_state.result_win, true)
+      end
+      trino_state.result_win = nil
+
+      for _, buf in ipairs(trino_state.result_buffers) do
+        if vim.api.nvim_buf_is_valid(buf) then
+          pcall(vim.api.nvim_buf_delete, buf, { force = true })
+        end
+      end
+      trino_state.result_buffers = {}
+    end
+
+    local function get_current_result_index()
+      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
+        return nil
+      end
+
+      local current_buf = vim.api.nvim_win_get_buf(trino_state.result_win)
+      for i, buf in ipairs(trino_state.result_buffers) do
+        if buf == current_buf then return i end
+      end
+      return nil
+    end
+
+    local function open_result_split()
+      if #trino_state.result_buffers == 0 then return end
+
+      local first_buf = trino_state.result_buffers[1]
+      if not vim.api.nvim_buf_is_valid(first_buf) then return end
+
+      if trino_state.result_win and vim.api.nvim_win_is_valid(trino_state.result_win) then
+        vim.api.nvim_win_set_buf(trino_state.result_win, first_buf)
+        refresh_result_winbar()
+        enable_csvview_on_result()
+        return
+      end
+
+      local origin_win = vim.api.nvim_get_current_win()
+      local split_height = math.floor(vim.o.lines * trino_state.split_height_pct / 100)
+
+      vim.cmd(string.format("botright %dsplit", split_height))
+      trino_state.result_win = vim.api.nvim_get_current_win()
+      vim.api.nvim_win_set_buf(trino_state.result_win, first_buf)
+
+      refresh_result_winbar()
+      enable_csvview_on_result()
+
+      if origin_win and vim.api.nvim_win_is_valid(origin_win) then
+        vim.api.nvim_set_current_win(origin_win)
+      end
+    end
+
+    local function trino_next_result()
+      if #trino_state.result_buffers == 0 then
+        vim.notify("No result buffers available", vim.log.levels.WARN, { title = "Trino" })
+        return
+      end
+
+      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
+        open_result_split()
+        return
+      end
+
+      local current_idx = get_current_result_index() or 0
+      local next_idx = (current_idx % #trino_state.result_buffers) + 1
+      switch_to_result(next_idx)
+    end
+
+    local function trino_prev_result()
+      if #trino_state.result_buffers == 0 then
+        vim.notify("No result buffers available", vim.log.levels.WARN, { title = "Trino" })
+        return
+      end
+
+      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
+        open_result_split()
+        return
+      end
+
+      local current_idx = get_current_result_index() or 1
+      local prev_idx = ((current_idx - 2) % #trino_state.result_buffers) + 1
+      switch_to_result(prev_idx)
     end
 
     -- ============================================================================
     -- Query Execution
     -- ============================================================================
 
-    --- Write content to a file
     local function write_file(path, content)
       local f = io.open(path, "w")
       if f then
@@ -217,24 +368,27 @@ return {
       return false
     end
 
-    --- Run a single query and write output to a file
-    ---@param query_info table {index, text}
-    ---@param output_file string Path to write CSV output
-    ---@param password string
-    ---@param otp string
-    ---@param auth_user string The li_authorization_user value
-    ---@param on_complete function Callback: function(success, error_msg)
-    local function run_single_query(query_info, output_file, password, otp, auth_user, on_complete)
+    local function read_file_lines(path)
+      local f = io.open(path, "r")
+      if not f then return nil end
+      local lines = {}
+      for line in f:lines() do
+        table.insert(lines, line)
+      end
+      f:close()
+      return lines
+    end
+
+    local function run_single_query(query_info, password, otp, auth_user, on_complete)
       local query_file = "/tmp/trino_query.sql"
       local temp_output_file = "/tmp/trino_output.csv"
       local stderr_chunks = {}
 
       if not write_file(query_file, query_info.text) then
-        on_complete(false, "Failed to write query file")
+        on_complete(false, "Failed to write query file", nil)
         return
       end
 
-      -- Delete any existing temp output file
       vim.fn.delete(temp_output_file)
 
       local cmd = {
@@ -263,48 +417,40 @@ return {
             trino_state.current_job = nil
 
             local stderr_content = table.concat(stderr_chunks, "\n")
-            local has_error = exit_code ~= 0 or stderr_content:match "Query %w+ failed" or stderr_content:match "FAILED"
+            local has_error = exit_code ~= 0
+              or stderr_content:match "Query %w+ failed"
+              or stderr_content:match "FAILED"
 
             if has_error then
               vim.fn.delete(temp_output_file)
               local error_msg = stderr_content ~= "" and stderr_content:sub(1, 200) or "Unknown error"
-              on_complete(false, error_msg)
+              on_complete(false, error_msg, nil)
             else
-              -- Move temp file to final location only on success
-              vim.fn.rename(temp_output_file, output_file)
-              on_complete(true, nil)
+              local csv_lines = read_file_lines(temp_output_file)
+              vim.fn.delete(temp_output_file)
+              on_complete(true, nil, csv_lines or {})
             end
           end)
         end,
       })
 
       if job_id <= 0 then
-        on_complete(false, "Failed to start job")
+        on_complete(false, "Failed to start job", nil)
         return
       end
 
       trino_state.current_job = job_id
 
-      -- Send credentials via stdin
       vim.fn.chansend(job_id, password .. "\n")
       vim.fn.chansend(job_id, otp .. "\n")
       vim.fn.chanclose(job_id, "stdin")
     end
 
-    --- Run all queries sequentially
-    ---@param queries table Array of query info
-    ---@param password string
-    ---@param otp string
-    ---@param auth_user string The li_authorization_user value
-    ---@param on_all_complete function Callback when all queries complete
     local function run_queries_sequentially(queries, password, otp, auth_user, on_all_complete)
       if #queries == 0 then
         on_all_complete()
         return
       end
-
-      local results_dir = get_results_dir()
-      vim.fn.mkdir(results_dir, "p")
 
       trino_state.total_queries = #queries
       trino_state.completed_count = 0
@@ -319,7 +465,6 @@ return {
         end
 
         local query_info = queries[current_index]
-        local output_file = string.format("%s/%d.csv", results_dir, query_info.index)
 
         update_loading_notification(
           string.format(
@@ -330,14 +475,12 @@ return {
           )
         )
 
-        run_single_query(query_info, output_file, password, otp, auth_user, function(success, error_msg)
+        run_single_query(query_info, password, otp, auth_user, function(success, error_msg, csv_lines)
           trino_state.completed_count = trino_state.completed_count + 1
           if not success then
-            table.insert(trino_state.failed_queries, {
-              index = query_info.index,
-              error = error_msg,
-            })
-            vim.fn.delete(output_file) -- Delete failed output
+            table.insert(trino_state.failed_queries, { index = query_info.index, error = error_msg })
+          else
+            create_result_buffer(query_info.index, csv_lines)
           end
 
           current_index = current_index + 1
@@ -348,14 +491,11 @@ return {
       run_next()
     end
 
-    --- Show summary notification
     local function show_results()
       dismiss_loading_notification()
 
-      local results_dir = get_results_dir()
       local success_count = trino_state.total_queries - #trino_state.failed_queries
 
-      -- Calculate elapsed time
       local elapsed = ""
       if trino_state.start_time then
         local elapsed_ms = (vim.loop.hrtime() - trino_state.start_time) / 1e6
@@ -366,29 +506,21 @@ return {
         end
       end
 
-      -- Show summary notification
       local msg
       if trino_state.total_queries == 0 then
         msg = "No data queries to execute"
       elseif #trino_state.failed_queries == 0 then
-        msg = string.format(
-          "%d/%d queries completed%s\nResults: %s",
-          success_count,
-          trino_state.total_queries,
-          elapsed,
-          results_dir
-        )
+        msg = string.format("%d/%d queries completed%s", success_count, trino_state.total_queries, elapsed)
       else
         msg = string.format(
-          "%d/%d queries completed%s\nFailed: %s\nResults: %s",
+          "%d/%d queries completed%s\nFailed: %s",
           success_count,
           trino_state.total_queries,
           elapsed,
           table.concat(
             vim.tbl_map(function(q) return string.format("#%d", q.index) end, trino_state.failed_queries),
             ", "
-          ),
-          results_dir
+          )
         )
       end
 
@@ -396,50 +528,37 @@ return {
       vim.notify(msg, level, { title = "Trino [" .. trino_state.cluster .. "]" })
     end
 
-    --- Main entry point for executing queries
     local function execute_trino_query(sql)
       if not sql or sql:match "^%s*$" then
         vim.notify("No SQL to execute", vim.log.levels.WARN, { title = "Trino" })
         return
       end
 
-      -- Check if there's already a running job
       if trino_state.current_job then
         vim.notify("Query already running. Cancel it first with :TrinoCancel", vim.log.levels.WARN, { title = "Trino" })
         return
       end
 
-      -- Store the source directory
-      trino_state.source_dir = vim.fn.expand "%:p:h"
-      if trino_state.source_dir == "" then trino_state.source_dir = vim.fn.getcwd() end
-
-      -- Parse SQL into queries
       local queries = split_queries(sql)
-
       if #queries == 0 then
         vim.notify("No valid SQL queries found", vim.log.levels.WARN, { title = "Trino" })
         return
       end
 
-      -- Get credentials
       local password, otp, auth_user = get_credentials()
       if not password or not otp or not auth_user then
         vim.notify("Query cancelled - credentials not provided", vim.log.levels.WARN, { title = "Trino" })
         return
       end
 
-      -- Clear previous results
-      clear_results_dir()
-      vim.fn.mkdir(get_results_dir(), "p")
-
-      -- Record start time
+      clear_result_buffers()
       trino_state.start_time = vim.loop.hrtime()
-
-      -- Show loading notification
       show_loading_notification(string.format("Executing queries on %s...", trino_state.cluster))
 
-      -- Run all queries sequentially
-      run_queries_sequentially(queries, password, otp, auth_user, function() show_results() end)
+      run_queries_sequentially(queries, password, otp, auth_user, function()
+        show_results()
+        open_result_split()
+      end)
     end
 
     -- ============================================================================
@@ -447,23 +566,19 @@ return {
     -- ============================================================================
 
     local function trino_run()
-      local ft = vim.bo.filetype
-      if ft ~= "sql" then
+      if vim.bo.filetype ~= "sql" then
         vim.notify("TrinoRun only works in .sql files", vim.log.levels.WARN, { title = "Trino" })
         return
       end
-      local sql = get_buffer_content()
-      execute_trino_query(sql)
+      execute_trino_query(get_buffer_content())
     end
 
     local function trino_run_selection()
-      local ft = vim.bo.filetype
-      if ft ~= "sql" then
+      if vim.bo.filetype ~= "sql" then
         vim.notify("TrinoRunSelection only works in .sql files", vim.log.levels.WARN, { title = "Trino" })
         return
       end
-      local sql = get_visual_selection()
-      execute_trino_query(sql)
+      execute_trino_query(get_visual_selection())
     end
 
     local function trino_cluster(args)
@@ -501,9 +616,7 @@ return {
       vim.fn.jobstop(trino_state.current_job)
       trino_state.current_job = nil
       trino_state.start_time = nil
-
       dismiss_loading_notification()
-
       vim.notify("Query cancelled", vim.log.levels.INFO, { title = "Trino" })
     end
 
@@ -532,81 +645,52 @@ return {
     -- ============================================================================
 
     opts.commands = opts.commands or {}
-    opts.commands.TrinoRun = {
-      trino_run,
-      desc = "Run current SQL buffer against Trino",
-    }
-    opts.commands.TrinoRunSelection = {
-      trino_run_selection,
-      desc = "Run visual selection against Trino",
-    }
+    opts.commands.TrinoRun = { trino_run, desc = "Run current SQL buffer against Trino" }
+    opts.commands.TrinoRunSelection = { trino_run_selection, desc = "Run visual selection against Trino" }
     opts.commands.TrinoCluster = {
       trino_cluster,
       nargs = "?",
       complete = function() return { "holdem", "war", "faro" } end,
       desc = "Set Trino cluster (holdem, war, faro)",
     }
-    opts.commands.TrinoCancel = {
-      trino_cancel,
-      desc = "Cancel running Trino query",
-    }
+    opts.commands.TrinoCancel = { trino_cancel, desc = "Cancel running Trino query" }
     opts.commands.TrinoAuthUser = {
       trino_auth_user,
       nargs = "?",
       desc = "Set Trino authorization user (li_authorization_user)",
     }
-    opts.commands.TrinoClearCache = {
-      clear_credential_cache,
-      desc = "Clear cached Trino credentials",
-    }
+    opts.commands.TrinoClearCache = { clear_credential_cache, desc = "Clear cached Trino credentials" }
+    opts.commands.TrinoClear = { clear_result_buffers, desc = "Clear all Trino result buffers" }
+    opts.commands.TrinoNext = { trino_next_result, desc = "Navigate to next Trino result buffer" }
+    opts.commands.TrinoPrev = { trino_prev_result, desc = "Navigate to previous Trino result buffer" }
 
-    -- Register autocmds
+    -- Register autocmds for SQL file keymaps
     opts.autocmds = opts.autocmds or {}
-
     opts.autocmds.trino_sql_keymaps = {
       {
         event = "FileType",
         pattern = "sql",
         callback = function(args)
           local bufnr = args.buf
+          local map = function(mode, lhs, rhs, desc)
+            vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
+          end
 
-          vim.keymap.set("n", "<Leader>qr", trino_run, {
-            buffer = bufnr,
-            desc = "Trino: Run query",
-          })
-
-          vim.keymap.set("v", "<Leader>qr", function()
+          map("n", "<Leader>qr", trino_run, "Trino: Run query")
+          map("v", "<Leader>qr", function()
             vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "x", false)
             vim.schedule(trino_run_selection)
-          end, {
-            buffer = bufnr,
-            desc = "Trino: Run selection",
-          })
+          end, "Trino: Run selection")
+          map("n", "<Leader>qc", function() trino_cluster { args = "" } end, "Trino: Change cluster")
+          map("n", "<Leader>qu", function() trino_auth_user { args = "" } end, "Trino: Change auth user")
+          map("n", "<Leader>qx", trino_cancel, "Trino: Cancel query")
+          map("n", "<Leader>qC", clear_result_buffers, "Trino: Clear result buffers")
+          map("n", "<Leader>qn", trino_next_result, "Trino: Next result")
+          map("n", "<Leader>qp", trino_prev_result, "Trino: Previous result")
 
-          vim.keymap.set("n", "<Leader>qc", function() trino_cluster { args = "" } end, {
-            buffer = bufnr,
-            desc = "Trino: Change cluster",
-          })
-
-          vim.keymap.set("n", "<Leader>qu", function() trino_auth_user { args = "" } end, {
-            buffer = bufnr,
-            desc = "Trino: Change auth user",
-          })
-
-          vim.keymap.set("n", "<Leader>qx", trino_cancel, {
-            buffer = bufnr,
-            desc = "Trino: Cancel query",
-          })
-
-          -- Which-key group description (buffer-local)
-          vim.keymap.set("n", "<Leader>q", function() end, {
-            buffer = bufnr,
-            desc = "Query (Trino)",
-          })
-          vim.keymap.set("v", "<Leader>q", function() end, {
-            buffer = bufnr,
-            desc = "Query (Trino)",
-          })
+          -- Which-key group description
+          map("n", "<Leader>q", function() end, "Query (Trino)")
+          map("v", "<Leader>q", function() end, "Query (Trino)")
         end,
         desc = "Set up Trino keymaps for SQL files",
       },
