@@ -1,14 +1,5 @@
 -- Trino query execution plugin for Neovim
--- Executes SQL queries against LinkedIn's Trino clusters and displays results
--- Features:
---   - Tree-sitter based SQL parsing for multi-query support
---   - Sequential query execution
---   - Credential caching with TTL
---   - Loading indicator via Snacks.notifier
---   - Results displayed in a single split window with csvview.nvim rendering
---   - Multiple results navigable via <Leader>qn/<Leader>qp within the split
---   - Commands: TrinoRun, TrinoRunSelection, TrinoCluster, TrinoCancel,
---               TrinoAuthUser, TrinoClearCache, TrinoClear, TrinoNext, TrinoPrev
+-- Commands: TrinoRun, TrinoRunSelection, TrinoCluster, TrinoCancel, TrinoAuthUser, TrinoClearCache, TrinoClear, TrinoNext, TrinoPrev
 
 ---@type LazySpec
 return {
@@ -18,32 +9,26 @@ return {
     -- ============================================================================
     -- Constants
     -- ============================================================================
-    local CREDENTIAL_CACHE_TTL = 900 -- 15 minutes
+    local CREDENTIAL_CACHE_TTL = 900
 
     -- ============================================================================
     -- State Management
     -- ============================================================================
     local trino_state = {
-      cluster = "holdem", -- default cluster: holdem, war, faro
-      start_time = nil, -- query start time for elapsed calculation
-      loading_notif_id = nil, -- loading notification ID for dismissal
-
-      -- Credential cache
+      cluster = "holdem",
+      start_time = nil,
+      loading_notif_id = nil,
       cached_password = nil,
       cached_otp = nil,
-      cached_auth_user = "convtrack", -- li_authorization_user
+      cached_auth_user = "convtrack",
       cache_timestamp = nil,
-
-      -- Job tracking
-      current_job = nil, -- current running job ID
-      failed_queries = {}, -- { { index=1, error="..." }, ... }
+      current_job = nil,
+      failed_queries = {},
       total_queries = 0,
       completed_count = 0,
-
-      -- Result buffer tracking
-      result_buffers = {}, -- buffer IDs for cleanup
-      result_win = nil, -- window ID for result split
-      split_height_pct = 50, -- percentage of screen height for splits
+      result_buffers = {},
+      result_win = nil,
+      split_height_pct = 50,
     }
 
     -- ============================================================================
@@ -85,7 +70,7 @@ return {
     local function clear_credential_cache()
       trino_state.cached_password = nil
       trino_state.cached_otp = nil
-      trino_state.cached_auth_user = "convtrack" -- Reset to default
+      trino_state.cached_auth_user = "convtrack"
       trino_state.cache_timestamp = nil
       vim.notify("Credential cache cleared", vim.log.levels.INFO, { title = "Trino" })
     end
@@ -128,17 +113,13 @@ return {
 
       local root = trees[1]:root()
       local queries = {}
-      local query_index = 0
 
       for i = 0, root:named_child_count() - 1 do
         local node = root:named_child(i)
         if node:type() == "statement" then
-          local text = vim.treesitter.get_node_text(node, sql)
-          text = vim.trim(text)
-          if not text:match ";$" then text = text .. ";" end
-
-          query_index = query_index + 1
-          table.insert(queries, { index = query_index, text = text })
+          local text = vim.trim(vim.treesitter.get_node_text(node, sql))
+          if not text:match(";$") then text = text .. ";" end
+          table.insert(queries, { index = #queries + 1, text = text })
         end
       end
 
@@ -152,6 +133,9 @@ return {
     local function show_loading_notification(message)
       local ok, Snacks = pcall(require, "snacks")
       if ok and Snacks.notifier then
+        if trino_state.loading_notif_id then
+          Snacks.notifier.hide(trino_state.loading_notif_id)
+        end
         trino_state.loading_notif_id = Snacks.notifier.notify(message, vim.log.levels.INFO, {
           title = "Trino",
           timeout = false,
@@ -159,18 +143,6 @@ return {
         })
       else
         vim.notify(message, vim.log.levels.INFO, { title = "Trino" })
-      end
-    end
-
-    local function update_loading_notification(message)
-      local ok, Snacks = pcall(require, "snacks")
-      if ok and Snacks.notifier and trino_state.loading_notif_id then
-        Snacks.notifier.hide(trino_state.loading_notif_id)
-        trino_state.loading_notif_id = Snacks.notifier.notify(message, vim.log.levels.INFO, {
-          title = "Trino",
-          timeout = false,
-          icon = "󰑮",
-        })
       end
     end
 
@@ -185,6 +157,10 @@ return {
     -- ============================================================================
     -- Result Buffer Management
     -- ============================================================================
+
+    local function is_result_win_valid()
+      return trino_state.result_win and vim.api.nvim_win_is_valid(trino_state.result_win)
+    end
 
     local function create_result_buffer(index, csv_lines)
       local buf = vim.api.nvim_create_buf(false, true)
@@ -208,9 +184,7 @@ return {
 
     local function get_result_winbar()
       if #trino_state.result_buffers == 0 then return "" end
-      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
-        return ""
-      end
+      if not is_result_win_valid() then return "" end
 
       local current_buf = vim.api.nvim_win_get_buf(trino_state.result_win)
       local parts = {}
@@ -224,20 +198,14 @@ return {
     end
 
     local function refresh_result_winbar()
-      if trino_state.result_win and vim.api.nvim_win_is_valid(trino_state.result_win) then
+      if is_result_win_valid() then
         vim.wo[trino_state.result_win].winbar = get_result_winbar()
       end
     end
 
     local function enable_csvview_on_result()
-      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
-        return
-      end
-
       vim.schedule(function()
-        if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
-          return
-        end
+        if not is_result_win_valid() then return end
 
         local ok, csvview = pcall(require, "csvview")
         if not ok then return end
@@ -253,9 +221,7 @@ return {
     end
 
     local function switch_to_result(index)
-      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
-        return
-      end
+      if not is_result_win_valid() then return end
 
       local buf = trino_state.result_buffers[index]
       if buf and vim.api.nvim_buf_is_valid(buf) then
@@ -269,7 +235,7 @@ return {
     _G.TrinoSelectResult = function(minwid) switch_to_result(minwid) end
 
     local function clear_result_buffers()
-      if trino_state.result_win and vim.api.nvim_win_is_valid(trino_state.result_win) then
+      if is_result_win_valid() then
         vim.api.nvim_win_close(trino_state.result_win, true)
       end
       trino_state.result_win = nil
@@ -283,9 +249,7 @@ return {
     end
 
     local function get_current_result_index()
-      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
-        return nil
-      end
+      if not is_result_win_valid() then return nil end
 
       local current_buf = vim.api.nvim_win_get_buf(trino_state.result_win)
       for i, buf in ipairs(trino_state.result_buffers) do
@@ -300,7 +264,7 @@ return {
       local first_buf = trino_state.result_buffers[1]
       if not vim.api.nvim_buf_is_valid(first_buf) then return end
 
-      if trino_state.result_win and vim.api.nvim_win_is_valid(trino_state.result_win) then
+      if is_result_win_valid() then
         vim.api.nvim_win_set_buf(trino_state.result_win, first_buf)
         refresh_result_winbar()
         enable_csvview_on_result()
@@ -328,7 +292,7 @@ return {
         return
       end
 
-      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
+      if not is_result_win_valid() then
         open_result_split()
         return
       end
@@ -344,7 +308,7 @@ return {
         return
       end
 
-      if not trino_state.result_win or not vim.api.nvim_win_is_valid(trino_state.result_win) then
+      if not is_result_win_valid() then
         open_result_split()
         return
       end
@@ -466,7 +430,7 @@ return {
 
         local query_info = queries[current_index]
 
-        update_loading_notification(
+        show_loading_notification(
           string.format(
             "Query %d/%d on %s...",
             trino_state.completed_count + 1,
@@ -481,6 +445,12 @@ return {
             table.insert(trino_state.failed_queries, { index = query_info.index, error = error_msg })
           else
             create_result_buffer(query_info.index, csv_lines)
+            -- Show split immediately on first result, then just update winbar for subsequent results
+            if not is_result_win_valid() then
+              open_result_split()
+            else
+              refresh_result_winbar()
+            end
           end
 
           current_index = current_index + 1
@@ -557,7 +527,6 @@ return {
 
       run_queries_sequentially(queries, password, otp, auth_user, function()
         show_results()
-        open_result_split()
       end)
     end
 
