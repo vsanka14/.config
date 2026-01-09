@@ -13,6 +13,7 @@ return {
         -- formatters
         "stylua",
         "prettier",
+        "sql-formatter",
 
         -- linters
         "eslint-lsp",
