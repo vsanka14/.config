@@ -29,7 +29,7 @@ return {
       pattern = "csv",
       callback = function()
         local csvview = require("csvview")
-        if not csvview.is_enabled() then
+        if not csvview.is_enabled(0) then
           csvview.enable()
         end
       end,
