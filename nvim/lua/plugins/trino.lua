@@ -44,6 +44,12 @@ return {
       return elapsed < CREDENTIAL_CACHE_TTL
     end
 
+    local function invalidate_credential_cache()
+      trino_state.cached_password = nil
+      trino_state.cached_otp = nil
+      trino_state.cache_timestamp = nil
+    end
+
     local function get_credentials()
       if is_cache_valid() then
         local remaining = CREDENTIAL_CACHE_TTL - (os.time() - trino_state.cache_timestamp)
@@ -163,7 +169,7 @@ return {
       return trino_state.result_win and vim.api.nvim_win_is_valid(trino_state.result_win)
     end
 
-    local function create_result_buffer(index, csv_lines)
+    local function create_result_buffer(index, lines)
       local buf = vim.api.nvim_create_buf(false, true)
       if buf == 0 then
         vim.notify("Failed to create result buffer", vim.log.levels.ERROR, { title = "Trino" })
@@ -176,11 +182,11 @@ return {
       vim.bo[buf].bufhidden = "hide"
       vim.bo[buf].swapfile = false
 
-      vim.api.nvim_buf_set_lines(buf, 0, -1, false, csv_lines)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
       vim.bo[buf].modifiable = false
       vim.bo[buf].filetype = "csv"
 
-      table.insert(trino_state.result_buffers, buf)
+      table.insert(trino_state.result_buffers, { buf = buf, index = index })
     end
 
     local function get_result_winbar()
@@ -190,9 +196,10 @@ return {
       local current_buf = vim.api.nvim_win_get_buf(trino_state.result_win)
       local parts = {}
 
-      for i, buf in ipairs(trino_state.result_buffers) do
-        local hl = (buf == current_buf) and "%#TabLineSel#" or "%#TabLine#"
-        table.insert(parts, string.format("%%%d@v:lua.TrinoSelectResult@%s %d %%X%%*", i, hl, i))
+      for i, entry in ipairs(trino_state.result_buffers) do
+        local is_current = entry.buf == current_buf
+        local hl = is_current and "%#TabLineSel#" or "%#TabLine#"
+        table.insert(parts, string.format("%%%d@v:lua.TrinoSelectResult@%s %d %%X%%*", i, hl, entry.index))
       end
 
       return table.concat(parts, "%#TabLineFill#│")
@@ -224,9 +231,9 @@ return {
     local function switch_to_result(index)
       if not is_result_win_valid() then return end
 
-      local buf = trino_state.result_buffers[index]
-      if buf and vim.api.nvim_buf_is_valid(buf) then
-        vim.api.nvim_win_set_buf(trino_state.result_win, buf)
+      local entry = trino_state.result_buffers[index]
+      if entry and vim.api.nvim_buf_is_valid(entry.buf) then
+        vim.api.nvim_win_set_buf(trino_state.result_win, entry.buf)
         refresh_result_winbar()
         enable_csvview_on_result()
       end
@@ -241,9 +248,9 @@ return {
       end
       trino_state.result_win = nil
 
-      for _, buf in ipairs(trino_state.result_buffers) do
-        if vim.api.nvim_buf_is_valid(buf) then
-          pcall(vim.api.nvim_buf_delete, buf, { force = true })
+      for _, entry in ipairs(trino_state.result_buffers) do
+        if vim.api.nvim_buf_is_valid(entry.buf) then
+          pcall(vim.api.nvim_buf_delete, entry.buf, { force = true })
         end
       end
       trino_state.result_buffers = {}
@@ -253,8 +260,8 @@ return {
       if not is_result_win_valid() then return nil end
 
       local current_buf = vim.api.nvim_win_get_buf(trino_state.result_win)
-      for i, buf in ipairs(trino_state.result_buffers) do
-        if buf == current_buf then return i end
+      for i, entry in ipairs(trino_state.result_buffers) do
+        if entry.buf == current_buf then return i end
       end
       return nil
     end
@@ -262,11 +269,11 @@ return {
     local function open_result_split()
       if #trino_state.result_buffers == 0 then return end
 
-      local first_buf = trino_state.result_buffers[1]
-      if not vim.api.nvim_buf_is_valid(first_buf) then return end
+      local first_entry = trino_state.result_buffers[1]
+      if not vim.api.nvim_buf_is_valid(first_entry.buf) then return end
 
       if is_result_win_valid() then
-        vim.api.nvim_win_set_buf(trino_state.result_win, first_buf)
+        vim.api.nvim_win_set_buf(trino_state.result_win, first_entry.buf)
         refresh_result_winbar()
         enable_csvview_on_result()
         return
@@ -277,7 +284,7 @@ return {
 
       vim.cmd(string.format("botright %dsplit", split_height))
       trino_state.result_win = vim.api.nvim_get_current_win()
-      vim.api.nvim_win_set_buf(trino_state.result_win, first_buf)
+      vim.api.nvim_win_set_buf(trino_state.result_win, first_entry.buf)
 
       refresh_result_winbar()
       enable_csvview_on_result()
@@ -347,7 +354,7 @@ return {
     local function run_single_query(query_info, password, otp, auth_user, on_complete)
       local query_file = "/tmp/trino_query.sql"
       local temp_output_file = "/tmp/trino_output.csv"
-      local stderr_chunks = {}
+      local temp_stderr_file = "/tmp/trino_stderr.txt"
 
       if not write_file(query_file, query_info.text) then
         on_complete(false, "Failed to write query file", nil)
@@ -355,45 +362,77 @@ return {
       end
 
       vim.fn.delete(temp_output_file)
+      vim.fn.delete(temp_stderr_file)
 
       local cmd = {
         "sh",
         "-c",
         string.format(
-          "trino query -c %s -f %s --session li_authorization_user=%s --output-format CSV_HEADER > %s",
+          "trino query -c %s -f %s --session li_authorization_user=%s --output-format CSV_HEADER > %s 2> %s",
           trino_state.cluster,
           query_file,
           auth_user,
-          temp_output_file
+          temp_output_file,
+          temp_stderr_file
         ),
       }
 
       local job_id = vim.fn.jobstart(cmd, {
         stdin = "pipe",
-        on_stderr = function(_, data)
-          if data then
-            for _, line in ipairs(data) do
-              if line ~= "" then table.insert(stderr_chunks, line) end
-            end
-          end
-        end,
         on_exit = function(_, exit_code)
           vim.schedule(function()
             trino_state.current_job = nil
 
-            local stderr_content = table.concat(stderr_chunks, "\n")
+            local stderr_lines = read_file_lines(temp_stderr_file) or {}
+            local stderr_content = table.concat(stderr_lines, "\n")
+            vim.fn.delete(temp_stderr_file)
+
+            -- Check for LDAP/authentication failure - invalidate credentials so user can retry
+            if stderr_content:match "LDAP" or stderr_content:match "Authentication failed" or stderr_content:match "authentication failed" then
+              invalidate_credential_cache()
+              vim.notify("Authentication failed. Credentials cleared for retry.", vim.log.levels.WARN, { title = "Trino" })
+            end
+
+            -- Extract the relevant error message, filtering out noise
+            local function extract_error(content)
+              -- Try to find "Query ... failed" and everything after
+              local error_start = content:match "(Query [%w_]+ failed.*)$"
+              if error_start then return error_start end
+              -- Try to find "FAILED:" and everything after
+              error_start = content:match "(FAILED.*)$"
+              if error_start then return error_start end
+              -- Try to find "Error:" and everything after
+              error_start = content:match "(Error:.*)$"
+              if error_start then return error_start end
+              -- Try to find "LDAP" error and everything after
+              error_start = content:match "(LDAP.*)$"
+              if error_start then return error_start end
+              -- Try to find "Authentication failed" and everything after
+              error_start = content:match "([Aa]uthentication failed.*)$"
+              if error_start then return error_start end
+              -- Fallback to full content
+              return content
+            end
+
             local has_error = exit_code ~= 0
-              or stderr_content:match "Query %w+ failed"
+              or stderr_content:match "Query [%w_]+ failed"
               or stderr_content:match "FAILED"
+              or stderr_content:match "LDAP"
+              or stderr_content:match "[Aa]uthentication failed"
 
             if has_error then
               vim.fn.delete(temp_output_file)
-              local error_msg = stderr_content ~= "" and stderr_content:sub(1, 200) or "Unknown error"
+              local error_msg = stderr_content ~= "" and extract_error(stderr_content) or "Unknown error"
               on_complete(false, error_msg, nil)
             else
               local csv_lines = read_file_lines(temp_output_file)
               vim.fn.delete(temp_output_file)
-              on_complete(true, nil, csv_lines or {})
+              -- If output is empty but we have stderr content, treat as error
+              if (not csv_lines or #csv_lines == 0) and stderr_content ~= "" then
+                on_complete(false, extract_error(stderr_content), nil)
+              else
+                on_complete(true, nil, csv_lines or {})
+              end
             end
           end)
         end,
@@ -455,14 +494,17 @@ return {
           trino_state.completed_count = trino_state.completed_count + 1
           if not success then
             table.insert(trino_state.failed_queries, { index = query_info.index, error = error_msg })
+            -- Create error buffer with the error message
+            local error_lines = vim.split(error_msg or "Unknown error", "\n")
+            create_result_buffer(query_info.index, error_lines)
           else
             create_result_buffer(query_info.index, csv_lines)
-            -- Show split immediately on first result, then just update winbar for subsequent results
-            if not is_result_win_valid() then
-              open_result_split()
-            else
-              refresh_result_winbar()
-            end
+          end
+          -- Show split immediately on first result, then just update winbar for subsequent results
+          if not is_result_win_valid() then
+            open_result_split()
+          else
+            refresh_result_winbar()
           end
 
           current_index = current_index + 1
@@ -478,7 +520,7 @@ return {
 
       -- Handle cancellation case
       if trino_state.cancelled then
-        local success_count = #trino_state.result_buffers
+        local success_count = trino_state.total_queries - #trino_state.failed_queries - (trino_state.total_queries - trino_state.completed_count)
         local cancelled_count = trino_state.total_queries - trino_state.completed_count
         local msg = string.format(
           "%d/%d queries completed, %d cancelled",
@@ -492,6 +534,7 @@ return {
       end
 
       local success_count = trino_state.total_queries - #trino_state.failed_queries
+      local failed_count = #trino_state.failed_queries
 
       local elapsed = ""
       if trino_state.start_time then
@@ -506,22 +549,19 @@ return {
       local msg
       if trino_state.total_queries == 0 then
         msg = "No data queries to execute"
-      elseif #trino_state.failed_queries == 0 then
+      elseif failed_count == 0 then
         msg = string.format("%d/%d queries completed%s", success_count, trino_state.total_queries, elapsed)
       else
         msg = string.format(
-          "%d/%d queries completed%s\nFailed: %s",
+          "%d/%d queries completed, %d failed%s",
           success_count,
           trino_state.total_queries,
-          elapsed,
-          table.concat(
-            vim.tbl_map(function(q) return string.format("#%d", q.index) end, trino_state.failed_queries),
-            ", "
-          )
+          failed_count,
+          elapsed
         )
       end
 
-      local level = #trino_state.failed_queries > 0 and vim.log.levels.WARN or vim.log.levels.INFO
+      local level = failed_count > 0 and vim.log.levels.WARN or vim.log.levels.INFO
       vim.notify(msg, level, { title = "Trino [" .. trino_state.cluster .. "]" })
     end
 
