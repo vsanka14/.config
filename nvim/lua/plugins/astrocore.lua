@@ -126,7 +126,7 @@ return {
           desc = "Review git diff",
         },
 
-        -- GitLens-like functionality keymaps
+        -- Git functionality keymaps
         ["<Leader>g"] = { desc = "Git" },
         ["<Leader>gb"] = { "<cmd>GitBlameToggle<cr>", desc = "Toggle Git Blame" },
         ["<Leader>gB"] = { function() require("gitsigns").blame_line { full = true } end, desc = "Git Blame Line" },
