@@ -31,6 +31,9 @@ return {
           return {}
         end,
       },
+      sql_formatter = {
+        prepend_args = { "-c", '{"keywordCase":"lower"}' },
+      },
     },
     format_on_save = {
       timeout_ms = 1000,
