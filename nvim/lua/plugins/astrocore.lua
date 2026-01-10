@@ -145,10 +145,6 @@ return {
 
         -- Screenkey toggle
         ["<Leader>uK"] = { "<cmd>Screenkey<cr>", desc = "Toggle Screenkey" },
-
-        -- Markdown preview keymaps
-        ["<Leader>m"] = { desc = "Markdown" },
-        ["<Leader>mb"] = { "<cmd>MarkdownPreview<cr>", desc = "Browser Preview" },
       },
       v = {
         -- Visual mode git operations
