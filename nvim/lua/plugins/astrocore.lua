@@ -298,10 +298,10 @@ return {
           desc = "Set markdown-specific options for better editing",
         },
       },
-      -- Auto refresh buffer when file changes on disk (triggers on focus gain, buffer enter, or cursor hold)
+      -- Auto refresh buffer when file changes on disk (triggers on focus gain, buffer enter)
       auto_refresh_buffer = {
         {
-          event = { "FocusGained", "BufEnter", "CursorHold" },
+          event = { "FocusGained", "BufEnter" },
           pattern = "*",
           callback = function()
             if vim.o.autoread then vim.cmd.checktime() end
