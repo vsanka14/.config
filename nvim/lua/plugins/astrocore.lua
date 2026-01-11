@@ -128,7 +128,6 @@ return {
 
         -- Git functionality keymaps
         ["<Leader>g"] = { desc = "Git" },
-        ["<Leader>gb"] = { "<cmd>GitBlameToggle<cr>", desc = "Toggle Git Blame" },
         ["<Leader>gB"] = { function() require("gitsigns").blame_line { full = true } end, desc = "Git Blame Line" },
         ["<Leader>gd"] = { "<cmd>DiffviewOpen<cr>", desc = "Open Diff View" },
         ["<Leader>gh"] = { "<cmd>DiffviewFileHistory %<cr>", desc = "File History" },
