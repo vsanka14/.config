@@ -1,34 +1,35 @@
 #!/bin/bash
 
-# Install script for dotfiles in dev container
-# This script is designed to be run from /dotfiles
-
-set -e
-
 DOTFILES_DIR="/dotfiles"
 CONFIG_DIR="$HOME/.config"
+TMUX_SOURCE="$DOTFILES_DIR/tmux/tmux.conf"
+TMUX_TARGET="$CONFIG_DIR/tmux/tmux.conf"
 
-echo "Setting up tmux configuration..."
+echo "Setting up tmux config..."
 
-# Create .config directory if it doesn't exist
+# Check source exists
+if [ ! -f "$TMUX_SOURCE" ]; then
+    echo "ERROR: Source not found: $TMUX_SOURCE"
+    exit 1
+fi
+
+# Create target directory
 mkdir -p "$CONFIG_DIR/tmux"
 
-# Create symlink to tmux config
-if [ -L "$CONFIG_DIR/tmux/tmux.conf" ] || [ -f "$CONFIG_DIR/tmux/tmux.conf" ]; then
-    echo "Removing existing tmux config..."
-    rm -f "$CONFIG_DIR/tmux/tmux.conf"
-fi
+# Remove existing config
+[ -e "$TMUX_TARGET" ] && rm -f "$TMUX_TARGET"
 
-echo "Creating symlink to tmux config..."
-ln -s "$DOTFILES_DIR/tmux/tmux.conf" "$CONFIG_DIR/tmux/tmux.conf"
+# Create symlink
+ln -s "$TMUX_SOURCE" "$TMUX_TARGET"
+echo "Symlink created: $TMUX_TARGET -> $TMUX_SOURCE"
 
-# Reload tmux config if tmux is running
+# Reload tmux if running (optional)
 if command -v tmux &> /dev/null && tmux list-sessions &> /dev/null; then
-    echo "Reloading tmux configuration..."
-    tmux source-file "$CONFIG_DIR/tmux/tmux.conf"
-    echo "Tmux config reloaded!"
-else
-    echo "Tmux is not running. Config will be loaded on next tmux start."
+    if tmux source-file "$TMUX_TARGET" 2>&1; then
+        echo "Tmux config reloaded"
+    else
+        echo "WARNING: Failed to reload tmux (non-fatal)"
+    fi
 fi
 
-echo "Dotfiles installation complete!"
+echo "Done!"
