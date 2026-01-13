@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DOTFILES_DIR="/dotfiles"
+DOTFILES_DIR="$HOME/dotfiles"
 CONFIG_DIR="$HOME/.config"
 TMUX_SOURCE="$DOTFILES_DIR/tmux/tmux.conf"
 TMUX_TARGET="$CONFIG_DIR/tmux/tmux.conf"
