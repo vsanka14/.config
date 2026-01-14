@@ -44,14 +44,14 @@ Usage: my-rdev <subcommand> [options]
 Manage rdev environments with mutagen sync.
 
 Subcommands:
-    setup     Create an rdev and set up mutagen sync
+    create    Create an rdev and set up mutagen sync
     delete    Delete an rdev and clean up local resources
     help      Show this help message
 
 Run 'my-rdev <subcommand> --help' for more information on a subcommand.
 
 Examples:
-    my-rdev setup campaign-manager-web --ignore node_modules
+    my-rdev create campaign-manager-web --ignore node_modules
     my-rdev delete campaign-manager-web/nutty-otter
 
 EOF
@@ -59,12 +59,12 @@ EOF
 }
 
 # =============================================================================
-# Setup Subcommand
+# Create Subcommand
 # =============================================================================
 
-usage_setup() {
+usage_create() {
     cat << EOF
-Usage: my-rdev setup <codebase> [--ignore pattern1] [--ignore pattern2] ...
+Usage: my-rdev create <codebase> [--ignore pattern1] [--ignore pattern2] ...
 
 Create an rdev and set up mutagen sync.
 
@@ -74,21 +74,21 @@ Arguments:
 
 Examples:
     # Frontend codebase
-    my-rdev setup campaign-manager-web --ignore node_modules --ignore .git
+    my-rdev create campaign-manager-web --ignore node_modules --ignore .git
 
     # Java backend codebase
-    my-rdev setup some-java-service --ignore target --ignore .gradle --ignore build
+    my-rdev create some-java-service --ignore target --ignore .gradle --ignore build
 
-    # Minimal setup
-    my-rdev setup my-project
+    # Minimal create
+    my-rdev create my-project
 
 EOF
     exit 1
 }
 
-parse_setup_args() {
+parse_create_args() {
     if [ $# -eq 0 ] || [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
-        usage_setup
+        usage_create
     fi
 
     CODEBASE="$1"
@@ -104,7 +104,7 @@ parse_setup_args() {
                 ;;
             *)
                 print_msg ERROR "Unknown argument: $1"
-                usage_setup
+                usage_create
                 ;;
         esac
     done
@@ -219,7 +219,7 @@ monitor_sync() {
     done
 }
 
-print_setup_completion() {
+print_create_completion() {
     cat <<EOF
 
 $(print_msg SUCCESS "Setup complete!")
@@ -237,14 +237,14 @@ Commands:
 EOF
 }
 
-setup_command() {
+create_command() {
     check_dependencies
-    parse_setup_args "$@"
+    parse_create_args "$@"
     create_rdev
     create_local_directory
     start_mutagen_sync
     monitor_sync
-    print_setup_completion
+    print_create_completion
 }
 
 # =============================================================================
@@ -388,8 +388,8 @@ main() {
     shift
 
     case "$SUBCOMMAND" in
-        setup)
-            setup_command "$@"
+        create)
+            create_command "$@"
             ;;
         delete)
             delete_command "$@"
