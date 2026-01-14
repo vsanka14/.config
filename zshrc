@@ -1,5 +1,6 @@
 # Add local bin to PATH (for user-installed binaries like nvim, lazygit, etc.)
 export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.config/bin:$PATH"
 
 # Increase Node.js memory limit for large TypeScript projects
 export NODE_OPTIONS="--max-old-space-size=8192"
