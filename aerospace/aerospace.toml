@@ -1,0 +1,105 @@
+# AeroSpace config - vim-centric tiling window manager
+# https://nikitabobko.github.io/AeroSpace/guide
+
+# Start AeroSpace at login
+start-at-login = true
+
+# Normalizations - keep enabled for intuitive behavior
+enable-normalization-flatten-containers = true
+enable-normalization-opposite-orientation-for-nested-containers = true
+
+# Mouse follows focus
+on-focus-changed = ['move-mouse window-lazy-center']
+
+# Default layout - accordion means windows stack (like tabs), not tile side-by-side
+default-root-container-layout = 'accordion'
+default-root-container-orientation = 'horizontal'
+
+# Gaps (minimal for clean look)
+[gaps]
+inner.horizontal = 8
+inner.vertical = 8
+outer.left = 8
+outer.bottom = 8
+outer.top = 8
+outer.right = 8
+
+# ============================================
+# MAIN KEYBINDINGS (using ctrl modifier)
+# ============================================
+[mode.main.binding]
+
+# Workspace switching (ctrl+number)
+ctrl-1 = 'workspace 1'
+ctrl-2 = 'workspace 2'
+ctrl-3 = 'workspace 3'
+ctrl-4 = 'workspace 4'
+ctrl-5 = 'workspace 5'
+
+# Window focus (ctrl+hjkl) - vim-style navigation
+ctrl-h = 'focus left'
+ctrl-j = 'focus down'
+ctrl-k = 'focus up'
+ctrl-l = 'focus right'
+
+# Move window within workspace (ctrl+shift+hjkl)
+ctrl-shift-h = 'move left'
+ctrl-shift-j = 'move down'
+ctrl-shift-k = 'move up'
+ctrl-shift-l = 'move right'
+
+# Move window to workspace (ctrl+shift+number)
+ctrl-shift-1 = 'move-node-to-workspace 1'
+ctrl-shift-2 = 'move-node-to-workspace 2'
+ctrl-shift-3 = 'move-node-to-workspace 3'
+ctrl-shift-4 = 'move-node-to-workspace 4'
+ctrl-shift-5 = 'move-node-to-workspace 5'
+
+# Layout controls
+ctrl-f = 'fullscreen'                            # Toggle fullscreen
+ctrl-comma = 'layout accordion horizontal'       # Stacked/accordion (default)
+ctrl-period = 'layout tiles horizontal vertical' # Side-by-side tiles
+
+# Join controls - tmux style (| horizontal, _ vertical)
+ctrl-shift-backslash = 'join-with right'         # Join horizontally (ctrl+|)
+ctrl-shift-minus = 'join-with down'              # Join vertically (ctrl+_)
+
+# Resize mode
+ctrl-r = 'mode resize'
+
+# Close window
+ctrl-q = 'close'
+
+# Toggle between workspaces
+ctrl-tab = 'workspace-back-and-forth'
+
+# Reload config (like tmux prefix+r)
+ctrl-shift-r = 'reload-config'
+
+# ============================================
+# RESIZE MODE
+# ============================================
+[mode.resize.binding]
+h = 'resize width -50'
+j = 'resize height +50'
+k = 'resize height -50'
+l = 'resize width +50'
+minus = 'resize smart -50'
+equal = 'resize smart +50'
+esc = 'mode main'
+enter = 'mode main'
+
+# ============================================
+# FLOATING WINDOWS (dialogs, settings, etc.)
+# ============================================
+[[on-window-detected]]
+if.app-id = 'com.apple.systempreferences'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.SystemPreferences'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-name-regex-substring = 'System Settings'
+run = 'layout floating'
