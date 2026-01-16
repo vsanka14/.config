@@ -5,8 +5,6 @@
 ---@type LazySpec
 return {
   "AstroNvim/astrocommunity",
-  -- AI completion
-  { import = "astrocommunity.completion.copilot-lua" },
   -- Language packs (includes LSP, treesitter, and tooling)
   { import = "astrocommunity.pack.lua" },
   { import = "astrocommunity.pack.typescript" },
