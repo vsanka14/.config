@@ -73,8 +73,9 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 	}
 end)
 
-config.window_background_opacity = 0.8 -- Slightly transparent window
+config.window_background_opacity = 0.85 -- Slightly transparent window
 config.text_background_opacity = 1.0 -- Ensure text background is opaque
+config.macos_window_background_blur = 20 -- Blur effect for frosted glass look
 
 -- Font
 config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = "Bold" })
