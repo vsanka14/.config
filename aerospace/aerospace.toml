@@ -11,6 +11,11 @@ enable-normalization-opposite-orientation-for-nested-containers = true
 # Mouse follows focus
 on-focus-changed = ['move-mouse window-lazy-center']
 
+# Notify sketchybar on workspace change
+exec-on-workspace-change = ['/bin/bash', '-c',
+  'sketchybar --trigger aerospace_workspace_change FOCUSED_WORKSPACE=$AEROSPACE_FOCUSED_WORKSPACE'
+]
+
 # Default layout - accordion means windows stack (like tabs), not tile side-by-side
 default-root-container-layout = 'accordion'
 default-root-container-orientation = 'horizontal'

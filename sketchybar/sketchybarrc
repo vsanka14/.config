@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Colors (Tokyo Night + Cyan accent)
+export BAR_COLOR=0xff1a1b26
+export ITEM_BG_COLOR=0xff24283b
+export ACCENT_COLOR=0xff00ffff
+export FG_COLOR=0xffc0caf5
+export FG_MUTED=0xff565f89
+
+# Font
+FONT="JetBrainsMono Nerd Font"
+
+# Bar appearance
+sketchybar --bar \
+    height=28 \
+    blur_radius=30 \
+    position=top \
+    sticky=on \
+    padding_left=8 \
+    padding_right=8 \
+    color=$BAR_COLOR \
+    shadow=off
+
+# Default item settings
+sketchybar --default \
+    icon.font="$FONT:Bold:14.0" \
+    icon.color=$FG_COLOR \
+    label.font="$FONT:Medium:12.0" \
+    label.color=$FG_COLOR \
+    padding_left=4 \
+    padding_right=4
+
+# Aerospace workspace event
+sketchybar --add event aerospace_workspace_change
+
+# Workspace indicators (left side)
+for sid in 1 2 3 4 5; do
+    sketchybar --add item space.$sid left \
+        --set space.$sid \
+            icon=$sid \
+            icon.padding_left=8 \
+            icon.padding_right=8 \
+            background.color=$ITEM_BG_COLOR \
+            background.corner_radius=4 \
+            background.height=20 \
+            background.drawing=off \
+            label.drawing=off \
+            script="$CONFIG_DIR/plugins/aerospace.sh" \
+        --subscribe space.$sid aerospace_workspace_change
+done
+
+# Battery (right side)
+sketchybar --add item battery right \
+    --set battery \
+        update_freq=120 \
+        icon.drawing=off \
+        script="$CONFIG_DIR/plugins/battery.sh" \
+    --subscribe battery system_woke power_source_change
+
+# Clock (right side)
+sketchybar --add item clock right \
+    --set clock \
+        update_freq=10 \
+        icon.drawing=off \
+        script="$CONFIG_DIR/plugins/clock.sh"
+
+# Force initial update
+sketchybar --update
