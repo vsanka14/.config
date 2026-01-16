@@ -79,7 +79,7 @@ config.macos_window_background_blur = 20 -- Blur effect for frosted glass look
 
 -- Font
 config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = "Bold" })
-config.font_size = 15.0
+config.font_size = 13.0
 
 -- Window
 config.window_decorations = "RESIZE" -- No title bar, just resizable window
