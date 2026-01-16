@@ -81,7 +81,7 @@ config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = "Bold" })
 config.font_size = 15.0
 
 -- Window
-config.window_decorations = "TITLE | RESIZE" -- Native macOS title bar with traffic light buttons
+config.window_decorations = "RESIZE" -- No title bar, just resizable window
 config.window_padding = {
 	left = 0,
 	right = 0,
