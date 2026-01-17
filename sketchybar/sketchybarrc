@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Colors (Tokyo Night + Cyan accent)
-export BAR_COLOR=0xff1a1b26
+export BAR_COLOR=0xff000000
 export ITEM_BG_COLOR=0xff24283b
 export ACCENT_COLOR=0xff00ffff
 export FG_COLOR=0xffc0caf5
@@ -12,7 +12,7 @@ FONT="JetBrainsMono Nerd Font"
 
 # Bar appearance
 sketchybar --bar \
-    height=28 \
+    height=32 \
     blur_radius=30 \
     position=top \
     sticky=on \

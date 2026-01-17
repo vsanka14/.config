@@ -81,6 +81,9 @@ ctrl-tab = 'workspace-back-and-forth'
 # Reload config (like tmux prefix+r)
 ctrl-shift-r = 'reload-config'
 
+# Reload sketchybar
+ctrl-shift-s = 'exec-and-forget sketchybar --reload'
+
 # ============================================
 # RESIZE MODE
 # ============================================
