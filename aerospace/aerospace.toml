@@ -75,9 +75,6 @@ ctrl-r = 'mode resize'
 # Close window
 ctrl-q = 'close'
 
-# Toggle between workspaces
-ctrl-tab = 'workspace-back-and-forth'
-
 # Reload config (like tmux prefix+r)
 ctrl-shift-r = 'reload-config'
 

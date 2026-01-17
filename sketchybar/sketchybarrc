@@ -53,16 +53,42 @@ done
 sketchybar --add item battery right \
     --set battery \
         update_freq=120 \
-        icon.drawing=off \
+        icon.padding_right=6 \
+        icon.color=$ACCENT_COLOR \
         script="$CONFIG_DIR/plugins/battery.sh" \
     --subscribe battery system_woke power_source_change
+
+# Battery container
+sketchybar --add bracket battery_container battery \
+    --set battery_container \
+        background.color=$ITEM_BG_COLOR \
+        background.corner_radius=6 \
+        background.height=24 \
+        background.drawing=on
+
+# Spacer between containers
+sketchybar --add item spacer right \
+    --set spacer \
+        width=8 \
+        background.drawing=off \
+        icon.drawing=off \
+        label.drawing=off
 
 # Clock (right side)
 sketchybar --add item clock right \
     --set clock \
         update_freq=10 \
-        icon.drawing=off \
+        icon.padding_right=6 \
+        icon.color=$ACCENT_COLOR \
         script="$CONFIG_DIR/plugins/clock.sh"
+
+# Clock container
+sketchybar --add bracket clock_container clock \
+    --set clock_container \
+        background.color=$ITEM_BG_COLOR \
+        background.corner_radius=6 \
+        background.height=24 \
+        background.drawing=on
 
 # Force initial update
 sketchybar --update
