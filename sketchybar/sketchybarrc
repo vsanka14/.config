@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Colors (Tokyo Night Moon)
-export BAR_COLOR=0xcc222436           # Moon background, semi-transparent
+export BAR_COLOR=0xdd0d0f18           # Darker background, semi-transparent
 export ITEM_BG_COLOR=0xcc1e2030       # Moon darker
 export ACCENT_BLUE=0xff82aaff         # Blue
 export ACCENT_PURPLE=0xffc099ff       # Purple
