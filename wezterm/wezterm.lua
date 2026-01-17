@@ -1,58 +1,58 @@
 local wezterm = require("wezterm")
 local config = wezterm.config_builder()
 
--- Custom vibrant color scheme for terminal text only
+-- Tokyo Night 'night' color scheme
 config.colors = {
 	-- Foreground and background
-	foreground = "#A0FFFF", -- Light cyan text
-	background = "#000000", -- Deep black background
+	foreground = "#c0caf5", -- Tokyo Night foreground
+	background = "#000000", -- Deep black (darker than Tokyo Night default)
 
-	-- Cursor (subtle)
-	cursor_bg = "#FFFFFF", -- White cursor
-	cursor_fg = "#000000", -- Black cursor text
-	cursor_border = "#FFFFFF",
+	-- Cursor
+	cursor_bg = "#c0caf5", -- Tokyo Night foreground
+	cursor_fg = "#1a1b26", -- Tokyo Night background
+	cursor_border = "#c0caf5",
 
-	-- Selection (subtle)
-	selection_bg = "#444444", -- Dark gray selection
-	selection_fg = "#FFFFFF", -- White selection text
+	-- Selection
+	selection_bg = "#283457", -- Tokyo Night selection
+	selection_fg = "#c0caf5", -- Tokyo Night foreground
 
-	-- ANSI colors (normal) - These make your ls output and text colorful!
+	-- ANSI colors (normal) - Tokyo Night palette
 	ansi = {
-		"#2E3440", -- black
-		"#FF6B9D", -- red (hot pink variant) - for errors, etc.
-		"#32CD32", -- green (lime green) - for executable files
-		"#FFD700", -- yellow (gold) - for directories and warnings
-		"#87CEEB", -- blue (sky blue) - for links and info
-		"#FF69B4", -- magenta (hot pink) - for special files
-		"#00FFFF", -- cyan (bright cyan) - for other file types
-		"#FFFFFF", -- white - for regular text
+		"#15161e", -- black
+		"#f7768e", -- red
+		"#9ece6a", -- green
+		"#e0af68", -- yellow
+		"#7aa2f7", -- blue
+		"#bb9af7", -- magenta
+		"#7dcfff", -- cyan
+		"#a9b1d6", -- white
 	},
 
-	-- ANSI colors (bright) - Even more vibrant versions
+	-- ANSI colors (bright) - Tokyo Night palette
 	brights = {
-		"#4C566A", -- bright black
-		"#FF8FA3", -- bright red (lighter hot pink)
-		"#7FFF00", -- bright green (chartreuse)
-		"#FFFF00", -- bright yellow (pure yellow)
-		"#00BFFF", -- bright blue (deep sky blue)
-		"#FF1493", -- bright magenta (deep pink)
-		"#00FFFF", -- bright cyan (aqua)
-		"#FFFFFF", -- bright white
+		"#414868", -- bright black
+		"#f7768e", -- bright red
+		"#9ece6a", -- bright green
+		"#e0af68", -- bright yellow
+		"#7aa2f7", -- bright blue
+		"#bb9af7", -- bright magenta
+		"#7dcfff", -- bright cyan
+		"#c0caf5", -- bright white
 	},
 }
 
--- Custom tab title formatting for clear borders
+-- Custom tab title formatting for clear borders (Tokyo Night colors)
 wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_width)
-	local background = "#1a1a1a"
-	local foreground = "#A0FFFF"
-	local edge_foreground = "#444444" -- Color for the vertical separator
+	local background = "#1a1b26" -- Tokyo Night background
+	local foreground = "#c0caf5" -- Tokyo Night foreground
+	local edge_foreground = "#414868" -- Tokyo Night bright black
 
 	if tab.is_active then
-		background = "#00FFFF"
-		foreground = "#000000"
+		background = "#7dcfff" -- Tokyo Night cyan
+		foreground = "#1a1b26" -- Tokyo Night background
 	elseif hover then
-		background = "#333333"
-		foreground = "#FFFFFF"
+		background = "#24283b" -- Tokyo Night terminal black
+		foreground = "#c0caf5" -- Tokyo Night foreground
 	end
 
 	local title = tab.active_pane.title
@@ -73,7 +73,7 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 	}
 end)
 
-config.window_background_opacity = 0.75 -- Slightly transparent window
+config.window_background_opacity = 0.85 -- More opaque for darker background
 config.text_background_opacity = 1.0 -- Ensure text background is opaque
 config.macos_window_background_blur = 20 -- Blur effect for frosted glass look
 
