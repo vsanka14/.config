@@ -171,52 +171,14 @@ start_mutagen_sync() {
 }
 
 monitor_sync() {
-    local spinner=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-    local spin_idx=0
-    local last_status_update=0
-    local status_update_interval=2
-    local current_display=""
-
     print_msg INFO "Syncing files (this may take a while)..."
+    print_msg INFO "Press Ctrl+C to stop monitoring (sync will continue in background)"
     echo ""
 
-    while true; do
-        local output=$(mutagen sync list "$SESSION_NAME" 2>&1)
+    # Use mutagen sync monitor which streams output until sync is complete
+    mutagen sync monitor "$SESSION_NAME" || true
 
-        # Check if sync is complete
-        if echo "$output" | grep -q "Watching for changes"; then
-            echo -ne "\r\033[K"  # Clear the spinner line
-            print_msg SUCCESS "Sync complete!"
-            return
-        fi
-
-        # Update status text periodically (every 2 seconds)
-        local current_time=$(date +%s)
-        if [ $((current_time - last_status_update)) -ge $status_update_interval ]; then
-            # Extract Status and Staging progress lines
-            local status_line=$(echo "$output" | grep "^Status:" | sed 's/^Status: //')
-            local progress_line=$(echo "$output" | grep "^Staging progress:" | sed 's/^Staging progress: //')
-
-            # Build display string
-            if [ -n "$progress_line" ]; then
-                current_display="$status_line | $progress_line"
-            elif [ -n "$status_line" ]; then
-                current_display="$status_line"
-            fi
-
-            last_status_update=$current_time
-        fi
-
-        # Show spinner with current status
-        if [ -n "$current_display" ]; then
-            echo -ne "\r  ${spinner[$spin_idx]} $current_display\033[K"
-        else
-            echo -ne "\r  ${spinner[$spin_idx]} Syncing...\033[K"
-        fi
-
-        spin_idx=$(( (spin_idx + 1) % ${#spinner[@]} ))
-        sleep 0.1
-    done
+    print_msg SUCCESS "Sync complete!"
 }
 
 print_create_completion() {
