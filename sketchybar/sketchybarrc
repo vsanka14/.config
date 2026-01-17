@@ -2,7 +2,7 @@
 
 # Colors (Tokyo Night + Cyan accent)
 export BAR_COLOR=0xff000000
-export ITEM_BG_COLOR=0xff24283b
+export ITEM_BG_COLOR=0xcc24283b
 export ACCENT_COLOR=0xff00ffff
 export FG_COLOR=0xffc0caf5
 export FG_MUTED=0xff565f89
