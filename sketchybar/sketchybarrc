@@ -1,11 +1,17 @@
 #!/bin/bash
 
-# Colors (Tokyo Night + Cyan accent)
-export BAR_COLOR=0xff000000
-export ITEM_BG_COLOR=0xcc24283b
-export ACCENT_COLOR=0xff00ffff
-export FG_COLOR=0xffc0caf5
-export FG_MUTED=0xff565f89
+# Colors (Tokyo Night Moon)
+export BAR_COLOR=0xcc222436           # Moon background, semi-transparent
+export ITEM_BG_COLOR=0xcc1e2030       # Moon darker
+export ACCENT_BLUE=0xff82aaff         # Blue
+export ACCENT_PURPLE=0xffc099ff       # Purple
+export ACCENT_CYAN=0xff86e1fc         # Cyan
+export ACCENT_GREEN=0xffc3e88d        # Green
+export ACCENT_PINK=0xfffca7ea         # Magenta/Pink
+export ACCENT_ORANGE=0xffffc777       # Yellow/Orange
+export ACCENT_RED=0xffff757f          # Red
+export FG_COLOR=0xffc8d3f5            # Moon foreground
+export FG_MUTED=0xff636da6            # Moon muted
 
 # Font
 FONT="JetBrainsMono Nerd Font"
@@ -63,7 +69,7 @@ sketchybar --add item battery right \
     --set battery \
         update_freq=120 \
         icon.padding_right=6 \
-        icon.color=$ACCENT_COLOR \
+        icon.color=$ACCENT_ORANGE \
         script="$CONFIG_DIR/plugins/battery.sh" \
     --subscribe battery system_woke power_source_change
 
@@ -88,7 +94,7 @@ sketchybar --add item clock right \
     --set clock \
         update_freq=10 \
         icon.padding_right=6 \
-        icon.color=$ACCENT_COLOR \
+        icon.color=$ACCENT_PURPLE \
         script="$CONFIG_DIR/plugins/clock.sh"
 
 # Clock container
