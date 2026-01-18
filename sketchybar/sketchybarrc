@@ -2,7 +2,7 @@
 
 # Colors (Tokyo Night Moon)
 export BAR_COLOR=0xdd0d0f18           # Darker background, semi-transparent
-export ITEM_BG_COLOR=0xcc1e2030       # Moon darker
+export ITEM_BG_COLOR=0xee2a2f45       # Moon darker, enhanced visibility
 export ACCENT_BLUE=0xff82aaff         # Blue
 export ACCENT_PURPLE=0xffc099ff       # Purple
 export ACCENT_CYAN=0xff86e1fc         # Cyan
