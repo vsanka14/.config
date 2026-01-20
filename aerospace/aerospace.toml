@@ -72,8 +72,8 @@ ctrl-shift-minus = 'join-with down'              # Join vertically (ctrl+_)
 # Resize mode
 ctrl-r = 'mode resize'
 
-# Close window
-ctrl-q = 'close'
+# Close window (disabled to allow Neovim to use Ctrl+Q for quickfix)
+# ctrl-q = 'close'
 
 # Reload config (like tmux prefix+r)
 ctrl-shift-r = 'reload-config'
