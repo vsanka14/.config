@@ -99,6 +99,9 @@ config.use_fancy_tab_bar = false -- Retro tab bar renders inside terminal grid, 
 -- Cursor
 config.default_cursor_style = "BlinkingBar"
 
+-- Performance
+config.max_fps = 120
+
 -- Keybindings
 config.keys = {
 	{ key = "LeftArrow", mods = "CMD|SHIFT", action = wezterm.action.MoveTabRelative(-1) },
