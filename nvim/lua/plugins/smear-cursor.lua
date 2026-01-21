@@ -1,6 +1,6 @@
 return {
   "sphamba/smear-cursor.nvim",
-  -- Smooth cursor
+  -- Smooth cursor - optimized for speed
   opts = {
     stiffness = 0.5,
     trailing_stiffness = 0.5,
