@@ -42,7 +42,7 @@ config.colors = {
 }
 
 --[[
-  TMUX TAB TITLE INTEGRATION
+  TMUX & RDEV TAB TITLE INTEGRATION
 
   This system spans 3 config files (unavoidable due to terminal title protocol):
 
@@ -51,16 +51,17 @@ config.colors = {
      • set -g set-titles-string "[#S] #W"
      Result: tmux sends "\033]0;[session-name] window\007"
 
-  2. wezterm.lua (THIS FILE): Detects [pattern] and displays  icon
+  2. wezterm.lua (THIS FILE): Detects patterns and displays icons
      • Extracts session name from tab.active_pane.title
-     • Shows " tmux: session-name" with colored icon
+     • Shows " tmux: session-name" (magenta icon) for tmux
+     • Shows " rdev: rdev-name" (cyan icon) for rdev
 
-  3. zshrc: Resets title when not in tmux (via precmd hook)
-     • Prevents stale tmux title after detaching
-     • Sends current directory as title
+  3. zshrc: Sets titles via hooks
+     • precmd(): Resets title when not in tmux (current directory)
+     • preexec(): Detects "rdev ssh <name>" and sets "[rdev: <name>]" title
 
   Why 3 files? Terminal titles use escape sequences that require:
-  • Producer (tmux) to send title
+  • Producer (tmux/zsh) to send title
   • Consumer (WezTerm) to display title
   • Fallback (zsh) to reset title when producer exits
 --]]
@@ -83,11 +84,18 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 
 	-- Extract tmux session name if in tmux
 	-- tmux sets title as "[session-name] window-name"
-	local session = title:match("%[([^%]]+)%]")
-	local in_tmux = session ~= nil
+	local tmux_session = title:match("^%[([^:][^%]]*)%]")
+	local in_tmux = tmux_session ~= nil
 
-	if session then
-		title = session -- Just use the session name
+	-- Extract rdev session name if in rdev
+	-- rdev sets title as "[rdev: rdev-name]"
+	local rdev_name = title:match("^%[rdev: ([^%]]+)%]")
+	local in_rdev = rdev_name ~= nil
+
+	if tmux_session then
+		title = tmux_session -- Just use the session name
+	elseif rdev_name then
+		title = rdev_name -- Just use the rdev name
 	end
 
 	-- Truncate title if it's too long
@@ -109,6 +117,13 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 		table.insert(result, { Text = "\u{ebc8} " }) -- Nerd Font tmux icon (nf-dev-terminal_tmux)
 		table.insert(result, { Foreground = { Color = foreground } })
 		table.insert(result, { Text = "tmux: " .. title .. " " })
+	-- Add rdev indicator with icon
+	elseif in_rdev then
+		local icon_color = tab.is_active and "#1a1b26" or "#7dcfff" -- Tokyo Night dark bg when active, cyan when inactive
+		table.insert(result, { Foreground = { Color = icon_color } })
+		table.insert(result, { Text = "\u{f0c2} " }) -- Nerd Font cloud/container icon (nf-fa-cloud)
+		table.insert(result, { Foreground = { Color = foreground } })
+		table.insert(result, { Text = "rdev: " .. title .. " " })
 	else
 		-- Add the title
 		table.insert(result, { Text = title .. " " })

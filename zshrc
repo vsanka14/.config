@@ -37,6 +37,16 @@ precmd() {
   fi
 }
 
+# Set terminal title before command execution (for rdev ssh detection)
+preexec() {
+  # Check if this is an rdev ssh command
+  if [[ "$1" =~ ^rdev[[:space:]]+ssh[[:space:]]+([^[:space:]]+) ]]; then
+    local rdev_name="${match[1]}"
+    # Set title in format that wezterm will recognize
+    print -Pn "\e]0;[rdev: $rdev_name]\a"
+  fi
+}
+
 # Zsh plugins (works on both macOS and Linux)
 for plugin_dir in /opt/homebrew/share ~/.local/share; do
   [ -f "$plugin_dir/zsh-autosuggestions/zsh-autosuggestions.zsh" ] && source "$plugin_dir/zsh-autosuggestions/zsh-autosuggestions.zsh"
