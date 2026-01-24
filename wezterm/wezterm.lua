@@ -87,7 +87,7 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 	local in_tmux = session ~= nil
 
 	if session then
-		title = session  -- Just use the session name
+		title = session -- Just use the session name
 	end
 
 	-- Truncate title if it's too long
@@ -104,9 +104,9 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 
 	-- Add tmux indicator with icon
 	if in_tmux then
-		local icon_color = tab.is_active and "#1a1b26" or "#bb9af7"  -- Tokyo Night dark bg when active, magenta when inactive
+		local icon_color = tab.is_active and "#1a1b26" or "#bb9af7" -- Tokyo Night dark bg when active, magenta when inactive
 		table.insert(result, { Foreground = { Color = icon_color } })
-		table.insert(result, { Text = "\u{ebc8} " })  -- Nerd Font tmux icon (nf-dev-terminal_tmux)
+		table.insert(result, { Text = "\u{ebc8} " }) -- Nerd Font tmux icon (nf-dev-terminal_tmux)
 		table.insert(result, { Foreground = { Color = foreground } })
 		table.insert(result, { Text = "tmux: " .. title .. " " })
 	else
@@ -127,7 +127,7 @@ config.macos_window_background_blur = 20 -- Blur effect for frosted glass look
 
 -- Font
 config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = "Bold" })
-config.font_size = 13.0
+config.font_size = 12.0
 
 -- Window
 config.window_decorations = "RESIZE" -- No title bar, just resizable window
@@ -139,7 +139,7 @@ config.window_padding = {
 }
 
 -- Tab bar
-config.hide_tab_bar_if_only_one_tab = true
+config.hide_tab_bar_if_only_one_tab = false
 config.tab_bar_at_bottom = false
 config.tab_max_width = 32
 config.use_fancy_tab_bar = false -- Retro tab bar renders inside terminal grid, avoiding pixel misalignment
