@@ -70,62 +70,6 @@ return {
         ["<C-f>"] = { "<C-f>zz", desc = "Page down (centered)" },
         ["<C-b>"] = { "<C-b>zz", desc = "Page up (centered)" },
 
-        -- OpenCode AI assistant keymaps
-        ["<Leader>a"] = { desc = "AI (OpenCode)" },
-        ["<Leader>aa"] = {
-          function() require("opencode").ask("@this: ", { submit = true }) end,
-          desc = "Ask OpenCode about selection/cursor",
-        },
-        ["<Leader>aA"] = {
-          function() require("opencode").ask() end,
-          desc = "Ask OpenCode (empty prompt)",
-        },
-        ["<Leader>as"] = {
-          function() require("opencode").select() end,
-          desc = "Select OpenCode action",
-        },
-        ["<Leader>at"] = {
-          function() require("opencode").toggle() end,
-          desc = "Toggle OpenCode terminal",
-        },
-        ["<Leader>ae"] = {
-          function() require("opencode").prompt("Explain @this and its context", { submit = true }) end,
-          desc = "Explain code",
-        },
-        ["<Leader>ar"] = {
-          function() require("opencode").prompt("Review @this for correctness and readability", { submit = true }) end,
-          desc = "Review code",
-        },
-        ["<Leader>af"] = {
-          function() require("opencode").prompt("Fix @diagnostics", { submit = true }) end,
-          desc = "Fix diagnostics",
-        },
-        ["<Leader>ad"] = {
-          function() require("opencode").prompt("Add comments documenting @this", { submit = true }) end,
-          desc = "Document code",
-        },
-        ["<Leader>ao"] = {
-          function() require("opencode").prompt("Optimize @this for performance and readability", { submit = true }) end,
-          desc = "Optimize code",
-        },
-        ["<Leader>ai"] = {
-          function() require("opencode").prompt("Implement @this", { submit = true }) end,
-          desc = "Implement (from comment/signature)",
-        },
-        ["<Leader>aT"] = {
-          function() require("opencode").prompt("Add tests for @this", { submit = true }) end,
-          desc = "Add tests",
-        },
-        ["<Leader>ag"] = {
-          function()
-            require("opencode").prompt(
-              "Review the following git diff for correctness and readability: @diff",
-              { submit = true }
-            )
-          end,
-          desc = "Review git diff",
-        },
-
         -- Git functionality keymaps
         ["<Leader>g"] = { desc = "Git" },
         ["<Leader>gB"] = { function() require("gitsigns").blame_line { full = true } end, desc = "Git Blame Line" },
@@ -154,32 +98,6 @@ return {
         ["<Leader>gr"] = {
           function() require("gitsigns").reset_hunk { vim.fn.line ".", vim.fn.line "v" } end,
           desc = "Reset Selected Hunk",
-        },
-        -- Visual mode OpenCode operations (work on selection)
-        ["<Leader>a"] = { desc = "AI (OpenCode)" },
-        ["<Leader>aa"] = {
-          function() require("opencode").ask("@this: ", { submit = true }) end,
-          desc = "Ask OpenCode about selection",
-        },
-        ["<Leader>ae"] = {
-          function() require("opencode").prompt("Explain @this and its context", { submit = true }) end,
-          desc = "Explain selection",
-        },
-        ["<Leader>ar"] = {
-          function() require("opencode").prompt("Review @this for correctness and readability", { submit = true }) end,
-          desc = "Review selection",
-        },
-        ["<Leader>ad"] = {
-          function() require("opencode").prompt("Add comments documenting @this", { submit = true }) end,
-          desc = "Document selection",
-        },
-        ["<Leader>ao"] = {
-          function() require("opencode").prompt("Optimize @this for performance and readability", { submit = true }) end,
-          desc = "Optimize selection",
-        },
-        ["<Leader>aT"] = {
-          function() require("opencode").prompt("Add tests for @this", { submit = true }) end,
-          desc = "Add tests for selection",
         },
       },
     },

@@ -4,5 +4,6 @@
 ---@type LazySpec
 return {
   "OXY2DEV/markview.nvim",
-  lazy = false, -- Don't lazy load - plugin is already lazy-loaded internally
+  -- Remove lazy = false to let plugin self-manage lazy-loading
+  ft = { "markdown", "mdx" }, -- Explicitly load on markdown filetypes
 }
