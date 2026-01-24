@@ -29,24 +29,13 @@ fi
 # Oh My Posh prompt (tonybaloney theme - customized)
 eval "$(oh-my-posh init zsh --config ~/.config/ohmyposh-theme.json)"
 
-# Set terminal title (resets it after detaching from tmux)
-update_terminal_title() {
+# Set terminal title when not in tmux (for WezTerm tab detection)
+# Works with tmux.conf set-titles to display session name in tabs
+precmd() {
   if [[ -z "$TMUX" ]]; then
-    print -Pn "\e]0;%~\a"  # Set title to current directory when not in tmux
+    print -Pn "\e]0;%~\a"  # Set title to current directory
   fi
 }
-
-precmd() {
-  update_terminal_title
-}
-
-preexec() {
-  update_terminal_title
-}
-
-# Alias for tmux that resets title on detach
-alias tmux='command tmux'
-# When detaching with prefix+d, the precmd will handle it on next prompt
 
 # Zsh plugins (works on both macOS and Linux)
 for plugin_dir in /opt/homebrew/share ~/.local/share; do

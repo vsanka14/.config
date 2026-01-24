@@ -41,6 +41,30 @@ config.colors = {
 	},
 }
 
+--[[
+  TMUX TAB TITLE INTEGRATION
+
+  This system spans 3 config files (unavoidable due to terminal title protocol):
+
+  1. tmux.conf: Tells tmux to send terminal title escape sequences
+     • set -g set-titles on
+     • set -g set-titles-string "[#S] #W"
+     Result: tmux sends "\033]0;[session-name] window\007"
+
+  2. wezterm.lua (THIS FILE): Detects [pattern] and displays  icon
+     • Extracts session name from tab.active_pane.title
+     • Shows " tmux: session-name" with colored icon
+
+  3. zshrc: Resets title when not in tmux (via precmd hook)
+     • Prevents stale tmux title after detaching
+     • Sends current directory as title
+
+  Why 3 files? Terminal titles use escape sequences that require:
+  • Producer (tmux) to send title
+  • Consumer (WezTerm) to display title
+  • Fallback (zsh) to reset title when producer exits
+--]]
+
 -- Custom tab title formatting for clear borders (Tokyo Night colors)
 wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_width)
 	local background = "#1a1b26" -- Tokyo Night background
