@@ -8,9 +8,7 @@ return {
   -- Language packs (includes LSP, treesitter, and tooling)
   { import = "astrocommunity.pack.lua" },
   { import = "astrocommunity.pack.typescript" },
-  { import = "astrocommunity.pack.astro" },
-  { import = "astrocommunity.pack.mdx" },
-  { import = "astrocommunity.pack.java" },
+  { import = "astrocommunity.pack.java" }, -- Keep for future use
   -- UI customizations
   { import = "astrocommunity.recipes.heirline-mode-text-statusline" },
   -- Theme customizations
