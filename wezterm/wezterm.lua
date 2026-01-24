@@ -56,21 +56,45 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 	end
 
 	local title = tab.active_pane.title
+
+	-- Extract tmux session name if in tmux
+	-- tmux sets title as "[session-name] window-name"
+	local session = title:match("%[([^%]]+)%]")
+	local in_tmux = session ~= nil
+
+	if session then
+		title = session  -- Just use the session name
+	end
+
 	-- Truncate title if it's too long
 	local max = 20
 	if #title > max then
 		title = title:sub(1, max - 3) .. "..."
 	end
 
-	title = " " .. tab.tab_index + 1 .. ": " .. title .. " "
-
-	return {
+	local result = {
 		{ Background = { Color = background } },
 		{ Foreground = { Color = foreground } },
-		{ Text = title },
-		{ Foreground = { Color = edge_foreground } },
-		{ Text = "|" },
+		{ Text = " " },
 	}
+
+	-- Add tmux indicator with icon
+	if in_tmux then
+		local icon_color = tab.is_active and "#1a1b26" or "#bb9af7"  -- Tokyo Night dark bg when active, magenta when inactive
+		table.insert(result, { Foreground = { Color = icon_color } })
+		table.insert(result, { Text = "\u{ebc8} " })  -- Nerd Font tmux icon (nf-dev-terminal_tmux)
+		table.insert(result, { Foreground = { Color = foreground } })
+		table.insert(result, { Text = "tmux: " .. title .. " " })
+	else
+		-- Add the title
+		table.insert(result, { Text = title .. " " })
+	end
+
+	-- Add separator
+	table.insert(result, { Foreground = { Color = edge_foreground } })
+	table.insert(result, { Text = "|" })
+
+	return result
 end)
 
 config.window_background_opacity = 0.75 -- More opaque for darker background
