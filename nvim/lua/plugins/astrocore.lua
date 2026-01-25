@@ -100,8 +100,36 @@ return {
 
         -- Screenkey toggle
         ["<Leader>uK"] = { "<cmd>Screenkey<cr>", desc = "Toggle Screenkey" },
+
+        -- Yank helpers
+        ["<Leader>ac"] = {
+          function()
+            local path = vim.fn.expand "%"
+            local line = vim.fn.line "."
+            local result = path .. ":" .. line
+            vim.fn.setreg("+", result)
+            vim.notify("Copied: " .. result, vim.log.levels.INFO)
+          end,
+          desc = "Copy file path:line",
+        },
       },
       v = {
+        -- Yank helpers
+        ["<Leader>ac"] = {
+          function()
+            local path = vim.fn.expand "%"
+            local start_line = vim.fn.line "v"
+            local end_line = vim.fn.line "."
+            if start_line > end_line then
+              start_line, end_line = end_line, start_line
+            end
+            local result = path .. ":" .. start_line .. "-" .. end_line
+            vim.fn.setreg("+", result)
+            vim.notify("Copied: " .. result, vim.log.levels.INFO)
+          end,
+          desc = "Copy file path:lines",
+        },
+
         -- Visual mode git operations
         ["<Leader>gs"] = {
           function() require("gitsigns").stage_hunk { vim.fn.line ".", vim.fn.line "v" } end,
