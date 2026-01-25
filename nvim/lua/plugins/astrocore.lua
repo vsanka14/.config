@@ -74,9 +74,20 @@ return {
         -- Git functionality keymaps
         ["<Leader>g"] = { desc = "Git" },
         ["<Leader>gB"] = { function() require("gitsigns").blame_line { full = true } end, desc = "Git Blame Line" },
-        ["<Leader>gd"] = { "<cmd>DiffviewOpen<cr>", desc = "Open Diff View" },
-        ["<Leader>gh"] = { "<cmd>DiffviewFileHistory %<cr>", desc = "File History" },
-        ["<Leader>gH"] = { "<cmd>DiffviewFileHistory<cr>", desc = "Project History" },
+        ["<Leader>gD"] = {
+          function()
+            -- Close gitsigns diff: find and close gitsigns buffer, turn off diff mode
+            for _, win in ipairs(vim.api.nvim_list_wins()) do
+              local buf = vim.api.nvim_win_get_buf(win)
+              local name = vim.api.nvim_buf_get_name(buf)
+              if name:match("^gitsigns://") then
+                vim.api.nvim_win_close(win, true)
+              end
+            end
+            vim.cmd("diffoff!")
+          end,
+          desc = "Close Git diff",
+        },
         ["<Leader>gg"] = { function() Snacks.lazygit() end, desc = "Open Lazygit" },
         ["<Leader>gp"] = { function() require("gitsigns").preview_hunk() end, desc = "Preview Hunk" },
         ["<Leader>gr"] = { function() require("gitsigns").reset_hunk() end, desc = "Reset Hunk" },
@@ -213,7 +224,6 @@ return {
         },
       },
       -- Auto refresh buffer when file changes on disk
-      -- Testing auto-reload: this comment was added by Claude Code
       auto_refresh_buffer = {
         {
           event = { "FocusGained", "BufEnter", "CursorHold", "CursorHoldI" },
