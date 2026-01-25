@@ -102,33 +102,12 @@ return {
         ["<Leader>uK"] = { "<cmd>Screenkey<cr>", desc = "Toggle Screenkey" },
 
         -- Yank helpers
-        ["<Leader>ac"] = {
-          function()
-            local path = vim.fn.expand "%"
-            local line = vim.fn.line "."
-            local result = path .. ":" .. line
-            vim.fn.setreg("+", result)
-            vim.notify("Copied: " .. result, vim.log.levels.INFO)
-          end,
-          desc = "Copy file path:line",
-        },
+        ["<Leader>ac"] = { function() require("helpers.yank").copy_path_line() end, desc = "Copy file path:line" },
+        ["<Leader>ad"] = { function() require("helpers.yank").copy_diagnostic() end, desc = "Copy diagnostic" },
       },
       v = {
         -- Yank helpers
-        ["<Leader>ac"] = {
-          function()
-            local path = vim.fn.expand "%"
-            local start_line = vim.fn.line "v"
-            local end_line = vim.fn.line "."
-            if start_line > end_line then
-              start_line, end_line = end_line, start_line
-            end
-            local result = path .. ":" .. start_line .. "-" .. end_line
-            vim.fn.setreg("+", result)
-            vim.notify("Copied: " .. result, vim.log.levels.INFO)
-          end,
-          desc = "Copy file path:lines",
-        },
+        ["<Leader>ac"] = { function() require("helpers.yank").copy_path_lines() end, desc = "Copy file path:lines" },
 
         -- Visual mode git operations
         ["<Leader>gs"] = {
