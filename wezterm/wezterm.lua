@@ -116,7 +116,7 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 		table.insert(result, { Foreground = { Color = icon_color } })
 		table.insert(result, { Text = "\u{ebc8} " }) -- Nerd Font tmux icon (nf-dev-terminal_tmux)
 		table.insert(result, { Foreground = { Color = foreground } })
-		table.insert(result, { Text = "tmux: " .. title .. " " })
+		table.insert(result, { Text = title .. " " })
 	-- Add rdev indicator with icon
 	elseif in_rdev then
 		local icon_color = tab.is_active and "#1a1b26" or "#7dcfff" -- Tokyo Night dark bg when active, cyan when inactive
