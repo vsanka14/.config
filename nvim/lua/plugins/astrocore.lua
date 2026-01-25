@@ -40,6 +40,7 @@ return {
         linebreak = true, -- wrap at word boundaries
         textwidth = 0, -- disable auto line breaks
         wrapmargin = 0, -- disable wrap margin
+        autoread = true, -- auto-reload files changed outside vim
       },
       g = { -- vim.g.<key>
         -- configure global vim variables (vim.g)
@@ -211,13 +212,14 @@ return {
           desc = "Set markdown-specific options for better editing",
         },
       },
-      -- Auto refresh buffer when file changes on disk (triggers on focus gain, buffer enter)
+      -- Auto refresh buffer when file changes on disk
+      -- Testing auto-reload: this comment was added by Claude Code
       auto_refresh_buffer = {
         {
-          event = { "FocusGained", "BufEnter" },
+          event = { "FocusGained", "BufEnter", "CursorHold", "CursorHoldI" },
           pattern = "*",
           callback = function()
-            if vim.o.autoread then vim.cmd.checktime() end
+            if vim.fn.getcmdwintype() == "" then vim.cmd.checktime() end
           end,
           desc = "Auto refresh buffer if file changed on disk",
         },
