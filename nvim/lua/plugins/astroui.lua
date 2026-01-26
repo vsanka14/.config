@@ -15,6 +15,13 @@ return {
       init = { -- this table overrides highlights in all themes
         -- Transparency is now handled by Tokyo Night theme config
         NeoTreeDirectoryName = { fg = "#c9c7cd" }, -- Off-white folder names (icon stays blue)
+        -- Git conflict highlighting (for git-conflict.nvim)
+        GitConflictCurrent = { bg = "#2e4b3e" }, -- green tint for ours/HEAD
+        GitConflictCurrentLabel = { bg = "#3d6b52", bold = true },
+        GitConflictIncoming = { bg = "#3d4b5c" }, -- blue tint for theirs
+        GitConflictIncomingLabel = { bg = "#4d6080", bold = true },
+        GitConflictAncestor = { bg = "#4a3d4e" }, -- purple tint for base
+        GitConflictAncestorLabel = { bg = "#5c4d62", bold = true },
       },
       astrodark = { -- a table of overrides/changes when applying the astrotheme theme
         -- Normal = { bg = "#000000" },
