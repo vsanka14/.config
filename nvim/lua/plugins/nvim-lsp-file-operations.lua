@@ -3,6 +3,7 @@ return {
   "antosha417/nvim-lsp-file-operations",
   -- Override astrocommunity config to prevent early init
   lazy = true,
+  init = function() end, -- Override astrocommunity's init to prevent early astrocore loading
   event = "User AstroFile", -- Load with other LSP plugins
   dependencies = {
     "nvim-lua/plenary.nvim",
