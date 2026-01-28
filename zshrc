@@ -5,6 +5,26 @@ export PATH="$HOME/.config/bin:$PATH"
 # Increase Node.js memory limit for large TypeScript projects
 export NODE_OPTIONS="--max-old-space-size=8192"
 
+# Enable vim mode for command line editing
+set -o vi
+
+# Change cursor shape based on vi mode
+# Beam cursor (|) for insert mode, block cursor (█) for normal mode
+function zle-keymap-select {
+  if [[ ${KEYMAP} == vicmd ]] || [[ $1 = 'block' ]]; then
+    echo -ne '\e[1 q'  # Block cursor for normal mode
+  elif [[ ${KEYMAP} == main ]] || [[ ${KEYMAP} == viins ]] || [[ ${KEYMAP} = '' ]] || [[ $1 = 'beam' ]]; then
+    echo -ne '\e[5 q'  # Beam cursor for insert mode
+  fi
+}
+zle -N zle-keymap-select
+
+# Start with beam cursor on new prompt
+function zle-line-init {
+  echo -ne "\e[5 q"  # Beam cursor
+}
+zle -N zle-line-init
+
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
