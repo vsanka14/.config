@@ -21,6 +21,7 @@ return {
       handlebars = { "prettier" },
       sql = { "sql_formatter" },
       lua = { "stylua" },
+      java = { "google-java-format" },
       gitignore = { "trim_whitespace" },
     },
     formatters = {
@@ -45,6 +46,9 @@ return {
       },
       sql_formatter = {
         prepend_args = { "-c", '{"keywordCase":"lower"}' },
+      },
+      ["google-java-format"] = {
+        prepend_args = {},
       },
     },
     format_on_save = {
