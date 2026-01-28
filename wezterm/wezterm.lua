@@ -84,7 +84,16 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, config, hover, max_wid
 
 	-- Extract tmux session name if in tmux
 	-- tmux sets title as "[session-name] window-name"
+	-- Exclude rdev format: "[rdev: name]" by checking for colon
 	local tmux_session = title:match("^%[([^:][^%]]*)%]")
+
+	-- Exclude nvim/vim title format which looks like: "[Scratch] - - Nvim" or "[file.txt] - Nvim"
+	-- Nvim titles have distinctive " - " (space dash space) pattern after the bracket
+	-- Tmux titles are simple: "[session] window" with just a space, no dashes
+	if tmux_session and title:match("^%[[^%]]+%]%s+%-") then
+		tmux_session = nil
+	end
+
 	local in_tmux = tmux_session ~= nil
 
 	-- Extract rdev session name if in rdev
