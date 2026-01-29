@@ -5,8 +5,22 @@ export PATH="$HOME/.config/bin:$PATH"
 # Increase Node.js memory limit for large TypeScript projects
 export NODE_OPTIONS="--max-old-space-size=8192"
 
-# Enable zsh-vi-mode for full vim keybindings with text objects
-source ~/.zsh/zsh-vi-mode/zsh-vi-mode.plugin.zsh
+# Enable vi mode in zsh
+bindkey -v
+
+# Set nvim as the default editor
+export EDITOR='nvim'
+export VISUAL='nvim'
+
+# Enable edit-command-line widget
+autoload -Uz edit-command-line
+zle -N edit-command-line
+
+# Bind Ctrl+X Ctrl+E to edit command in nvim (standard emacs binding)
+bindkey '^X^E' edit-command-line
+
+# Bind v in vi command mode to edit command in nvim (vi-style)
+bindkey -M vicmd 'v' edit-command-line
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
