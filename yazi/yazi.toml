@@ -1,0 +1,23 @@
+# Yazi configuration
+# https://yazi-rs.github.io/docs/configuration/yazi
+
+[mgr]
+# Show hidden files
+show_hidden = false
+# Sort directories first
+sort_dir_first = true
+
+[preview]
+# Enable image preview (requires terminal support)
+image_filter = "triangle"
+
+# Git plugin fetchers - shows git status next to files
+[[plugin.prepend_fetchers]]
+id = "git"
+url = "*"
+run = "git"
+
+[[plugin.prepend_fetchers]]
+id = "git"
+url = "*/"
+run = "git"
