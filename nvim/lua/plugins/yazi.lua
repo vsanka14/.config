@@ -6,13 +6,6 @@ return {
   dependencies = {
     { "nvim-lua/plenary.nvim", lazy = true },
   },
-  keys = {
-    {
-      "<leader>e",
-      "<cmd>Yazi<cr>",
-      desc = "File Explorer (yazi)",
-    },
-  },
   ---@type YaziConfig | {}
   opts = {
     open_for_directories = true,

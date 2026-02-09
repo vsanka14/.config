@@ -80,11 +80,9 @@ return {
             for _, win in ipairs(vim.api.nvim_list_wins()) do
               local buf = vim.api.nvim_win_get_buf(win)
               local name = vim.api.nvim_buf_get_name(buf)
-              if name:match("^gitsigns://") then
-                vim.api.nvim_win_close(win, true)
-              end
+              if name:match "^gitsigns://" then vim.api.nvim_win_close(win, true) end
             end
-            vim.cmd("diffoff!")
+            vim.cmd "diffoff!"
           end,
           desc = "Close Git diff",
         },
@@ -101,17 +99,21 @@ return {
         -- Screenkey toggle
         ["<Leader>uK"] = { "<cmd>Screenkey<cr>", desc = "Toggle Screenkey" },
 
+        -- Yazi
+        ["<Leader>e"] = {
+          "<cmd>Yazi<cr>",
+          desc = "File Explorer (yazi)",
+        },
+
         -- Yank helpers
         ["<Leader>ac"] = { function() require("helpers.yank").copy_path_line() end, desc = "Copy file path:line" },
         ["<Leader>ad"] = { function() require("helpers.yank").copy_diagnostic() end, desc = "Copy diagnostic" },
 
-        -- Ember file switching (.hbs <-> .js/.ts)
+        -- Ember.js helpers: file switching (.hbs <-> .js/.ts), (integration for components, unit for others)
         ["<Leader>oa"] = {
           function() require("helpers.ember").go_to_alternate() end,
           desc = "Go to alternate Ember file (.hbs <-> .js/.ts)",
         },
-
-        -- Open Ember test (integration for components, unit for others)
         ["<Leader>ot"] = {
           function() require("helpers.ember").open_test() end,
           desc = "Open test file",
