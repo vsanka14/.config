@@ -107,40 +107,14 @@ return {
 
         -- Ember file switching (.hbs <-> .js/.ts)
         ["<Leader>oa"] = {
-          function()
-            local current_file = vim.fn.expand("%:p")
-            local target_file
-
-            if current_file:match("%.hbs$") then
-              -- From .hbs -> try .js first, then .ts
-              local js_file = current_file:gsub("%.hbs$", ".js")
-              local ts_file = current_file:gsub("%.hbs$", ".ts")
-              if vim.fn.filereadable(js_file) == 1 then
-                target_file = js_file
-              elseif vim.fn.filereadable(ts_file) == 1 then
-                target_file = ts_file
-              else
-                vim.notify("No corresponding .js or .ts file found", vim.log.levels.WARN)
-                return
-              end
-            elseif current_file:match("%.js$") then
-              -- From .js -> .hbs
-              target_file = current_file:gsub("%.js$", ".hbs")
-            elseif current_file:match("%.ts$") then
-              -- From .ts -> .hbs
-              target_file = current_file:gsub("%.ts$", ".hbs")
-            else
-              vim.notify("Not an Ember file (.hbs, .js, or .ts)", vim.log.levels.WARN)
-              return
-            end
-
-            if vim.fn.filereadable(target_file) == 1 then
-              vim.cmd("edit " .. vim.fn.fnameescape(target_file))
-            else
-              vim.notify("File not found: " .. target_file, vim.log.levels.WARN)
-            end
-          end,
+          function() require("helpers.ember").go_to_alternate() end,
           desc = "Go to alternate Ember file (.hbs <-> .js/.ts)",
+        },
+
+        -- Open Ember test (integration for components, unit for others)
+        ["<Leader>ot"] = {
+          function() require("helpers.ember").open_test() end,
+          desc = "Open test file",
         },
       },
       v = {
