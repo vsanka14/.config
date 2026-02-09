@@ -1,0 +1,39 @@
+# Tokyonight theme for Yazi with high visibility status bar
+
+[manager]
+cwd = { fg = "#7aa2f7", bold = true }
+
+# Status bar - all elements in one section
+[status]
+# Overall status bar background
+overall = { bg = "#414868" }
+
+# Separators
+sep_left = { open = "", close = "" }
+sep_right = { open = "", close = "" }
+
+# Permission characters - bright colorful text on gray background
+perm_type = { fg = "#7dcfff", bg = "#414868", bold = true }
+perm_read = { fg = "#9ece6a", bg = "#414868", bold = true }
+perm_write = { fg = "#f7768e", bg = "#414868", bold = true }
+perm_exec = { fg = "#bb9af7", bg = "#414868", bold = true }
+perm_sep = { fg = "#565f89", bg = "#414868" }
+
+# Progress indicators
+progress_label = { fg = "#9ece6a", bg = "#414868", bold = true }
+progress_normal = { fg = "#9ece6a", bg = "#414868", bold = true }
+progress_error = { fg = "#f7768e", bg = "#414868", bold = true }
+
+# Mode indicators - bright backgrounds for visibility
+[mode]
+normal_main = { fg = "#1a1b26", bg = "#bb9af7", bold = true }
+normal_alt = { fg = "#1a1b26", bg = "#9d7cd8", bold = true }
+select_main = { fg = "#1a1b26", bg = "#7aa2f7", bold = true }
+select_alt = { fg = "#1a1b26", bg = "#5e8bcc", bold = true }
+unset_main = { fg = "#1a1b26", bg = "#7dcfff", bold = true }
+unset_alt = { fg = "#1a1b26", bg = "#5ea6cc", bold = true }
+
+[select]
+border = { fg = "#7aa2f7" }
+active = { fg = "#bb9af7", bold = true }
+inactive = {}
