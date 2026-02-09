@@ -1,13 +1,5 @@
--- Show hidden files by default in Neo-tree
+-- Disable neo-tree in favor of yazi
 return {
   "nvim-neo-tree/neo-tree.nvim",
-  opts = {
-    filesystem = {
-      filtered_items = {
-        visible = true,
-        hide_dotfiles = false,
-        hide_gitignored = false,
-      },
-    },
-  },
+  enabled = false,
 }

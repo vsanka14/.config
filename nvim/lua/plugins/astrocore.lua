@@ -203,19 +203,6 @@ return {
           end,
         },
       },
-      -- Auto-refresh Neo-tree git status when Neovim regains focus
-      neotree_git_refresh = {
-        {
-          event = { "FocusGained", "BufEnter", "CursorHold" },
-          pattern = "*",
-          callback = function()
-            if package.loaded["neo-tree.sources.manager"] then
-              require("neo-tree.sources.manager").refresh "filesystem"
-            end
-          end,
-          desc = "Refresh Neo-tree git status on focus",
-        },
-      },
       -- Markdown-specific settings
       markdown_settings = {
         {
