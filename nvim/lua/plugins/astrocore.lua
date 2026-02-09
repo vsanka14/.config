@@ -108,11 +108,19 @@ return {
         -- Yank helpers
         ["<Leader>ac"] = { function() require("helpers.yank").copy_path_line() end, desc = "Copy file path:line" },
         ["<Leader>ad"] = { function() require("helpers.yank").copy_diagnostic() end, desc = "Copy diagnostic" },
+        ["<Leader>yt"] = {
+          function() require("helpers.ember").copy_test_module() end,
+          desc = "Yank Ember test module name",
+        },
 
-        -- Ember.js helpers: file switching (.hbs <-> .js/.ts), (integration for components, unit for others)
+        -- Ember.js file jumper helpers: file switching (.hbs <-> .js/.ts), (integration for components, unit for others)
         ["<Leader>oa"] = {
           function() require("helpers.ember").go_to_alternate() end,
           desc = "Go to alternate Ember file (.hbs <-> .js/.ts)",
+        },
+        ["<Leader>os"] = {
+          function() require("helpers.ember").open_source() end,
+          desc = "Open source file from test",
         },
         ["<Leader>ot"] = {
           function() require("helpers.ember").open_test() end,
