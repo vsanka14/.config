@@ -47,7 +47,7 @@ else
     [[ -n "$selected" ]] && selected="$HOME/$selected"
 fi
 
-[[ -z "$selected" ]] && exit 0
+[[ -z "$selected" ]] && exit 1
 
 # Session name = directory basename, dots replaced with underscores
 selected_name=$(basename "$selected" | tr . _)
@@ -57,4 +57,8 @@ if ! tmux has-session -t="$selected_name" 2>/dev/null; then
     tmux new-session -ds "$selected_name" -c "$selected"
 fi
 
-tmux switch-client -t "$selected_name"
+if [[ -n "$TMUX" ]]; then
+    tmux switch-client -t "$selected_name"
+else
+    exec tmux attach-session -t "$selected_name"
+fi

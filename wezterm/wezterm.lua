@@ -61,6 +61,12 @@ config.window_padding = {
 -- Tab bar
 config.hide_tab_bar_if_only_one_tab = true
 
+-- Launch into tmux session switcher on startup
+config.default_prog = {
+	"/bin/zsh", "-l", "-c",
+	"~/.config/scripts/tmux-session-switcher.sh || exec tmux new-session -As main",
+}
+
 -- Cursor
 config.default_cursor_style = "BlinkingBar"
 
