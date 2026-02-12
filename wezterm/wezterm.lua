@@ -60,9 +60,6 @@ config.window_padding = {
 
 -- Tab bar
 config.hide_tab_bar_if_only_one_tab = true
-config.tab_bar_at_bottom = false
-config.tab_max_width = 32
-config.use_fancy_tab_bar = false -- Retro tab bar renders inside terminal grid, avoiding pixel misalignment
 
 -- Cursor
 config.default_cursor_style = "BlinkingBar"
@@ -72,11 +69,7 @@ config.max_fps = 120
 
 -- Keybindings
 config.keys = {
-	{ key = "LeftArrow", mods = "CMD|SHIFT", action = wezterm.action.MoveTabRelative(-1) },
-	{ key = "RightArrow", mods = "CMD|SHIFT", action = wezterm.action.MoveTabRelative(1) },
 	{ key = "k", mods = "CMD", action = wezterm.action.SendKey({ key = "l", mods = "CTRL" }) },
-	{ key = "j", mods = "CMD", action = wezterm.action.SendKey({ key = "j", mods = "CTRL" }) }, -- newline (ctrl+j intercepted by AeroSpace)
-	{ key = "w", mods = "CMD", action = wezterm.action.CloseCurrentTab({ confirm = true }) },
 	{
 		key = "a",
 		mods = "CMD",
@@ -89,54 +82,6 @@ config.keys = {
 	-- Option + Arrow keys for word navigation
 	{ key = "LeftArrow", mods = "OPT", action = wezterm.action.SendString("\x1bb") },
 	{ key = "RightArrow", mods = "OPT", action = wezterm.action.SendString("\x1bf") },
-
-	-- Split panes
-	{
-		key = "|",
-		mods = "CMD|SHIFT",
-		action = wezterm.action.SplitHorizontal({ domain = "CurrentPaneDomain" }),
-	},
-	{ key = "_", mods = "CMD|SHIFT", action = wezterm.action.SplitVertical({ domain = "CurrentPaneDomain" }) },
-
-	-- Navigate panes
-	{ key = "h", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Left") },
-	{ key = "l", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Right") },
-	{ key = "k", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Up") },
-	{ key = "j", mods = "CMD|OPT", action = wezterm.action.ActivatePaneDirection("Down") },
-
-	-- Manage panes
-	{ key = "w", mods = "CMD|SHIFT", action = wezterm.action.CloseCurrentPane({ confirm = true }) },
-	{ key = "z", mods = "CMD|SHIFT", action = wezterm.action.TogglePaneZoomState },
-
-	-- Resize panes
-	{ key = "h", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Left", 5 }) },
-	{ key = "l", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Right", 5 }) },
-	{ key = "k", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Up", 5 }) },
-	{ key = "j", mods = "CMD|CTRL", action = wezterm.action.AdjustPaneSize({ "Down", 5 }) },
 }
 
--- CTRL+ALT + number to move tab to that position
-for i = 1, 8 do
-	table.insert(config.keys, {
-		key = tostring(i),
-		mods = "CTRL|ALT",
-		action = wezterm.action.MoveTab(i - 1),
-	})
-end
-
 return config
-
---[[
-  Popular color schemes to try:
-  - "Tokyo Night"
-  - "Catppuccin Mocha"
-  - "Dracula"
-  - "Gruvbox Dark"
-  - "Nord"
-  - "One Dark"
-  - "Solarized Dark"
-  - "Kanagawa"
-
-  Run `wezterm ls-fonts --list-system` to see available fonts
-  Full scheme list: https://wezfurlong.org/wezterm/colorschemes/index.html
-]]
