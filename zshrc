@@ -46,24 +46,6 @@ fi
 # Oh My Posh prompt (tonybaloney theme - customized)
 eval "$(oh-my-posh init zsh --config ~/.config/ohmyposh-theme.json)"
 
-# Set terminal title when not in tmux (for WezTerm tab detection)
-# Works with tmux.conf set-titles to display session name in tabs
-precmd() {
-  if [[ -z "$TMUX" ]]; then
-    print -Pn "\e]0;%~\a"  # Set title to current directory
-  fi
-}
-
-# Set terminal title before command execution (for rdev ssh detection)
-preexec() {
-  # Check if this is an rdev ssh command
-  if [[ "$1" =~ ^rdev[[:space:]]+ssh[[:space:]]+([^[:space:]]+) ]]; then
-    local rdev_name="${match[1]}"
-    # Set title in format that wezterm will recognize
-    print -Pn "\e]0;[rdev: $rdev_name]\a"
-  fi
-}
-
 # Zsh plugins (works on both macOS and Linux)
 for plugin_dir in /opt/homebrew/share ~/.local/share; do
   [ -f "$plugin_dir/zsh-autosuggestions/zsh-autosuggestions.zsh" ] && source "$plugin_dir/zsh-autosuggestions/zsh-autosuggestions.zsh"
