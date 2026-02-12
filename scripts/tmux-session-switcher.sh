@@ -25,15 +25,17 @@ else
           | while IFS= read -r dir; do
                 name=$(basename "$dir" | tr . _)
                 if echo "$active_sessions" | grep -qx "$name"; then
-                    echo "● $dir"
+                    echo -e "0\033[32m●\033[0m $dir"
                 else
-                    echo "  $dir"
+                    echo "1  $dir"
                 fi
             done \
+          | sort -t' ' -k1,1 \
+          | cut -c2- \
           | fzf --ansi \
                 --reverse \
                 --border=rounded \
-                --border-label=" sessions " \
+                --border-label=" switch " \
                 --border-label-pos=3 \
                 --prompt="  " \
                 --pointer="▶" \
@@ -41,7 +43,6 @@ else
                 --color='bg+:#33467c,fg+:#a9b1d6,hl:#7aa2f7,hl+:#7dcfff' \
                 --color='border:#7aa2f7,label:#7aa2f7,prompt:#bb9af7' \
                 --color='pointer:#bb9af7,info:#565f89,header:#565f89' \
-                --header='● active' \
           | sed 's/^. //'
     )
     [[ -n "$selected" ]] && selected="$HOME/$selected"
