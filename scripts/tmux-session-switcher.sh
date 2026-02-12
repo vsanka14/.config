@@ -12,17 +12,37 @@ EXTRA_DIRS=(
 )
 
 if [[ $# -eq 1 ]]; then
-    # Direct jump mode — argument is the target directory
     selected="$1"
 else
-    # Fuzzy picker mode — list subdirs + extras, pipe to fzf
+    active_sessions=$(tmux list-sessions -F '#S' 2>/dev/null)
+
     selected=$(
         {
             fd . "${SCAN_DIRS[@]}" --type=d --max-depth=1 --absolute-path
             printf '%s\n' "${EXTRA_DIRS[@]}"
         } | sort -u \
           | sed "s|^$HOME/||" \
-          | fzf --height=40% --reverse --border --prompt="code> "
+          | while IFS= read -r dir; do
+                name=$(basename "$dir" | tr . _)
+                if echo "$active_sessions" | grep -qx "$name"; then
+                    echo "● $dir"
+                else
+                    echo "  $dir"
+                fi
+            done \
+          | fzf --ansi \
+                --reverse \
+                --border=rounded \
+                --border-label=" sessions " \
+                --border-label-pos=3 \
+                --prompt="  " \
+                --pointer="▶" \
+                --padding=1 \
+                --color='bg+:#33467c,fg+:#a9b1d6,hl:#7aa2f7,hl+:#7dcfff' \
+                --color='border:#7aa2f7,label:#7aa2f7,prompt:#bb9af7' \
+                --color='pointer:#bb9af7,info:#565f89,header:#565f89' \
+                --header='● active' \
+          | sed 's/^. //'
     )
     [[ -n "$selected" ]] && selected="$HOME/$selected"
 fi
