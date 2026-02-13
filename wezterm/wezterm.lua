@@ -41,7 +41,7 @@ config.colors = {
 	},
 }
 
-config.window_background_opacity = 0.70 -- More opaque for darker background
+config.window_background_opacity = 0.75 -- More opaque for darker background
 config.text_background_opacity = 1.0 -- Ensure text background is opaque
 config.macos_window_background_blur = 20 -- Blur effect for frosted glass look
 
@@ -63,7 +63,9 @@ config.hide_tab_bar_if_only_one_tab = true
 
 -- Launch into tmux session switcher on startup
 config.default_prog = {
-	"/bin/zsh", "-l", "-c",
+	"/bin/zsh",
+	"-l",
+	"-c",
 	"~/.config/scripts/tmux-session-switcher.sh || exec tmux new-session -As main",
 }
 
