@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # Colors (Tokyo Night Moon)
-export BAR_COLOR=0xdd0d0f18           # Darker background, semi-transparent
+export BAR_COLOR=0xcc0d0f18           # ~0.80 opacity, matching wezterm
 export ITEM_BG_COLOR=0xee2a2f45       # Moon darker, enhanced visibility
+export CONTAINER_BG_COLOR=0x991e2030   # Moon bg_dark, ~0.60 opacity
 export ACCENT_BLUE=0xff82aaff         # Blue
 export ACCENT_PURPLE=0xffc099ff       # Purple
 export ACCENT_CYAN=0xff86e1fc         # Cyan
@@ -76,7 +77,7 @@ sketchybar --add item battery right \
 # Battery container
 sketchybar --add bracket battery_container battery \
     --set battery_container \
-        background.color=$ITEM_BG_COLOR \
+        background.color=$CONTAINER_BG_COLOR \
         background.corner_radius=6 \
         background.height=24 \
         background.drawing=on
@@ -100,7 +101,7 @@ sketchybar --add item clock right \
 # Clock container
 sketchybar --add bracket clock_container clock \
     --set clock_container \
-        background.color=$ITEM_BG_COLOR \
+        background.color=$CONTAINER_BG_COLOR \
         background.corner_radius=6 \
         background.height=24 \
         background.drawing=on
