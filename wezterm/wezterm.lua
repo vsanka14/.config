@@ -9,7 +9,7 @@ config.color_scheme = "tokyonight_night"
 config.colors = {
 	background = "#000000", -- Deep black (darker than default #1a1b26)
 }
-config.window_background_opacity = 0.75
+config.window_background_opacity = 0.80
 config.text_background_opacity = 1.0
 config.macos_window_background_blur = 20
 
