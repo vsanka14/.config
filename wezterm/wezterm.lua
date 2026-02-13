@@ -14,16 +14,17 @@ config.text_background_opacity = 1.0
 config.macos_window_background_blur = 20
 
 -- Font
-config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = "Bold" })
+config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = "DemiBold" })
 config.font_size = 12.0
+config.line_height = 1.2
 
 -- Window
 config.window_decorations = "RESIZE" -- No title bar, just resizable window
 config.window_padding = {
-	left = 0,
-	right = 0,
-	top = 0,
-	bottom = 0,
+	left = 12,
+	right = 12,
+	top = 12,
+	bottom = 12,
 }
 
 -- Tab bar
