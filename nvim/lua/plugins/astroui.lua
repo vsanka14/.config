@@ -22,6 +22,7 @@ return {
         GitConflictIncomingLabel = { bg = "#4d6080", bold = true },
         GitConflictAncestor = { bg = "#4a3d4e" }, -- purple tint for base
         GitConflictAncestorLabel = { bg = "#5c4d62", bold = true },
+        SnacksDashboardHeader = { fg = "#bb9af7" }, -- Tokyo Night magenta
       },
       astrodark = { -- a table of overrides/changes when applying the astrotheme theme
         -- Normal = { bg = "#000000" },
