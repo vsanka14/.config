@@ -86,13 +86,9 @@ export SORT USER_ONLY
 
 PREVIEW_CMD='pid=$(echo {} | awk "{print \$1}"); [[ "$pid" =~ ^[0-9]+$ ]] && ps -p "$pid" -o pid,ppid,user,stat,%cpu,%mem,rss,vsz,etime,command 2>/dev/null && echo "---" && lsof -p "$pid" 2>/dev/null | head -20 || echo "Process not found"'
 
-# TokyoNight fzf theme
-TN_FZF_COLORS="bg:-1,bg+:#292e42,fg:#c0caf5,fg+:#c0caf5"
-TN_FZF_COLORS+=",hl:#ff9e64,hl+:#ff9e64"
-TN_FZF_COLORS+=",info:#7aa2f7,prompt:#7dcfff,pointer:#f7768e"
-TN_FZF_COLORS+=",marker:#9ece6a,spinner:#9ece6a"
-TN_FZF_COLORS+=",header:#565f89,border:#29a4bd,label:#7aa2f7"
-TN_FZF_COLORS+=",gutter:-1,preview-bg:-1"
+# fzf overrides (base theme from FZF_DEFAULT_OPTS in zshrc)
+TN_FZF_COLORS="bg:-1,gutter:-1,preview-bg:-1"
+TN_FZF_COLORS+=",hl:#ff9e64,hl+:#ff9e64"  # Orange highlights for process names
 
 result=$(format_procs | fzf \
   --multi \

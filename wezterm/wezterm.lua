@@ -1,49 +1,17 @@
 local wezterm = require("wezterm")
 local config = wezterm.config_builder()
 
--- Tokyo Night 'night' color scheme
+-- Tokyo Night 'night' color scheme (from tokyonight.nvim extras)
+config.color_scheme_dirs = { os.getenv("HOME") .. "/.local/share/nvim/lazy/tokyonight.nvim/extras/wezterm" }
+config.color_scheme = "tokyonight_night"
+
+-- Custom overrides
 config.colors = {
-	-- Foreground and background
-	foreground = "#c0caf5", -- Tokyo Night foreground
-	background = "#000000", -- Deep black (darker than Tokyo Night default)
-
-	-- Cursor
-	cursor_bg = "#c0caf5", -- Tokyo Night foreground
-	cursor_fg = "#1a1b26", -- Tokyo Night background
-	cursor_border = "#c0caf5",
-
-	-- Selection
-	selection_bg = "#283457", -- Tokyo Night selection
-	selection_fg = "#c0caf5", -- Tokyo Night foreground
-
-	-- ANSI colors (normal) - Tokyo Night palette
-	ansi = {
-		"#15161e", -- black
-		"#f7768e", -- red
-		"#9ece6a", -- green
-		"#e0af68", -- yellow
-		"#7aa2f7", -- blue
-		"#bb9af7", -- magenta
-		"#7dcfff", -- cyan
-		"#a9b1d6", -- white
-	},
-
-	-- ANSI colors (bright) - Tokyo Night palette
-	brights = {
-		"#414868", -- bright black
-		"#f7768e", -- bright red
-		"#9ece6a", -- bright green
-		"#e0af68", -- bright yellow
-		"#7aa2f7", -- bright blue
-		"#bb9af7", -- bright magenta
-		"#7dcfff", -- bright cyan
-		"#c0caf5", -- bright white
-	},
+	background = "#000000", -- Deep black (darker than default #1a1b26)
 }
-
-config.window_background_opacity = 0.75 -- More opaque for darker background
-config.text_background_opacity = 1.0 -- Ensure text background is opaque
-config.macos_window_background_blur = 20 -- Blur effect for frosted glass look
+config.window_background_opacity = 0.75
+config.text_background_opacity = 1.0
+config.macos_window_background_blur = 20
 
 -- Font
 config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = "Bold" })

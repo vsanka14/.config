@@ -40,9 +40,7 @@ else
                 --prompt="  " \
                 --pointer="▶" \
                 --padding=1 \
-                --color='bg+:#33467c,fg+:#a9b1d6,hl:#7aa2f7,hl+:#7dcfff' \
-                --color='border:#7aa2f7,label:#7aa2f7,prompt:#bb9af7' \
-                --color='pointer:#bb9af7,info:#565f89,header:#565f89' \
+                --color='bg:-1,gutter:-1' \
           | sed 's/^. //'
     )
     [[ -n "$selected" ]] && selected="$HOME/$selected"
