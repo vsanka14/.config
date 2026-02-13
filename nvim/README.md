@@ -1,243 +1,42 @@
-# Neovim Config Breakdown
+# Neovim Config
 
-## Architecture Overview
+Built on [AstroNvim v5](https://astronvim.com/). Extended via lazy.nvim plugin specs and AstroCommunity packs.
 
-Your config is built on **AstroNvim v5** - a pre-configured Neovim distribution. The loading order is:
-
-```
-init.lua -> lazy_setup.lua -> [AstroNvim core, community/, plugins/]
-```
-
----
-
-## Plugin Categories
-
-### Core Framework (Required)
-
-| Plugin | Purpose |
-|--------|---------|
-| **AstroNvim** | Base distribution - provides sensible defaults, UI, keymaps |
-| **astrocore** | Core settings, options, mappings |
-| **astrolsp** | LSP configuration engine |
-| **astroui** | UI theming and icons |
-
-### Package Management
-
-| Plugin | Purpose |
-|--------|---------|
-| **lazy.nvim** | Plugin manager (bootstrapped in init.lua) |
-| **mason-tool-installer** | Auto-installs LSPs, formatters, linters |
-
-### Code Intelligence
-
-| Plugin | Purpose |
-|--------|---------|
-| **nvim-treesitter** | Syntax highlighting, code parsing |
-| **blink.cmp** | Autocompletion engine |
-| **lsp_signature.nvim** | Function signature hints |
-| **LuaSnip** | Snippet engine |
-
-### Formatting & Linting
-
-| Plugin | Purpose |
-|--------|---------|
-| **conform.nvim** | Code formatting on save (prettier, stylua) |
-| **none-ls.nvim** | Linters (eslint_d, shellcheck, markdownlint) |
-
-### Git Integration (GitLens-like)
-
-| Plugin | Purpose |
-|--------|---------|
-| **gitsigns.nvim** | Inline git signs, always-on EOL blame, hunk staging |
-| **git-blame.nvim** | Toggle-able full blame display |
-| **diffview.nvim** | Advanced diff/history viewer |
-| **lazygit** (via snacks.nvim) | Full git UI in terminal |
-
-### UI & Navigation
-
-| Plugin | Purpose |
-|--------|---------|
-| **snacks.nvim** | Dashboard, lazygit integration, input/picker/terminal |
-| **neo-tree.nvim** | File explorer (shows hidden files) |
-| **mini.icons** | Icons (includes Astro icon) |
-| **nvim-autopairs** | Auto-close brackets/quotes |
-| **screenkey.nvim** | Display keypresses on screen (for demos/recordings) |
-
-### AI Integration
-
-| Plugin | Purpose |
-|--------|---------|
-| **opencode.nvim** | OpenCode AI assistant with WezTerm integration |
-
-### Markdown
-
-| Plugin | Purpose |
-|--------|---------|
-| **markview.nvim** | In-buffer markdown/HTML/LaTeX/Typst/YAML rendering |
-| **glow.nvim** | Terminal preview using `glow` CLI |
-| **markdown-preview.nvim** | Live browser preview with hot reload |
-
----
-
-## Installed Tools (via Mason)
-
-### Language Servers
-- `lua-language-server` - Lua
-- `typescript-language-server` - JS/TS
-- `astro-language-server` - Astro
-- `mdx-analyzer` - MDX
-
-### Formatters
-- `stylua` - Lua
-- `prettier` - JS/TS/CSS/HTML/JSON/YAML/Markdown
-
-### Linters
-- `eslint_d` - JS/TS (fast daemon version)
-- `shellcheck` - Shell scripts
-- `markdownlint` - Markdown
-
-### Other
-- `debugpy` - Python debugger
-- `tree-sitter-cli` - Treesitter grammar compiler
-
----
-
-## Linting Behavior
-
-Linters run automatically and show diagnostics:
-- **On file open** - immediate feedback
-- **On save** - re-checks the file
-- **As you type** - eslint_d supports this
-
-Diagnostics appear as:
-- Squiggly underlines in the editor
-- Signs in the gutter (left margin)
-- Listed in `:Telescope diagnostics`
-
-**Note**: Linters do NOT block git commits. For commit blocking, set up pre-commit hooks in your project (husky, lint-staged, etc.).
-
----
-
-## Keybinding Summary
-
-| Key | Action |
-|-----|--------|
-| `<Space>` | Leader key |
-| `jk` | Exit insert mode |
-
-### Git (`<Leader>g`)
-| Key | Action |
-|-----|--------|
-| `<Leader>gb` | Toggle git blame |
-| `<Leader>gB` | Full blame for current line |
-| `<Leader>gd` | Open diff view |
-| `<Leader>gh` | File history |
-| `<Leader>gH` | Project history |
-| `<Leader>gg` | Open Lazygit |
-| `<Leader>gp` | Preview hunk |
-| `<Leader>gr` | Reset hunk |
-| `<Leader>gR` | Reset buffer |
-| `<Leader>gs` | Stage hunk |
-| `<Leader>gS` | Stage buffer |
-| `<Leader>gu` | Undo stage hunk |
-| `]h` / `[h` | Next/Prev git hunk |
-
-### AI / OpenCode (`<Leader>a`)
-| Key | Action |
-|-----|--------|
-| `<Leader>aa` | Ask OpenCode about selection/cursor |
-| `<Leader>aA` | Ask OpenCode (empty prompt) |
-| `<Leader>as` | Select OpenCode action |
-| `<Leader>at` | Toggle OpenCode terminal |
-| `<Leader>ae` | Explain code |
-| `<Leader>ar` | Review code |
-| `<Leader>af` | Fix diagnostics |
-| `<Leader>ad` | Document code |
-| `<Leader>ao` | Optimize code |
-| `<Leader>ai` | Implement (from comment/signature) |
-| `<Leader>aT` | Add tests |
-| `<Leader>ag` | Review git diff |
-
-### Markdown (`<Leader>m`)
-| Key | Action |
-|-----|--------|
-| `<Leader>mp` | Preview in terminal (Glow) |
-| `<Leader>mb` | Preview in browser |
-| `<Leader>ms` | Stop browser preview |
-
-### Buffers
-| Key | Action |
-|-----|--------|
-| `]b` / `[b` | Next/Prev buffer |
-| `<Leader>bd` | Close buffer from tabline |
-
-### Utilities
-| Key | Action |
-|-----|--------|
-| `<Leader>uK` | Toggle Screenkey (show keypresses) |
-
----
-
-## Markdown Editing Experience
-
-### Editing Features
-- **Word wrap** enabled globally (`wrap = true`, `linebreak = true`)
-- **Conceal** enabled for markdown (hides syntax like `**bold**` showing **bold**)
-- **Autocompletion disabled** for markdown/text files (less noise when writing prose)
-- **Prettier** formats on save
-- **markview.nvim** renders markdown in-buffer with syntax highlighting
-
-### Preview Options
-| Command | What it does |
-|---------|--------------|
-| `<Leader>mp` | Opens Glow in a floating terminal window - fast, stays in nvim |
-| `<Leader>mb` | Opens browser with live preview - auto-refreshes as you type |
-| `<Leader>ms` | Stops the browser preview server |
-| (auto) | markview.nvim renders headings, lists, code blocks in-buffer |
-
-### MDX Support
-- Filetype detection for `.mdx` files
-- Uses markdown treesitter parser
-- LSP via `mdx-analyzer`
-
-### Dependencies
-- `glow` CLI (installed via brew) - required for terminal preview
-- `lazygit` CLI (installed via brew) - required for lazygit integration
-- `opencode` CLI - required for OpenCode AI assistant
-- Browser preview installs its own npm dependencies on first use
-
----
-
-## File Structure
+## Loading Order
 
 ```
-nvim/
-├── init.lua                 # Bootstrap lazy.nvim
-├── lua/
-│   ├── lazy_setup.lua       # Lazy.nvim config, loads AstroNvim
-│   ├── community.lua        # AstroCommunity imports (lua pack)
-│   ├── polish.lua           # Post-setup customizations (empty)
-│   └── plugins/
-│       ├── astrocore.lua    # Core settings, keymaps, options
-│       ├── astrolsp.lua     # LSP configuration
-│       ├── astroui.lua      # Theme, icons
-│       ├── blink-cmp.lua    # Completion settings
-│       ├── conform.lua      # Formatters
-│       ├── markview.lua     # In-buffer markdown rendering
-│       ├── mason.lua        # Tool installation
-│       ├── mdx.lua          # MDX support
-│       ├── none-ls.lua      # Linters
-│       ├── treesitter.lua   # Syntax highlighting
-│       └── user.lua         # Custom plugins (git, markdown, opencode, etc.)
+init.lua → lazy_setup.lua → AstroNvim core → community.lua → plugins/ → polish.lua
 ```
 
----
+`community.lua` loads first, so anything in `plugins/` can override community defaults.
 
-## Remaining Considerations
+## Structure
 
-### Optional Improvements
-- **DAP config** - debugpy is installed but no debug UI configured
-- **Pre-commit hooks** - if you want linting to block commits (per-project setup)
+```
+lua/
+├── lazy_setup.lua       # lazy.nvim bootstrap + AstroNvim spec
+├── community.lua        # AstroCommunity pack imports (language packs, recipes)
+├── polish.lua           # Runs last — filetype registration, final tweaks
+├── helpers/             # Reusable Lua modules (require("helpers.xxx"))
+└── plugins/             # One file per plugin (see conventions below)
+```
 
-### Intentional Redundancies (kept by choice)
-- **git-blame.nvim + gitsigns** - two different blame modes (toggle vs always-on)
+## Conventions
+
+**Plugin files** — One file per plugin in `plugins/`, named after the plugin (`gitsigns.lua`, `conform.lua`). Each returns a lazy.nvim spec:
+
+```lua
+return { "author/plugin.nvim", opts = { ... } }
+```
+
+Use `opts` for declarative config. Use `config = function()` only when `opts` isn't enough. Disable a plugin with `enabled = false`.
+
+**Keymaps** — Centralized in `plugins/astrocore.lua` under `mappings`. Organized by mode (`n`, `v`, `t`). Leader is `<Space>`, LocalLeader is `,`. Group prefixes: `<Leader>g` for git, `<Leader>a` for AI, `<Leader>m` for markdown, `<Leader>u` for toggles. Filetype-specific keymaps go in autocmds scoped to the buffer.
+
+**LSP** — Configured in `plugins/astrolsp.lua`. Language servers come from AstroCommunity packs or Mason. LSP formatting is disabled in favor of conform.nvim.
+
+**Formatting** — `plugins/conform.lua` handles format-on-save. Add formatters per filetype in `formatters_by_ft`. Mason auto-installs tools listed in `plugins/mason.lua`.
+
+**Filetype-specific behavior** — Custom filetypes registered in `polish.lua`. Per-filetype completion, formatting, and options set in their respective plugin files.
+
+**Helpers** — Shared Lua functions live in `lua/helpers/` and are loaded with `require("helpers.module")`.
