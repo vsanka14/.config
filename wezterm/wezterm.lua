@@ -1,15 +1,11 @@
 local wezterm = require("wezterm")
 local config = wezterm.config_builder()
 
--- Tokyo Night 'night' color scheme (from tokyonight.nvim extras)
-config.color_scheme_dirs = { os.getenv("HOME") .. "/.local/share/nvim/lazy/tokyonight.nvim/extras/wezterm" }
-config.color_scheme = "tokyonight_night"
-
 -- Custom overrides
 config.colors = {
 	background = "#000000", -- Deep black (darker than default #1a1b26)
 }
-config.window_background_opacity = 0.80
+config.window_background_opacity = 0.75
 config.text_background_opacity = 1.0
 config.macos_window_background_blur = 20
 

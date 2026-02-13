@@ -46,10 +46,6 @@ fi
 # Oh My Posh prompt (tonybaloney theme - customized)
 eval "$(oh-my-posh init zsh --config ~/.config/ohmyposh-theme.json)"
 
-# Tokyo Night fzf theme (from tokyonight.nvim extras)
-[ -f ~/.local/share/nvim/lazy/tokyonight.nvim/extras/fzf/tokyonight_night.sh ] && \
-  source ~/.local/share/nvim/lazy/tokyonight.nvim/extras/fzf/tokyonight_night.sh
-
 # Zsh plugins (works on both macOS and Linux)
 for plugin_dir in /opt/homebrew/share ~/.local/share; do
   [ -f "$plugin_dir/zsh-autosuggestions/zsh-autosuggestions.zsh" ] && source "$plugin_dir/zsh-autosuggestions/zsh-autosuggestions.zsh"
