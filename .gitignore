@@ -1,4 +1,6 @@
 .DS_Store
 yarn/global/node_modules/
 yarn/global/yarn-error.log
-github-copilot/apps.json
+github-copilot/
+jgit/
+gh/
