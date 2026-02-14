@@ -1,5 +1,35 @@
 #!/bin/bash
 
+# --- Subcommands: go / status ---
+case "$1" in
+    go)
+        sessions=$(tmux list-sessions -F '#S' 2>/dev/null | sort)
+        n="$2"
+        [[ "$n" =~ ^[0-9]+$ ]] || exit 1
+        target=$(echo "$sessions" | sed -n "${n}p")
+        [[ -n "$target" ]] && tmux switch-client -t "$target"
+        exit 0
+        ;;
+    status)
+        sessions=$(tmux list-sessions -F '#S' 2>/dev/null | sort)
+        current="$2"
+        count=$(echo "$sessions" | wc -l | tr -d ' ')
+        parts=()
+        for ((i = 1; i <= count; i++)); do
+            name=$(echo "$sessions" | sed -n "${i}p")
+            if [[ "$name" == "$current" ]]; then
+                parts+=("#[fg=#7aa2f7]●")
+            else
+                parts+=("#[fg=#565f89]●")
+            fi
+        done
+        echo "${parts[*]} "
+        exit 0
+        ;;
+esac
+
+# --- FZF session switcher (default) ---
+
 # Directories whose immediate subdirs are selectable projects
 SCAN_DIRS=(
     "$HOME/code"
@@ -14,7 +44,7 @@ EXTRA_DIRS=(
 if [[ $# -eq 1 ]]; then
     selected="$1"
 else
-    active_sessions=$(tmux list-sessions -F '#S' 2>/dev/null)
+    active_sessions=$(tmux list-sessions -F '#S' 2>/dev/null | sort)
 
     selected=$(
         {
@@ -24,10 +54,11 @@ else
           | sed "s|^$HOME/||" \
           | while IFS= read -r dir; do
                 name=$(basename "$dir" | tr . _)
-                if echo "$active_sessions" | grep -qx "$name"; then
-                    echo -e "0\033[32m●\033[0m $dir"
+                pos=$(echo "$active_sessions" | grep -nx "$name" | cut -d: -f1)
+                if [[ -n "$pos" ]]; then
+                    echo -e "0\033[32m●\033[0m \033[33m${pos}\033[0m\t$dir"
                 else
-                    echo "1  $dir"
+                    echo -e "1   \t$dir"
                 fi
             done \
           | sort -t' ' -k1,1 \
@@ -41,7 +72,8 @@ else
                 --pointer="▶" \
                 --padding=1 \
                 --color='bg:-1,gutter:-1' \
-          | sed 's/^. //'
+                --delimiter='\t' --with-nth=1.. \
+          | sed 's/.*\t//'
     )
     [[ -n "$selected" ]] && selected="$HOME/$selected"
 fi
