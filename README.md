@@ -11,17 +11,14 @@ macOS development environment with a consistent Tokyo Night theme.
 - **Window Manager:** AeroSpace
 - **Status Bar:** Sketchybar
 - **File Manager:** Yazi
+- **Keyboard:** Karabiner-Elements
 
-## Setup
-
-```bash
-ln -s ~/.config/zshrc ~/.zshrc
-```
-
-## Dependencies
+## Quick Start
 
 ```bash
-brew install neovim tmux eza fzf yazi jandedobbeleer/oh-my-posh/oh-my-posh
-brew install --cask wezterm nikitabobko/tap/aerospace
-brew tap FelixKratz/formulae && brew install sketchybar
+git clone git@github.com:vsanka14/.config.git ~/.config
+cd ~/.config
+./install.sh
 ```
+
+See [docs/migration.md](docs/migration.md) for detailed setup guide and troubleshooting.
