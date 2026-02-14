@@ -8,6 +8,8 @@ export NODE_OPTIONS="--max-old-space-size=8192"
 # Enable vi mode in zsh
 bindkey -v
 export KEYTIMEOUT=1
+# Fix backspace not working after re-entering insert mode from normal mode
+bindkey -M viins '^?' backward-delete-char
 
 # Vi mode cursor shape indicator
 # Block cursor for normal mode, beam cursor for insert mode
