@@ -4,3 +4,5 @@ yarn/global/yarn-error.log
 github-copilot/
 jgit/
 gh/
+.gitconfig
+DUAL_REMOTE.md
