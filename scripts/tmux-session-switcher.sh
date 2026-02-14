@@ -13,7 +13,11 @@ case "$1" in
     status)
         sessions=$(tmux list-sessions -F '#S' 2>/dev/null | sort)
         current="$2"
-        count=$(echo "$sessions" | wc -l | tr -d ' ')
+        count=$(echo "$sessions" | grep -c .)
+        if [[ "$count" -le 1 ]]; then
+            echo ""
+            exit 0
+        fi
         parts=()
         for ((i = 1; i <= count; i++)); do
             name=$(echo "$sessions" | sed -n "${i}p")
@@ -61,7 +65,7 @@ else
                     echo -e "1   \t$dir"
                 fi
             done \
-          | sort -t' ' -k1,1 \
+          | sort -t' ' -k1,1 -k3,3 \
           | cut -c2- \
           | fzf --ansi \
                 --reverse \
