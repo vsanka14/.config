@@ -1,12 +1,11 @@
 #!/bin/bash
 
 # Colors (Tokyo Night Moon) - different color per workspace
+# 1=browser, 2=terminal, 3=misc
 declare -A WORKSPACE_COLORS=(
-    [1]=0xffc3e88d    # Browser/Chrome - green
+    [1]=0xffc3e88d    # Browser - green
     [2]=0xffc099ff    # Terminal - purple/violet
-    [3]=0xffffc777    # Slack - yellow/orange (warm)
-    [4]=0xff89ddff    # Outlook - light blue/cyan
-    [5]=0xffff757f    # Misc - red/coral
+    [3]=0xffffc777    # Misc - yellow/orange
 )
 FG_MUTED=0xff636da6               # Moon muted
 ITEM_BG_COLOR=0xcc1e2030          # Moon background
@@ -16,7 +15,7 @@ FOCUSED_WORKSPACE=$(aerospace list-workspaces --focused)
 
 # Update all spaces based on current focus
 # Background changes are instant (before --animate), icon changes are animated
-for i in 1 2 3 4 5; do
+for i in 1 2 3; do
     if [ "$i" = "$FOCUSED_WORKSPACE" ]; then
         # Focused space: instant background, animate icon bounce
         sketchybar --set space.$i \

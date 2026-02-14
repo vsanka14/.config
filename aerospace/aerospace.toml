@@ -35,11 +35,10 @@ outer.right = 8
 [mode.main.binding]
 
 # Workspace switching (ctrl+number)
+# 1=browser, 2=terminal, 3=misc
 ctrl-1 = 'workspace 1'
 ctrl-2 = 'workspace 2'
 ctrl-3 = 'workspace 3'
-ctrl-4 = 'workspace 4'
-ctrl-5 = 'workspace 5'
 
 # Window focus (ctrl+cmd+hjkl) - vim-style navigation
 ctrl-cmd-h = 'focus left'
@@ -57,8 +56,6 @@ ctrl-shift-l = 'move right'
 ctrl-shift-1 = 'move-node-to-workspace 1'
 ctrl-shift-2 = 'move-node-to-workspace 2'
 ctrl-shift-3 = 'move-node-to-workspace 3'
-ctrl-shift-4 = 'move-node-to-workspace 4'
-ctrl-shift-5 = 'move-node-to-workspace 5'
 
 # Layout controls
 ctrl-f = 'fullscreen'                            # Toggle fullscreen
@@ -115,6 +112,7 @@ run = 'layout floating'
 
 # ============================================
 # APP-TO-WORKSPACE ASSIGNMENTS
+# 1=browser, 2=terminal, 3=misc
 # ============================================
 [[on-window-detected]]
 if.app-id = 'com.google.Chrome'
@@ -130,12 +128,12 @@ run = 'move-node-to-workspace 3'
 
 [[on-window-detected]]
 if.app-id = 'com.microsoft.Outlook'
-run = 'move-node-to-workspace 4'
+run = 'move-node-to-workspace 3'
 
 [[on-window-detected]]
 if.app-id = 'com.microsoft.teams2'
-run = 'move-node-to-workspace 4'
+run = 'move-node-to-workspace 3'
 
 [[on-window-detected]]
 if.app-id = 'com.apple.finder'
-run = 'move-node-to-workspace 5'
+run = 'move-node-to-workspace 3'
