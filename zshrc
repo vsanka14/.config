@@ -7,6 +7,23 @@ export NODE_OPTIONS="--max-old-space-size=8192"
 
 # Enable vi mode in zsh
 bindkey -v
+export KEYTIMEOUT=1
+
+# Vi mode cursor shape indicator
+# Block cursor for normal mode, beam cursor for insert mode
+function zle-keymap-select {
+  if [[ $KEYMAP == vicmd ]] || [[ $1 == 'block' ]]; then
+    echo -ne '\e[2 q'  # block cursor
+  elif [[ $KEYMAP == main ]] || [[ $KEYMAP == viins ]] || [[ $1 == 'beam' ]]; then
+    echo -ne '\e[6 q'  # beam cursor
+  fi
+}
+zle -N zle-keymap-select
+
+function zle-line-init {
+  echo -ne '\e[6 q'  # beam cursor on new prompt
+}
+zle -N zle-line-init
 
 # Set nvim as the default editor
 export EDITOR='nvim'
