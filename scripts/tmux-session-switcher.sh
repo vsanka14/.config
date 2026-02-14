@@ -3,7 +3,7 @@
 # --- Subcommands: go / status ---
 case "$1" in
     go)
-        sessions=$(tmux list-sessions -F '#S' 2>/dev/null | sort)
+        sessions=$(tmux list-sessions -F '#{session_created}:#S' 2>/dev/null | sort -n | cut -d: -f2-)
         n="$2"
         [[ "$n" =~ ^[0-9]+$ ]] || exit 1
         target=$(echo "$sessions" | sed -n "${n}p")
@@ -11,7 +11,7 @@ case "$1" in
         exit 0
         ;;
     status)
-        sessions=$(tmux list-sessions -F '#S' 2>/dev/null | sort)
+        sessions=$(tmux list-sessions -F '#{session_created}:#S' 2>/dev/null | sort -n | cut -d: -f2-)
         current="$2"
         count=$(echo "$sessions" | grep -c .)
         if [[ "$count" -le 1 ]]; then
@@ -31,7 +31,7 @@ case "$1" in
         exit 0
         ;;
     sessions)
-        sessions=$(tmux list-sessions -F '#S' 2>/dev/null | sort)
+        sessions=$(tmux list-sessions -F '#{session_created}:#S' 2>/dev/null | sort -n | cut -d: -f2-)
         count=$(echo "$sessions" | grep -c .)
         [[ "$count" -eq 0 ]] && exit 0
         current=$(tmux display-message -p '#S')
@@ -79,7 +79,7 @@ EXTRA_DIRS=(
 if [[ $# -eq 1 ]]; then
     selected="$1"
 else
-    active_sessions=$(tmux list-sessions -F '#S' 2>/dev/null | sort)
+    active_sessions=$(tmux list-sessions -F '#{session_created}:#S' 2>/dev/null | sort -n | cut -d: -f2-)
 
     selected=$(
         {
