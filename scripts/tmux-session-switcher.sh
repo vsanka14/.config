@@ -49,12 +49,12 @@ case "$1" in
               | fzf --ansi \
                     --reverse \
                     --border=rounded \
-                    --border-label=" sessions " \
+                    --border-label=" sessions " \
                     --border-label-pos=3 \
                     --prompt="  " \
                     --pointer="▶" \
                     --padding=1 \
-                    --color='bg:-1,gutter:-1' \
+                    --color='bg:-1,gutter:-1,label:#7dcfff' \
                     --delimiter='\t' --with-nth=1.. \
               | cut -f2
         )
@@ -101,12 +101,12 @@ else
           | fzf --ansi \
                 --reverse \
                 --border=rounded \
-                --border-label=" switch " \
+                --border-label="  switch " \
                 --border-label-pos=3 \
                 --prompt="  " \
                 --pointer="▶" \
                 --padding=1 \
-                --color='bg:-1,gutter:-1' \
+                --color='bg:-1,gutter:-1,label:#7dcfff' \
                 --delimiter='\t' --with-nth=1.. \
           | sed 's/.*\t//'
     )
