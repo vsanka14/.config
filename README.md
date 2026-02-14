@@ -1,26 +1,27 @@
 # Dotfiles
 
-Work dotfiles for development environment setup.
+macOS development environment with a consistent Tokyo Night theme.
 
-## Contents
+## Tools
 
-- `nvim/` - Neovim configuration (AstroNvim-based)
-- `wezterm/` - WezTerm terminal configuration
-- `zshrc` - Zsh shell configuration
-- `.gitconfig` - Git configuration
-- `install.sh` - Installation script
+- **Terminal:** WezTerm
+- **Editor:** Neovim (AstroNvim)
+- **Multiplexer:** Tmux
+- **Shell:** Zsh + Oh My Posh
+- **Window Manager:** AeroSpace
+- **Status Bar:** Sketchybar
+- **File Manager:** Yazi
 
-## Installation
-
-```bash
-git clone git@github.com:vsankar_LinkedIn/dotfiles.git ~/.config
-cd ~/.config
-./install.sh
-```
-
-## Manual Symlinks
+## Setup
 
 ```bash
 ln -s ~/.config/zshrc ~/.zshrc
-ln -s ~/.config/.gitconfig ~/.gitconfig
+```
+
+## Dependencies
+
+```bash
+brew install neovim tmux eza fzf yazi jandedobbeleer/oh-my-posh/oh-my-posh
+brew install --cask wezterm nikitabobko/tap/aerospace
+brew tap FelixKratz/formulae && brew install sketchybar
 ```
