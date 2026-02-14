@@ -24,10 +24,41 @@ case "$1" in
             if [[ "$name" == "$current" ]]; then
                 parts+=("#[fg=#7aa2f7]●")
             else
-                parts+=("#[fg=#565f89]●")
+                parts+=("#[fg=#414868]●")
             fi
         done
         echo "${parts[*]} "
+        exit 0
+        ;;
+    sessions)
+        sessions=$(tmux list-sessions -F '#S' 2>/dev/null | sort)
+        count=$(echo "$sessions" | grep -c .)
+        [[ "$count" -eq 0 ]] && exit 0
+        current=$(tmux display-message -p '#S')
+
+        target=$(
+            echo "$sessions" \
+              | nl -ba -w1 -s $'\t' \
+              | while IFS=$'\t' read -r pos name; do
+                    if [[ "$name" == "$current" ]]; then
+                        echo -e "\033[33m${pos}\033[0m\t\033[34m${name}\033[0m\t\033[32m●\033[0m"
+                    else
+                        echo -e "\033[33m${pos}\033[0m\t${name}\t"
+                    fi
+                done \
+              | fzf --ansi \
+                    --reverse \
+                    --border=rounded \
+                    --border-label=" sessions " \
+                    --border-label-pos=3 \
+                    --prompt="  " \
+                    --pointer="▶" \
+                    --padding=1 \
+                    --color='bg:-1,gutter:-1' \
+                    --delimiter='\t' --with-nth=1.. \
+              | cut -f2
+        )
+        [[ -n "$target" ]] && tmux switch-client -t "$target"
         exit 0
         ;;
 esac
