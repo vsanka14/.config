@@ -41,11 +41,11 @@ ctrl-3 = 'workspace 3'
 ctrl-4 = 'workspace 4'
 ctrl-5 = 'workspace 5'
 
-# Window focus (ctrl+cmd+hjkl) - vim-style navigation
-ctrl-h = 'focus left'
-ctrl-j = 'focus down'
-ctrl-k = 'focus up'
-ctrl-l = 'focus right'
+# Window focus (ctrl+cmd+hjkl) — ctrl alone conflicts with terminal agents (ctrl+j = newline)
+ctrl-cmd-h = 'focus left'
+ctrl-cmd-j = 'focus down'
+ctrl-cmd-k = 'focus up'
+ctrl-cmd-l = 'focus right'
 
 # Move window within workspace (ctrl+shift+hjkl)
 ctrl-shift-h = 'move left'
