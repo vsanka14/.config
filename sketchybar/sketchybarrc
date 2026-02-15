@@ -37,8 +37,9 @@ sketchybar --default \
     padding_left=4 \
     padding_right=4
 
-# Aerospace workspace event
+# Aerospace events
 sketchybar --add event aerospace_workspace_change
+sketchybar --add event aerospace_mode_change
 
 # Workspace icons (Nerd Font)
 declare -A SPACE_ICONS=(
@@ -64,6 +65,18 @@ for sid in 1 2 3 4 5; do
             script="$CONFIG_DIR/plugins/aerospace.sh" \
         --subscribe space.$sid aerospace_workspace_change
 done
+
+# Mode indicator (right side)
+sketchybar --add item mode_indicator right \
+    --set mode_indicator \
+        icon="󰩨" \
+        icon.color=$ACCENT_RED \
+        icon.padding_left=8 \
+        icon.padding_right=8 \
+        label.drawing=off \
+        drawing=off \
+        script="$CONFIG_DIR/plugins/mode.sh" \
+    --subscribe mode_indicator aerospace_mode_change
 
 # Battery (right side)
 sketchybar --add item battery right \
