@@ -148,66 +148,19 @@ return {
       --  This set of autocmds will convert those unicode escapes to actual characters on buffer load,
       --  then convert them back to unicode escapes on save to preserve original file content.
       glimmer_unicode_fix = {
-        -- Helper function to replace characters in t-def first quoted string only
-        -- This handles multiline t-def blocks and ignores doc="..." attributes
-        _replace_in_tdef = function(bufnr, char_map, notify_msg)
-          local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-          local content = table.concat(lines, "\n")
-
-          local new_content = content:gsub('({{t%-def%s+")(.-)(")', function(prefix, str_content, suffix)
-            local replaced_content = str_content
-            for from, to in pairs(char_map) do
-              replaced_content = replaced_content:gsub(from, to)
-            end
-            return prefix .. replaced_content .. suffix
-          end)
-
-          if new_content ~= content then
-            local new_lines = vim.split(new_content, "\n", { plain = true })
-            vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, new_lines)
-            if notify_msg then vim.notify(notify_msg, vim.log.levels.INFO) end
-            return true
-          end
-          return false
-        end,
-
-        -- Unicode escape -> character mappings
-        _unicode_to_char = {
-          ["\\u2019"] = "'", -- Right single quotation mark
-          ["\\u201C"] = '"', -- Left double quotation mark
-          ["\\u201c"] = '"', -- Left double quotation mark (lowercase)
-          ["\\u201D"] = '"', -- Right double quotation mark
-          ["\\u201d"] = '"', -- Right double quotation mark (lowercase)
-          ["\\u0022"] = '"', -- Straight double quotation mark
-          ["\\u0026"] = "&", -- Ampersand
-        },
-
-        -- Character -> unicode escape mappings (reverse)
-        _char_to_unicode = { ["'"] = "\\u2019", ['"'] = "\\u0022", ["&"] = "\\u0026" },
-
         -- Read: convert unicode escapes to actual characters on load to prevent glimmer treesitter from breaking
         -- Only affects the first quoted string in t-def, NOT doc="..." values
         {
           event = { "BufReadPost", "BufNewFile" },
           pattern = { "*.hbs" },
-          callback = function(args)
-            local autocmds = require("astrocore").config.autocmds.glimmer_unicode_fix
-            autocmds._replace_in_tdef(
-              args.buf,
-              autocmds._unicode_to_char,
-              "Replaced unicode escapes with actual characters"
-            )
-          end,
+          callback = function(args) require("helpers.ember").convert_unicode_to_char(args.buf) end,
         },
         -- Write: convert characters back to unicode escapes on save to preserve original file content
         -- Only affects the first quoted string in t-def, NOT doc="..." values
         {
           event = "BufWritePre",
           pattern = { "*.hbs" },
-          callback = function(args)
-            local autocmds = require("astrocore").config.autocmds.glimmer_unicode_fix
-            autocmds._replace_in_tdef(args.buf, autocmds._char_to_unicode, nil)
-          end,
+          callback = function(args) require("helpers.ember").convert_char_to_unicode(args.buf) end,
         },
         -- Post-write: restore buffer to treesitter-friendly state (unicode escapes -> actual chars)
         -- This runs after the file is saved, so the file on disk has unicode escapes,
@@ -215,14 +168,7 @@ return {
         {
           event = "BufWritePost",
           pattern = { "*.hbs" },
-          callback = function(args)
-            local autocmds = require("astrocore").config.autocmds.glimmer_unicode_fix
-            autocmds._replace_in_tdef(
-              args.buf,
-              autocmds._unicode_to_char,
-              "Restored unicode escapes to actual characters"
-            )
-          end,
+          callback = function(args) require("helpers.ember").convert_unicode_to_char(args.buf) end,
         },
       },
       -- Markdown-specific settings
