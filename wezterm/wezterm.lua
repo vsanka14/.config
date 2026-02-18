@@ -36,7 +36,20 @@ config.max_fps = 120
 
 -- Keybindings
 config.keys = {
-	{ key = "k", mods = "CMD", action = wezterm.action.SendKey({ key = "l", mods = "CTRL" }) },
+	{
+		key = "k",
+		mods = "CMD",
+		action = wezterm.action_callback(function(window, pane)
+			local proc = pane:get_foreground_process_name() or ""
+			if proc:find("tmux") then
+				-- Clear only the current tmux pane: Ctrl+U clears any partial input,
+				-- then clear the viewport and wipe tmux pane scrollback
+				pane:send_text("\x15clear; tmux clear-history\n")
+			else
+				window:perform_action(wezterm.action.ClearScrollback("ScrollbackAndViewport"), pane)
+			end
+		end),
+	},
 	{
 		key = "a",
 		mods = "CMD",
