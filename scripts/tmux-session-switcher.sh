@@ -22,7 +22,7 @@ case "$1" in
         for ((i = 1; i <= count; i++)); do
             name=$(echo "$sessions" | sed -n "${i}p")
             if [[ "$name" == "$current" ]]; then
-                parts+=("#[fg=#7aa2f7]●")
+                parts+=("#[fg=#9ece6a]●")
             else
                 parts+=("#[fg=#414868]●")
             fi
