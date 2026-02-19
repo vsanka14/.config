@@ -1,22 +1,16 @@
 local M = {}
 
 -- Helper functions for file operations
-local function open_file(file_path)
-  vim.cmd("edit " .. vim.fn.fnameescape(file_path))
-end
+local function open_file(file_path) vim.cmd("edit " .. vim.fn.fnameescape(file_path)) end
 
-local function file_exists(file_path)
-  return vim.fn.filereadable(file_path) == 1
-end
+local function file_exists(file_path) return vim.fn.filereadable(file_path) == 1 end
 
 local function try_open_file(file_path, error_message)
   if file_exists(file_path) then
     open_file(file_path)
     return true
   end
-  if error_message then
-    vim.notify(error_message, vim.log.levels.WARN)
-  end
+  if error_message then vim.notify(error_message, vim.log.levels.WARN) end
   return false
 end
 
@@ -162,7 +156,57 @@ function M.copy_test_module()
   end
 
   -- Not in a recognized test file
-  vim.notify("Not in an Ember test file (tests/acceptance/..., tests/integration/..., or tests/unit/...)", vim.log.levels.WARN)
+  vim.notify(
+    "Not in an Ember test file (tests/acceptance/..., tests/integration/..., or tests/unit/...)",
+    vim.log.levels.WARN
+  )
+end
+
+-- Helper function to replace characters in t-def first quoted string only
+-- This handles multiline t-def blocks and ignores doc="..." attributes
+local function replace_in_tdef(bufnr, char_map, notify_msg)
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local content = table.concat(lines, "\n")
+
+  local new_content = content:gsub('({{t%-def%s+")(.-)(")', function(prefix, str_content, suffix)
+    local replaced_content = str_content
+    for from, to in pairs(char_map) do
+      replaced_content = replaced_content:gsub(from, to)
+    end
+    return prefix .. replaced_content .. suffix
+  end)
+
+  if new_content ~= content then
+    local new_lines = vim.split(new_content, "\n", { plain = true })
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, new_lines)
+    if notify_msg then vim.notify(notify_msg, vim.log.levels.INFO) end
+    return true
+  end
+  return false
+end
+
+-- convert unicode escapes to actual characters on load to prevent glimmer treesitter from breaking
+-- Only affects the first quoted string in t-def, NOT doc="..." values
+function M.convert_unicode_to_char(buf)
+  -- Unicode escape -> character mappings
+  local unicode_to_char = {
+    ["\\u2019"] = "'", -- Right single quotation mark
+    ["\\u201C"] = '"', -- Left double quotation mark
+    ["\\u201c"] = '"', -- Left double quotation mark (lowercase)
+    ["\\u201D"] = '"', -- Right double quotation mark
+    ["\\u201d"] = '"', -- Right double quotation mark (lowercase)
+    ["\\u0022"] = '"', -- Straight double quotation mark
+    ["\\u0026"] = "&", -- Ampersand
+  }
+  replace_in_tdef(buf, unicode_to_char, "Replaced unicode escapes with actual characters")
+end
+
+-- convert characters back to unicode escapes on save to preserve original file content
+-- Only affects the first quoted string in t-def, NOT doc="..." values
+function M.convert_char_to_unicode(buf)
+  -- Character -> unicode escape mappings (reverse)
+  local char_to_unicode = { ["'"] = "\\u2019", ['"'] = "\\u0022", ["&"] = "\\u0026" }
+  replace_in_tdef(buf, char_to_unicode, nil)
 end
 
 return M
