@@ -3,15 +3,33 @@ return {
   config = function()
     local dap = require "dap"
 
-    -- Remote JVM attach configuration for campaign-manager-api
+    local function get_debug_port()
+      local cwd = vim.fn.getcwd()
+      local port_map = {
+        ["campaign%-manager%-api"] = 9999,
+        ["tscp%-assets"] = 23456,
+      }
+
+      for project, port in pairs(port_map) do
+        if cwd:match(project) then
+          return port
+        end
+      end
+
+      return 9999 -- default
+    end
+
+    local port = get_debug_port()
+
+    -- Remote JVM attach configuration
     -- Start the app with: aves-tools run --debug -t
     dap.configurations.java = dap.configurations.java or {}
     table.insert(dap.configurations.java, {
       type = "java",
       request = "attach",
-      name = "Attach to Remote JVM (port 9999)",
+      name = string.format("Attach to Remote JVM (port %d)", port),
       hostName = "::1",
-      port = 9999,
+      port = port,
     })
   end,
 }
