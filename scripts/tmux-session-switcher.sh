@@ -73,7 +73,7 @@ SCAN_DIRS=(
 # Standalone directories to always include as options
 EXTRA_DIRS=(
     "$HOME/.config"
-    "$HOME/documents/docs"
+    "$HOME/documents/notes"
 )
 
 if [[ $# -eq 1 ]]; then
