@@ -1,53 +1,81 @@
 local M = {}
 
 local mode_map = {
-  ["n"]     = "NOR",
-  ["no"]    = "O-P",
-  ["nov"]   = "O-P",
-  ["noV"]   = "O-P",
-  ["no\22"] = "O-P",
-  ["niI"]   = "NOR",
-  ["niR"]   = "NOR",
-  ["niV"]   = "NOR",
-  ["nt"]    = "NOR",
-  ["v"]     = "VIS",
-  ["vs"]    = "VIS",
-  ["V"]     = "V-L",
-  ["Vs"]    = "V-L",
-  ["\22"]   = "V-B",
-  ["\22s"]  = "V-B",
-  ["s"]     = "SEL",
-  ["S"]     = "S-L",
-  ["\19"]   = "S-B",
-  ["i"]     = "INS",
-  ["ic"]    = "INS",
-  ["ix"]    = "INS",
-  ["R"]     = "REP",
-  ["Rc"]    = "REP",
-  ["Rx"]    = "REP",
-  ["Rv"]    = "V-R",
-  ["Rvc"]   = "V-R",
-  ["Rvx"]   = "V-R",
-  ["c"]     = "CMD",
-  ["cv"]    = "EX ",
-  ["ce"]    = "EX ",
-  ["r"]     = "ENT",
-  ["rm"]    = "MOR",
-  ["r?"]    = "CON",
-  ["!"]     = "SHL",
-  ["t"]     = "TRM",
+  ["n"]     = "NORMAL",
+  ["no"]    = "OP-PENDING",
+  ["nov"]   = "OP-PENDING",
+  ["noV"]   = "OP-PENDING",
+  ["no\22"] = "OP-PENDING",
+  ["niI"]   = "NORMAL",
+  ["niR"]   = "NORMAL",
+  ["niV"]   = "NORMAL",
+  ["nt"]    = "NORMAL",
+  ["v"]     = "VISUAL",
+  ["vs"]    = "VISUAL",
+  ["V"]     = "VISUAL LINE",
+  ["Vs"]    = "VISUAL LINE",
+  ["\22"]   = "VISUAL BLOCK",
+  ["\22s"]  = "VISUAL BLOCK",
+  ["s"]     = "SELECT",
+  ["S"]     = "SELECT LINE",
+  ["\19"]   = "SELECT BLOCK",
+  ["i"]     = "INSERT",
+  ["ic"]    = "INSERT",
+  ["ix"]    = "INSERT",
+  ["R"]     = "REPLACE",
+  ["Rc"]    = "REPLACE",
+  ["Rx"]    = "REPLACE",
+  ["Rv"]    = "VISUAL REPLACE",
+  ["Rvc"]   = "VISUAL REPLACE",
+  ["Rvx"]   = "VISUAL REPLACE",
+  ["c"]     = "COMMAND",
+  ["cv"]    = "EX",
+  ["ce"]    = "EX",
+  ["r"]     = "ENTER",
+  ["rm"]    = "MORE",
+  ["r?"]    = "CONFIRM",
+  ["!"]     = "SHELL",
+  ["t"]     = "TERMINAL",
 }
 
 local mode_hl = {
-  NOR = "StatusLineMode",
-  INS = "StatusLineModeInsert",
-  VIS = "StatusLineModeVisual",
-  ["V-L"] = "StatusLineModeVisual",
-  ["V-B"] = "StatusLineModeVisual",
-  REP = "StatusLineModeReplace",
-  CMD = "StatusLineModeCommand",
-  TRM = "StatusLineModeTerm",
+  NORMAL = "StatusLineMode",
+  INSERT = "StatusLineModeInsert",
+  VISUAL = "StatusLineModeVisual",
+  ["VISUAL LINE"] = "StatusLineModeVisual",
+  ["VISUAL BLOCK"] = "StatusLineModeVisual",
+  REPLACE = "StatusLineModeReplace",
+  ["VISUAL REPLACE"] = "StatusLineModeReplace",
+  COMMAND = "StatusLineModeCommand",
+  TERMINAL = "StatusLineModeTerm",
+  SELECT = "StatusLineModeVisual",
+  ["SELECT LINE"] = "StatusLineModeVisual",
+  ["SELECT BLOCK"] = "StatusLineModeVisual",
 }
+
+-- LSP progress tracking
+local lsp_progress = {}
+
+vim.api.nvim_create_autocmd("LspProgress", {
+  group = vim.api.nvim_create_augroup("statusline_lsp_progress", { clear = true }),
+  callback = function(args)
+    local data = args.data
+    if not data or not data.params then return end
+    local val = data.params.value
+    local client_id = data.client_id
+    if not val or not client_id then return end
+
+    if val.kind == "end" then
+      lsp_progress[client_id] = nil
+    else
+      local msg = val.title or ""
+      if val.message then msg = msg .. ": " .. val.message end
+      if val.percentage then msg = msg .. " (" .. val.percentage .. "%%%%)" end
+      lsp_progress[client_id] = msg
+    end
+    vim.cmd.redrawstatus()
+  end,
+})
 
 local function setup_highlights()
   local colors = {
@@ -80,23 +108,15 @@ function M.render()
   local parts = { "%#" .. hl .. "# " .. mode_label .. " %*" }
 
   -- File
-  table.insert(parts, "%#StatusLineFile# %f %m%r%*")
+  table.insert(parts, "%#StatusLineFile# %t %m%r%*")
 
-  -- Git branch (from mini.diff or fallback)
+  -- Git branch
   local branch = ""
-  local ok, summary = pcall(function() return vim.b.minidiff_summary end)
-  if ok and summary then
-    branch = summary.source_name or ""
-  end
-  if branch == "" then
-    local git_dir = vim.fn.finddir(".git", vim.fn.expand("%:p:h") .. ";")
-    if git_dir ~= "" then
-      local f = io.open(git_dir .. "/HEAD", "r")
-      if f then
-        local content = f:read("*l") or ""
-        f:close()
-        branch = content:match("ref: refs/heads/(.+)") or content:sub(1, 7)
-      end
+  local buf_dir = vim.fn.expand("%:p:h")
+  if buf_dir ~= "" then
+    local result = vim.fn.systemlist("git -C " .. vim.fn.shellescape(buf_dir) .. " rev-parse --abbrev-ref HEAD 2>/dev/null")
+    if vim.v.shell_error == 0 and result[1] and result[1] ~= "" then
+      branch = result[1]
     end
   end
   if branch ~= "" then
@@ -120,14 +140,22 @@ function M.render()
     end
   end
 
-  -- LSP server name
-  local clients = vim.lsp.get_clients({ bufnr = 0 })
-  if #clients > 0 then
-    local names = {}
-    for _, c in ipairs(clients) do
-      table.insert(names, c.name)
+  -- LSP progress or server name
+  local progress_msgs = {}
+  for _, msg in pairs(lsp_progress) do
+    table.insert(progress_msgs, msg)
+  end
+  if #progress_msgs > 0 then
+    table.insert(parts, "%#StatusLineLsp# " .. table.concat(progress_msgs, " | ") .. " %*")
+  else
+    local clients = vim.lsp.get_clients({ bufnr = 0 })
+    if #clients > 0 then
+      local names = {}
+      for _, c in ipairs(clients) do
+        table.insert(names, c.name)
+      end
+      table.insert(parts, "%#StatusLineLsp# " .. table.concat(names, ", ") .. " %*")
     end
-    table.insert(parts, "%#StatusLineLsp# " .. table.concat(names, ", ") .. " %*")
   end
 
   -- Position + filetype

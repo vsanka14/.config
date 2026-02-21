@@ -25,7 +25,10 @@ return {
 
     -- Notifications
     require("mini.notify").setup({
-      lsp_progress = { enable = true },
+      lsp_progress = { enable = false },
+      window = {
+        max_width_share = 0.4,
+      },
     })
     vim.notify = require("mini.notify").make_notify()
 

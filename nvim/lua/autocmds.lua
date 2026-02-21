@@ -15,8 +15,13 @@ autocmd({ "FocusGained", "BufEnter", "CursorHold", "CursorHoldI" }, {
 autocmd("ColorScheme", {
   group = augroup("italic_highlights", { clear = true }),
   callback = function()
-    vim.api.nvim_set_hl(0, "Comment", { italic = true })
-    vim.api.nvim_set_hl(0, "Keyword", { italic = true })
+    local comment_hl = vim.api.nvim_get_hl(0, { name = "Comment" })
+    comment_hl.italic = true
+    vim.api.nvim_set_hl(0, "Comment", comment_hl)
+
+    local keyword_hl = vim.api.nvim_get_hl(0, { name = "Keyword" })
+    keyword_hl.italic = true
+    vim.api.nvim_set_hl(0, "Keyword", keyword_hl)
   end,
   desc = "Reapply italic highlights",
 })
@@ -64,6 +69,7 @@ autocmd("BufWritePost", {
   callback = function(args) require("helpers.ember").convert_unicode_to_char(args.buf) end,
   desc = "Restore buffer to treesitter-friendly state after save",
 })
+
 
 -- Highlight on yank
 autocmd("TextYankPost", {

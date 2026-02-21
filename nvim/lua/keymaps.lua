@@ -26,34 +26,6 @@ map("n", "<Leader>c", function()
 	vim.api.nvim_buf_delete(buf, {})
 end, { desc = "Close buffer" })
 
--- Buffer quick-jump by letter hint (a=1st, b=2nd, etc.)
-map("n", "<Leader>bb", function()
-	local bufs = vim.tbl_filter(function(b)
-		return vim.bo[b].buflisted and vim.api.nvim_buf_is_loaded(b)
-	end, vim.api.nvim_list_bufs())
-	if #bufs == 0 then
-		return
-	end
-
-	local labels = {}
-	for i, b in ipairs(bufs) do
-		local letter = string.char(96 + i) -- a, b, c, ...
-		local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(b), ":t")
-		if name == "" then
-			name = "[No Name]"
-		end
-		labels[letter] = b
-		vim.api.nvim_echo({ { letter .. ": " .. name .. "  ", "Normal" } }, false, {})
-	end
-	vim.api.nvim_echo({ { "Jump to buffer: ", "Question" } }, false, {})
-
-	local ok, char = pcall(vim.fn.getcharstr)
-	vim.cmd("redraw")
-	if ok and labels[char] then
-		vim.api.nvim_set_current_buf(labels[char])
-	end
-end, { desc = "Jump to buffer by letter" })
-
 -- Git keymaps (using mini.diff where applicable)
 map("n", "<Leader>g", "<nop>", { desc = "Git" })
 map("n", "<Leader>gp", function()
@@ -75,12 +47,28 @@ map("n", "[h", function()
 	MiniDiff.goto_hunk("prev")
 end, { desc = "Previous git hunk" })
 
--- Lazygit (opens in a floating terminal)
+-- Lazygit (floating terminal inside Neovim)
 map("n", "<Leader>gg", function()
-	vim.cmd("tabnew")
+	local buf = vim.api.nvim_create_buf(false, true)
+	local width = math.floor(vim.o.columns * 0.8)
+	local height = math.floor(vim.o.lines * 0.8)
+	local win = vim.api.nvim_open_win(buf, true, {
+		relative = "editor",
+		width = width,
+		height = height,
+		col = math.floor((vim.o.columns - width) / 2),
+		row = math.floor((vim.o.lines - height) / 2),
+		style = "minimal",
+		border = "rounded",
+	})
 	vim.fn.termopen("lazygit", {
 		on_exit = function()
-			vim.cmd("tabclose")
+			if vim.api.nvim_win_is_valid(win) then
+				vim.api.nvim_win_close(win, true)
+			end
+			if vim.api.nvim_buf_is_valid(buf) then
+				vim.api.nvim_buf_delete(buf, { force = true })
+			end
 		end,
 	})
 	vim.cmd("startinsert")
