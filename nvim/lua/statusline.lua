@@ -45,6 +45,7 @@ local hl_defs = {
   DiagInfo    = { fg = "#7dcfff", bg = "#1a1b26" },
   DiagHint    = { fg = "#9ece6a", bg = "#1a1b26" },
   Lsp         = { fg = "#565f89", bg = "#1a1b26" },
+  Search      = { fg = "#1a1b26", bg = "#ff9e64", bold = true },
   PosIcon     = { fg = "#7aa2f7", bg = "#24283b" },
   PosLine     = { fg = "#c0caf5", bg = "#24283b" },
   PosSep      = { fg = "#565f89", bg = "#24283b" },
@@ -156,8 +157,17 @@ function M.render()
   local mode = vim.api.nvim_get_mode().mode
   local mode_label = mode_map[mode] or mode
 
-  -- Left: mode + git
+  -- Left: mode + search count + git
   local left = hl(mode_hl[mode_label] or "Mode", " " .. mode_label .. " ")
+
+  -- Search match count (only when searching)
+  if vim.v.hlsearch == 1 then
+    local ok, sc = pcall(vim.fn.searchcount, { maxcount = 999 })
+    if ok and sc.total and sc.total > 0 then
+      left = left .. hl("Search", " \u{f002} " .. sc.current .. "/" .. sc.total .. " ")
+    end
+  end
+
   if cache.git_branch ~= "" then
     left = left .. hl("GitIcon", " \u{e725} ") .. hl("Git", cache.git_branch .. " ")
   end

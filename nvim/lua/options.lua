@@ -26,6 +26,8 @@ opt.clipboard = "unnamedplus"
 opt.cursorline = true
 opt.scrolloff = 8
 opt.cmdheight = 0
+opt.hlsearch = true
+opt.incsearch = true
 opt.list = true
 opt.listchars = { leadmultispace = "│ ", tab = "│ ", trail = "·" }
 opt.shiftwidth = 2
