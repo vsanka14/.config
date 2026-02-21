@@ -102,11 +102,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
     map("n", "]d", function() vim.diagnostic.jump({ count = 1 }) end, "Next diagnostic")
     map("n", "[d", function() vim.diagnostic.jump({ count = -1 }) end, "Previous diagnostic")
 
-    -- Native completion
-    if client and client:supports_method("textDocument/completion") then
-      vim.lsp.completion.enable(true, client.id, bufnr, { autotrigger = true })
-    end
-
     -- Codelens
     if client and client:supports_method("textDocument/codeLens") then
       vim.api.nvim_create_autocmd({ "InsertLeave", "BufEnter" }, {

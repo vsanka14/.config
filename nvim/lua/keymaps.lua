@@ -181,9 +181,5 @@ map("n", "<Leader>fs", function()
 	end)
 end, { desc = "Find LSP symbols" })
 
--- Completion navigation
-map("i", "<C-j>", "<C-n>", { desc = "Next completion item" })
-map("i", "<C-k>", "<C-p>", { desc = "Previous completion item" })
-
 -- Clear search highlights
 map("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear highlights" })

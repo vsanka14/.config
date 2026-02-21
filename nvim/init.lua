@@ -31,3 +31,14 @@ require("statusline")
 require("tabline")
 require("lsp")
 require("helpers.trino").setup()
+
+-- Show startup time as a notification
+vim.api.nvim_create_autocmd("VimEnter", {
+  callback = function()
+    vim.schedule(function()
+      local stats = require("lazy").stats()
+      local ms = math.floor(stats.startuptime * 100 + 0.5) / 100
+      vim.notify(string.format("Loaded %d plugins in %.2fms", stats.loaded, ms))
+    end)
+  end,
+})

@@ -53,30 +53,146 @@ local mode_hl = {
   ["SELECT BLOCK"] = "StatusLineModeVisual",
 }
 
--- LSP progress tracking
-local lsp_progress = {}
+-- ============================================================================
+-- Cached state (updated via autocmds, never computed in render)
+-- ============================================================================
+local cache = {
+  git_branch = "",
+  lsp_progress = "",
+  lsp_clients = "",
+  diag = "",
+}
 
-vim.api.nvim_create_autocmd("LspProgress", {
-  group = vim.api.nvim_create_augroup("statusline_lsp_progress", { clear = true }),
-  callback = function(args)
-    local data = args.data
-    if not data or not data.params then return end
-    local val = data.params.value
-    local client_id = data.client_id
-    if not val or not client_id then return end
+-- Git branch (async job, updated on BufEnter/FocusGained)
+local function update_git_branch()
+  local buf_dir = vim.fn.expand("%:p:h")
+  if buf_dir == "" then
+    cache.git_branch = ""
+    return
+  end
+  vim.fn.jobstart({ "git", "-C", buf_dir, "rev-parse", "--abbrev-ref", "HEAD" }, {
+    stdout_buffered = true,
+    on_stdout = function(_, data)
+      cache.git_branch = (data and data[1] and data[1] ~= "") and data[1] or ""
+    end,
+    on_exit = function(_, code)
+      if code ~= 0 then cache.git_branch = "" end
+    end,
+  })
+end
 
-    if val.kind == "end" then
-      lsp_progress[client_id] = nil
-    else
-      local msg = val.title or ""
-      if val.message then msg = msg .. ": " .. val.message end
-      if val.percentage then msg = msg .. " (" .. val.percentage .. "%%%%)" end
-      lsp_progress[client_id] = msg
+-- Diagnostics (cached string, updated on DiagnosticChanged)
+local function update_diagnostics()
+  local icons = {
+    { vim.diagnostic.severity.ERROR, "StatusLineDiagError", "\u{f0674} " },
+    { vim.diagnostic.severity.WARN,  "StatusLineDiagWarn",  "\u{f0026} " },
+    { vim.diagnostic.severity.INFO,  "StatusLineDiagInfo",  "\u{f02fc} " },
+    { vim.diagnostic.severity.HINT,  "StatusLineDiagHint",  "\u{f0835} " },
+  }
+  local parts = {}
+  for _, d in ipairs(icons) do
+    local count = #vim.diagnostic.get(0, { severity = d[1] })
+    if count > 0 then
+      parts[#parts + 1] = "%#" .. d[2] .. "#" .. d[3] .. count .. " %*"
     end
-    vim.cmd.redrawstatus()
-  end,
+  end
+  cache.diag = table.concat(parts)
+end
+
+-- LSP clients (cached string, updated on LspAttach/LspDetach)
+local function update_lsp_clients()
+  local clients = vim.lsp.get_clients({ bufnr = 0 })
+  if #clients > 0 then
+    local names = {}
+    for _, c in ipairs(clients) do
+      names[#names + 1] = c.name
+    end
+    cache.lsp_clients = table.concat(names, ", ")
+  else
+    cache.lsp_clients = ""
+  end
+end
+
+-- LSP progress (updated on LspProgress events)
+local lsp_progress_map = {}
+
+local function update_lsp_progress(args)
+  local data = args.data
+  if not data or not data.params then return end
+  local val = data.params.value
+  local client_id = data.client_id
+  if not val or not client_id then return end
+
+  if val.kind == "end" then
+    lsp_progress_map[client_id] = nil
+  else
+    local msg = val.title or ""
+    if val.message then msg = msg .. ": " .. val.message end
+    if val.percentage then msg = msg .. " (" .. val.percentage .. "%%%%)" end
+    lsp_progress_map[client_id] = msg
+  end
+
+  local msgs = {}
+  for _, msg in pairs(lsp_progress_map) do
+    msgs[#msgs + 1] = msg
+  end
+  cache.lsp_progress = table.concat(msgs, " | ")
+end
+
+-- ============================================================================
+-- Autocmds to keep cache fresh
+-- ============================================================================
+local group = vim.api.nvim_create_augroup("statusline_cache", { clear = true })
+
+vim.api.nvim_create_autocmd({ "BufEnter", "FocusGained", "DirChanged" }, {
+  group = group, callback = update_git_branch,
 })
 
+vim.api.nvim_create_autocmd("DiagnosticChanged", {
+  group = group, callback = update_diagnostics,
+})
+
+vim.api.nvim_create_autocmd({ "LspAttach", "LspDetach", "BufEnter" }, {
+  group = group, callback = update_lsp_clients,
+})
+
+vim.api.nvim_create_autocmd("LspProgress", {
+  group = group, callback = update_lsp_progress,
+})
+
+-- Initial fetch
+update_git_branch()
+
+-- ============================================================================
+-- Render (pure string concat, no API calls)
+-- ============================================================================
+function M.render()
+  local mode = vim.api.nvim_get_mode().mode
+  local mode_label = mode_map[mode] or mode
+  local hl = mode_hl[mode_label] or "StatusLineMode"
+
+  -- Left: mode + file + git
+  local left = "%#" .. hl .. "# " .. mode_label .. " %*"
+    .. "%#StatusLineFile# %t %m%r%*"
+  if cache.git_branch ~= "" then
+    left = left .. "%#StatusLineGit#  " .. cache.git_branch .. " %*"
+  end
+
+  -- Right: diagnostics + lsp + position
+  local right = cache.diag
+  if cache.lsp_progress ~= "" then
+    right = right .. "%#StatusLineLsp# " .. cache.lsp_progress .. " %*"
+  elseif cache.lsp_clients ~= "" then
+    right = right .. "%#StatusLineLsp# " .. cache.lsp_clients .. " %*"
+  end
+  right = right .. "%#StatusLinePos# %l:%c %p%% %*"
+
+  return left .. "%=" .. right
+end
+
+-- ============================================================================
+-- Highlights
+-- ============================================================================
 local function setup_highlights()
   local colors = {
     StatusLineMode        = { fg = "#1a1b26", bg = "#7aa2f7", bold = true },
@@ -99,79 +215,12 @@ local function setup_highlights()
   end
 end
 
-function M.render()
-  local mode = vim.api.nvim_get_mode().mode
-  local mode_label = mode_map[mode] or mode
-  local hl = mode_hl[mode_label] or "StatusLineMode"
-
-  -- Mode
-  local parts = { "%#" .. hl .. "# " .. mode_label .. " %*" }
-
-  -- File
-  table.insert(parts, "%#StatusLineFile# %t %m%r%*")
-
-  -- Git branch
-  local branch = ""
-  local buf_dir = vim.fn.expand("%:p:h")
-  if buf_dir ~= "" then
-    local result = vim.fn.systemlist("git -C " .. vim.fn.shellescape(buf_dir) .. " rev-parse --abbrev-ref HEAD 2>/dev/null")
-    if vim.v.shell_error == 0 and result[1] and result[1] ~= "" then
-      branch = result[1]
-    end
-  end
-  if branch ~= "" then
-    table.insert(parts, "%#StatusLineGit#  " .. branch .. " %*")
-  end
-
-  -- Separator
-  table.insert(parts, "%=")
-
-  -- Diagnostics
-  local diag_counts = {
-    { vim.diagnostic.severity.ERROR, "StatusLineDiagError", " " },
-    { vim.diagnostic.severity.WARN,  "StatusLineDiagWarn",  " " },
-    { vim.diagnostic.severity.INFO,  "StatusLineDiagInfo",  " " },
-    { vim.diagnostic.severity.HINT,  "StatusLineDiagHint",  " " },
-  }
-  for _, d in ipairs(diag_counts) do
-    local count = #vim.diagnostic.get(0, { severity = d[1] })
-    if count > 0 then
-      table.insert(parts, "%#" .. d[2] .. "#" .. d[3] .. count .. " %*")
-    end
-  end
-
-  -- LSP progress or server name
-  local progress_msgs = {}
-  for _, msg in pairs(lsp_progress) do
-    table.insert(progress_msgs, msg)
-  end
-  if #progress_msgs > 0 then
-    table.insert(parts, "%#StatusLineLsp# " .. table.concat(progress_msgs, " | ") .. " %*")
-  else
-    local clients = vim.lsp.get_clients({ bufnr = 0 })
-    if #clients > 0 then
-      local names = {}
-      for _, c in ipairs(clients) do
-        table.insert(names, c.name)
-      end
-      table.insert(parts, "%#StatusLineLsp# " .. table.concat(names, ", ") .. " %*")
-    end
-  end
-
-  -- Position + filetype
-  table.insert(parts, "%#StatusLinePos# %l:%c %p%% %*")
-
-  return table.concat(parts)
-end
-
--- Set up highlights and statusline
 setup_highlights()
 vim.api.nvim_create_autocmd("ColorScheme", {
   group = vim.api.nvim_create_augroup("statusline_colors", { clear = true }),
   callback = setup_highlights,
 })
 
--- Use global statusline
 vim.o.laststatus = 3
 vim.o.statusline = "%!v:lua.require('statusline').render()"
 
