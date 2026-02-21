@@ -1,7 +1,7 @@
 local M = {}
 
-local sel_bg = "#292e42"
-local fill_bg = "#1a1b26"
+local sel_bg = "#1a1b26"
+local fill_bg = "#000000"
 
 local function setup_highlights()
   vim.api.nvim_set_hl(0, "TabLineBuf",    { fg = "#565f89", bg = fill_bg })
