@@ -1,15 +1,7 @@
 return {
   {
     "mfussenegger/nvim-dap",
-    keys = {
-      { "<Leader>db", function() require("dap").toggle_breakpoint() end, desc = "Toggle breakpoint" },
-      { "<Leader>dc", function() require("dap").continue() end, desc = "Continue" },
-      { "<Leader>di", function() require("dap").step_into() end, desc = "Step into" },
-      { "<Leader>do", function() require("dap").step_over() end, desc = "Step over" },
-      { "<Leader>dO", function() require("dap").step_out() end, desc = "Step out" },
-      { "<Leader>dr", function() require("dap").repl.open() end, desc = "Open REPL" },
-      { "<Leader>dt", function() require("dap").terminate() end, desc = "Terminate" },
-    },
+    lazy = true,
     config = function()
       local dap = require("dap")
 
@@ -71,10 +63,8 @@ return {
   },
   {
     "rcarriga/nvim-dap-ui",
+    lazy = true,
     dependencies = { "mfussenegger/nvim-dap", "nvim-neotest/nvim-nio" },
-    keys = {
-      { "<Leader>du", function() require("dapui").toggle() end, desc = "Toggle DAP UI" },
-    },
     config = function()
       local dapui = require("dapui")
       dapui.setup()

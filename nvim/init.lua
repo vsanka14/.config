@@ -30,7 +30,7 @@ require("keymaps")
 require("statusline")
 require("tabline")
 require("lsp")
-require("helpers.trino").setup()
+require("trino").setup()
 
 -- Show startup time as a notification
 vim.api.nvim_create_autocmd("VimEnter", {

@@ -1,3 +1,6 @@
+-- Java LSP lifecycle, DAP wiring, and hot-code replace via nvim-jdtls.
+-- Ported from astrocommunity pack/java (https://github.com/AstroNvim/astrocommunity)
+-- with workspace dirs, lombok agent, mason-managed jdtls/debug-adapter/test bundles.
 return {
   "mfussenegger/nvim-jdtls",
   ft = "java",

@@ -47,36 +47,36 @@ map("n", "[h", function()
 	MiniDiff.goto_hunk("prev")
 end, { desc = "Previous git hunk" })
 
--- Lazygit (floating terminal inside Neovim)
+-- Diffview
+map("n", "<Leader>gd", "<cmd>DiffviewOpen<cr>", { desc = "Git diff view" })
+map("n", "<Leader>gh", "<cmd>DiffviewFileHistory %<cr>", { desc = "File git history" })
+map("n", "<Leader>gH", "<cmd>DiffviewFileHistory<cr>", { desc = "Branch git history" })
+map("n", "<Leader>gx", "<cmd>DiffviewClose<cr>", { desc = "Close diff view" })
+
+-- Lazygit
 map("n", "<Leader>gg", function()
-	local buf = vim.api.nvim_create_buf(false, true)
-	local width = math.floor(vim.o.columns * 0.8)
-	local height = math.floor(vim.o.lines * 0.8)
-	local win = vim.api.nvim_open_win(buf, true, {
-		relative = "editor",
-		width = width,
-		height = height,
-		col = math.floor((vim.o.columns - width) / 2),
-		row = math.floor((vim.o.lines - height) / 2),
-		style = "minimal",
-		border = "rounded",
-	})
-	vim.fn.termopen("lazygit", {
-		on_exit = function()
-			if vim.api.nvim_win_is_valid(win) then
-				vim.api.nvim_win_close(win, true)
-			end
-			if vim.api.nvim_buf_is_valid(buf) then
-				vim.api.nvim_buf_delete(buf, { force = true })
-			end
-		end,
-	})
-	vim.cmd("startinsert")
+	require("helpers.float-term").open("lazygit")
 end, { desc = "Open Lazygit" })
 
 -- Yazi file explorer
 map("n", "<Leader>e", function()
-	require("helpers.yazi").open()
+	local chooser_file = vim.fn.tempname()
+	local cmd = string.format("yazi --chooser-file=%s %s", chooser_file, vim.fn.expand("%:p:h"))
+	require("helpers.float-term").open(cmd, {
+		width = 0.85,
+		height = 0.85,
+		on_exit = function()
+			local f = io.open(chooser_file, "r")
+			if f then
+				local path = f:read("*l")
+				f:close()
+				vim.fn.delete(chooser_file)
+				if path and path ~= "" then
+					vim.cmd("edit " .. vim.fn.fnameescape(path))
+				end
+			end
+		end,
+	})
 end, { desc = "File Explorer (yazi)" })
 
 -- Yank helpers
@@ -180,6 +180,16 @@ map("n", "<Leader>fs", function()
 		})
 	end)
 end, { desc = "Find LSP symbols" })
+
+-- DAP (debug adapter)
+map("n", "<Leader>db", function() require("dap").toggle_breakpoint() end, { desc = "Toggle breakpoint" })
+map("n", "<Leader>dc", function() require("dap").continue() end, { desc = "Continue" })
+map("n", "<Leader>di", function() require("dap").step_into() end, { desc = "Step into" })
+map("n", "<Leader>do", function() require("dap").step_over() end, { desc = "Step over" })
+map("n", "<Leader>dO", function() require("dap").step_out() end, { desc = "Step out" })
+map("n", "<Leader>dr", function() require("dap").repl.open() end, { desc = "Open REPL" })
+map("n", "<Leader>dt", function() require("dap").terminate() end, { desc = "Terminate" })
+map("n", "<Leader>du", function() require("dapui").toggle() end, { desc = "Toggle DAP UI" })
 
 -- Clear search highlights
 map("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear highlights" })
