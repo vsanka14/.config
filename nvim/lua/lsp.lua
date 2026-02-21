@@ -4,7 +4,14 @@
 vim.diagnostic.config({
   virtual_text = true,
   underline = true,
-  signs = true,
+  signs = {
+    text = {
+      [vim.diagnostic.severity.ERROR] = "\u{f0674}",
+      [vim.diagnostic.severity.WARN]  = "\u{f0026}",
+      [vim.diagnostic.severity.INFO]  = "\u{f02fc}",
+      [vim.diagnostic.severity.HINT]  = "\u{f0835}",
+    },
+  },
   float = { border = "rounded" },
   severity_sort = true,
 })
