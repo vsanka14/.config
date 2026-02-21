@@ -20,9 +20,9 @@ config.line_height = 1.2
 config.window_decorations = "RESIZE" -- No title bar, just resizable window
 config.window_padding = {
 	left = 12,
-	right = 12,
+	right = 0,
 	top = 12,
-	bottom = 12,
+	bottom = 0,
 }
 
 -- Tab bar
