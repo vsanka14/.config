@@ -1,4 +1,4 @@
 return {
-  "OXY2DEV/markview.nvim",
-  ft = { "markdown", "markdown.mdx" },
+	"OXY2DEV/markview.nvim",
+	ft = { "markdown", "markdown.mdx" },
 }
