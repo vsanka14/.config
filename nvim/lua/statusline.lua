@@ -45,7 +45,11 @@ local hl_defs = {
   DiagInfo    = { fg = "#7dcfff", bg = "#1a1b26" },
   DiagHint    = { fg = "#9ece6a", bg = "#1a1b26" },
   Lsp         = { fg = "#565f89", bg = "#1a1b26" },
-  Pos         = { fg = "#a9b1d6", bg = "#24283b" },
+  PosIcon     = { fg = "#7aa2f7", bg = "#24283b" },
+  PosLine     = { fg = "#c0caf5", bg = "#24283b" },
+  PosSep      = { fg = "#565f89", bg = "#24283b" },
+  PosCol      = { fg = "#9ece6a", bg = "#24283b" },
+  PosPct      = { fg = "#bb9af7", bg = "#24283b" },
 }
 
 local function setup_highlights()
@@ -152,9 +156,8 @@ function M.render()
   local mode = vim.api.nvim_get_mode().mode
   local mode_label = mode_map[mode] or mode
 
-  -- Left: mode + file + git
+  -- Left: mode + git
   local left = hl(mode_hl[mode_label] or "Mode", " " .. mode_label .. " ")
-    .. hl("File", " %t %m%r")
   if cache.git_branch ~= "" then
     left = left .. hl("GitIcon", " \u{e725} ") .. hl("Git", cache.git_branch .. " ")
   end
@@ -169,8 +172,14 @@ function M.render()
 
   local cur = vim.fn.line(".")
   local total = vim.fn.line("$")
-  local pos = cur == 1 and "Top" or cur == total and "Bot" or (math.floor(cur / total * 100) .. "%%%%")
-  right = right .. hl("Pos", " %l:%c " .. pos .. " ")
+  local pct = cur == 1 and "Top" or cur == total and "Bot" or (math.floor(cur / total * 100) .. "%%%%")
+  right = right
+    .. hl("PosIcon", " \u{f0c9} ")
+    .. hl("PosLine", "%l")
+    .. hl("PosSep", ":")
+    .. hl("PosCol", "%c")
+    .. hl("PosSep", " \u{f01e8} ")
+    .. hl("PosPct", pct .. " ")
 
   return left .. "%=" .. right
 end
