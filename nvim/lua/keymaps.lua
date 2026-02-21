@@ -16,10 +16,13 @@ map("n", "<C-b>", "<C-b>zz", { desc = "Page up (centered)" })
 map("n", "<Leader>bn", "<cmd>bnext<cr>", { desc = "Next buffer" })
 map("n", "<Leader>bp", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
 map("n", "<Leader>bc", function()
-	local buf = vim.api.nvim_get_current_buf()
-	vim.cmd("bprevious")
-	vim.api.nvim_buf_delete(buf, {})
-end, { desc = "Close buffer" })
+	local current = vim.api.nvim_get_current_buf()
+	for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+		if buf ~= current and vim.bo[buf].buflisted then
+			vim.api.nvim_buf_delete(buf, {})
+		end
+	end
+end, { desc = "Close other buffers" })
 map("n", "<Leader>c", function()
 	local buf = vim.api.nvim_get_current_buf()
 	vim.cmd("bprevious")
