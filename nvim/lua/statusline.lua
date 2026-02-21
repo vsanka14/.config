@@ -172,7 +172,7 @@ function M.render()
 
   local cur = vim.fn.line(".")
   local total = vim.fn.line("$")
-  local pct = cur == 1 and "Top" or cur == total and "Bot" or (math.floor(cur / total * 100) .. "%%%%")
+  local pct = cur == 1 and "Top" or cur == total and "Bot" or (math.floor(cur / total * 100) .. "%%")
   right = right
     .. hl("PosIcon", " \u{f0c9} ")
     .. hl("PosLine", "%l")

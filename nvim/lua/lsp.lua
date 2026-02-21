@@ -119,17 +119,5 @@ vim.api.nvim_create_autocmd("LspAttach", {
         desc = "Refresh codelens",
       })
     end
-
-    -- File operations capabilities (for nvim-lsp-file-operations)
-    if client then
-      local caps = client.server_capabilities or {}
-      if not caps.workspace then caps.workspace = {} end
-      if not caps.workspace.fileOperations then
-        caps.workspace.fileOperations = {
-          didRename = true,
-          willRename = true,
-        }
-      end
-    end
   end,
 })
