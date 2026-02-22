@@ -1,6 +1,6 @@
 local map = vim.keymap.set
 
--- Save
+-- Save with Ctrl-s
 map({ "n", "i", "v" }, "<C-s>", "<cmd>write<cr>", { desc = "Save file" })
 
 -- Redo with U
@@ -31,24 +31,12 @@ end, { desc = "Close buffer" })
 
 -- Git keymaps (using mini.diff where applicable)
 map("n", "<Leader>g", "<nop>", { desc = "Git" })
-map("n", "<Leader>gp", function()
-	MiniDiff.toggle_overlay(0)
-end, { desc = "Toggle diff overlay" })
 map("n", "<Leader>gr", function()
 	MiniDiff.do_hunks(0, "reset")
 end, { desc = "Reset hunk" })
 map("n", "<Leader>gR", function()
 	MiniDiff.do_hunks(0, "reset", { line_start = 1, line_end = vim.fn.line("$") })
 end, { desc = "Reset buffer" })
-map("v", "<Leader>gr", function()
-	MiniDiff.do_hunks(0, "reset")
-end, { desc = "Reset selected hunk" })
-map("n", "]h", function()
-	MiniDiff.goto_hunk("next")
-end, { desc = "Next git hunk" })
-map("n", "[h", function()
-	MiniDiff.goto_hunk("prev")
-end, { desc = "Previous git hunk" })
 
 -- Diffview
 map("n", "<Leader>gd", "<cmd>DiffviewOpen<cr>", { desc = "Git diff view" })
@@ -143,46 +131,6 @@ map("n", "<Leader>fd", function()
 		},
 	})
 end, { desc = "Find diagnostics" })
-
-map("n", "<Leader>fs", function()
-	local params = { query = "" }
-	vim.lsp.buf_request(0, "textDocument/documentSymbol", {
-		textDocument = vim.lsp.util.make_text_document_params(),
-	}, function(err, result)
-		if err or not result then
-			return
-		end
-		local items = {}
-		local function flatten(symbols, prefix)
-			for _, s in ipairs(symbols) do
-				local name = prefix ~= "" and (prefix .. "." .. s.name) or s.name
-				table.insert(items, {
-					text = string.format(
-						"[%s] %s :%d",
-						vim.lsp.protocol.SymbolKind[s.kind] or "?",
-						name,
-						s.range.start.line + 1
-					),
-					lnum = s.range.start.line + 1,
-					col = s.range.start.character + 1,
-				})
-				if s.children then
-					flatten(s.children, name)
-				end
-			end
-		end
-		flatten(result, "")
-		MiniPick.start({
-			source = {
-				name = "Document Symbols",
-				items = items,
-				choose = function(item)
-					vim.api.nvim_win_set_cursor(0, { item.lnum, item.col - 1 })
-				end,
-			},
-		})
-	end)
-end, { desc = "Find LSP symbols" })
 
 -- DAP (debug adapter)
 map("n", "<Leader>db", function()
