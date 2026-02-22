@@ -32,13 +32,21 @@ require("tabline")
 require("lsp")
 require("trino").setup()
 
--- Show startup time as a notification
+-- Show startup time as a notification (only when launched directly, not as shell editor)
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = function()
-    vim.schedule(function()
-      local stats = require("lazy").stats()
-      local ms = math.floor(stats.startuptime * 100 + 0.5) / 100
-      vim.notify(string.format("Loaded %d plugins in %.2fms", stats.loaded, ms))
-    end)
+    if vim.fn.argc() == 0 and not vim.g.started_with_stdin then
+      vim.schedule(function()
+        local stats = require("lazy").stats()
+        local ms = math.floor(stats.startuptime * 100 + 0.5) / 100
+        vim.notify(string.format("Loaded %d plugins in %.2fms", stats.loaded, ms))
+      end)
+    end
+  end,
+})
+
+vim.api.nvim_create_autocmd("StdinReadPre", {
+  callback = function()
+    vim.g.started_with_stdin = true
   end,
 })
