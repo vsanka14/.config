@@ -182,6 +182,7 @@ local function update_lsp_progress(args)
 		msgs[#msgs + 1] = msg
 	end
 	cache.lsp_progress = table.concat(msgs, " | ")
+	vim.cmd.redrawstatus()
 end
 
 -- ============================================================================

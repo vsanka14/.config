@@ -1,6 +1,6 @@
 -- Java LSP lifecycle, DAP wiring, and hot-code replace via nvim-jdtls.
 -- Ported from astrocommunity pack/java (https://github.com/AstroNvim/astrocommunity)
--- Uses $MASON/share/ symlinks for stable paths across mason package updates.
+-- Uses mason/share/ symlinks for stable paths across mason package updates.
 --
 -- LinkedIn MP support: detects multi-module Gradle projects, configures Buildship
 -- import with proper memory/JVM settings, and registers generated source directories
@@ -10,11 +10,15 @@ return {
 	ft = "java",
 	dependencies = { "mfussenegger/nvim-dap" },
 	config = function()
-		-- DAP bundles (use $MASON/share/ symlinks, same as astrocommunity)
+		-- Resolve mason path directly instead of using $MASON env var,
+		-- which requires mason.nvim to be loaded first (it's lazy-loaded).
+		local mason = vim.fn.stdpath("data") .. "/mason"
+
+		-- DAP bundles (use mason/share/ symlinks for stable paths across updates)
 		local bundles = {
-			vim.fn.expand("$MASON/share/java-debug-adapter/com.microsoft.java.debug.plugin.jar"),
+			mason .. "/share/java-debug-adapter/com.microsoft.java.debug.plugin.jar",
 		}
-		local test_jars = vim.split(vim.fn.glob("$MASON/share/java-test/*.jar", true), "\n", {})
+		local test_jars = vim.split(vim.fn.glob(mason .. "/share/java-test/*.jar", true), "\n", {})
 		for _, jar in ipairs(test_jars) do
 			if jar ~= "" then
 				table.insert(bundles, jar)
@@ -77,7 +81,7 @@ return {
 					"-Declipse.product=org.eclipse.jdt.ls.core.product",
 					"-Dlog.protocol=true",
 					"-Dlog.level=ALL",
-					"-javaagent:" .. vim.fn.expand("$MASON/share/jdtls/lombok.jar"),
+					"-javaagent:" .. mason .. "/share/jdtls/lombok.jar",
 					"-Xms2g",
 					"-Xmx8g",
 					"--add-modules=ALL-SYSTEM",
@@ -86,9 +90,9 @@ return {
 					"--add-opens",
 					"java.base/java.lang=ALL-UNNAMED",
 					"-jar",
-					vim.fn.expand("$MASON/share/jdtls/plugins/org.eclipse.equinox.launcher.jar"),
+					mason .. "/share/jdtls/plugins/org.eclipse.equinox.launcher.jar",
 					"-configuration",
-					vim.fn.expand("$MASON/share/jdtls/config"),
+					mason .. "/share/jdtls/config",
 					"-data",
 					workspace_dir,
 				},
