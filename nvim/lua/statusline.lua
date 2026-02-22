@@ -120,7 +120,7 @@ local function update_git_branch()
 end
 
 local diag_icons = {
-	{ vim.diagnostic.severity.ERROR, "DiagError", "\u{f0674} " },
+	{ vim.diagnostic.severity.ERROR, "DiagError", "\u{f0159} " },
 	{ vim.diagnostic.severity.WARN, "DiagWarn", "\u{f0026} " },
 	{ vim.diagnostic.severity.INFO, "DiagInfo", "\u{f02fc} " },
 	{ vim.diagnostic.severity.HINT, "DiagHint", "\u{f0835} " },
