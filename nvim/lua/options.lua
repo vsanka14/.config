@@ -32,3 +32,7 @@ opt.list = true
 opt.listchars = { leadmultispace = "│ ", tab = "│ ", trail = "·" }
 opt.shiftwidth = 2
 opt.tabstop = 2
+opt.foldmethod = "expr"
+opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+opt.foldlevel = 99
+opt.foldlevelstart = 99
