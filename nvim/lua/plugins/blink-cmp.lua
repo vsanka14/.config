@@ -8,6 +8,7 @@ return {
 			["<C-j>"] = { "select_next", "fallback" },
 			["<C-k>"] = { "select_prev", "fallback" },
 			["<C-l>"] = { "accept", "fallback" },
+			["<CR>"] = { "accept", "fallback" },
 		},
 		sources = {
 			default = { "lsp", "path", "snippets", "buffer" },

@@ -20,12 +20,18 @@ local function get_icon_hl(base_hl, is_sel)
 	local hl_name = base_hl .. suffix
 
 	if not icon_hl_cache[hl_name] then
-		local existing = vim.api.nvim_get_hl(0, { name = base_hl, link = false })
-		local fg = existing.fg
-		if fg then
-			vim.api.nvim_set_hl(0, hl_name, { fg = fg, bg = is_sel and sel_bg or fill_bg })
+		if is_sel then
+			local existing = vim.api.nvim_get_hl(0, { name = base_hl, link = false })
+			local fg = existing.fg
+			if fg then
+				vim.api.nvim_set_hl(0, hl_name, { fg = fg, bg = sel_bg })
+			else
+				vim.api.nvim_set_hl(0, hl_name, { link = base_hl })
+			end
 		else
-			vim.api.nvim_set_hl(0, hl_name, { link = base_hl })
+			-- Dim inactive buffer icons to match the inactive text color
+			local dim_fg = vim.api.nvim_get_hl(0, { name = "TabLineBuf", link = false }).fg
+			vim.api.nvim_set_hl(0, hl_name, { fg = dim_fg, bg = fill_bg })
 		end
 		icon_hl_cache[hl_name] = true
 	end
@@ -65,7 +71,7 @@ function M.render()
 		local mod_str = ""
 		if vim.bo[buf].modified then
 			local mod_hl = is_sel and "%#TabLineModSel#" or "%#TabLineMod#"
-			mod_str = mod_hl .. " ⦁"
+			mod_str = mod_hl .. " 󰏫"
 		end
 
 		local left = is_sel and "%#TabLineSep# " or " "
