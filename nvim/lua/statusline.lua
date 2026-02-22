@@ -119,11 +119,12 @@ local function update_git_branch()
 	})
 end
 
+local icons = require("helpers.icons")
 local diag_icons = {
-	{ vim.diagnostic.severity.ERROR, "DiagError", "\u{f0159} " },
-	{ vim.diagnostic.severity.WARN, "DiagWarn", "\u{f0026} " },
-	{ vim.diagnostic.severity.INFO, "DiagInfo", "\u{f02fc} " },
-	{ vim.diagnostic.severity.HINT, "DiagHint", "\u{f0835} " },
+	{ vim.diagnostic.severity.ERROR, "DiagError", icons[vim.diagnostic.severity.ERROR] .. " " },
+	{ vim.diagnostic.severity.WARN, "DiagWarn", icons[vim.diagnostic.severity.WARN] .. " " },
+	{ vim.diagnostic.severity.INFO, "DiagInfo", icons[vim.diagnostic.severity.INFO] .. " " },
+	{ vim.diagnostic.severity.HINT, "DiagHint", icons[vim.diagnostic.severity.HINT] .. " " },
 }
 
 local function update_diagnostics()

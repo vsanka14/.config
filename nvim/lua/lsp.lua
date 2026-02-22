@@ -4,14 +4,7 @@
 vim.diagnostic.config({
 	virtual_text = true,
 	underline = true,
-	signs = {
-		text = {
-			[vim.diagnostic.severity.ERROR] = "\u{f0159}",
-			[vim.diagnostic.severity.WARN] = "\u{f0026}",
-			[vim.diagnostic.severity.INFO] = "\u{f02fc}",
-			[vim.diagnostic.severity.HINT] = "\u{f0835}",
-		},
-	},
+	signs = { text = require("helpers.icons") },
 	float = { border = "rounded" },
 	severity_sort = true,
 })
