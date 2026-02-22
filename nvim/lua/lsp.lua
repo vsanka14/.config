@@ -16,6 +16,11 @@ vim.diagnostic.config({
 	severity_sort = true,
 })
 
+-- Apply blink.cmp capabilities to all LSP servers
+vim.lsp.config("*", {
+	capabilities = require("blink.cmp").get_lsp_capabilities(),
+})
+
 -- LSP server configurations
 vim.lsp.config("lua_ls", {
 	cmd = { "lua-language-server" },
