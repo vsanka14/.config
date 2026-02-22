@@ -71,7 +71,7 @@ function M.render()
 		local mod_str = ""
 		if vim.bo[buf].modified then
 			local mod_hl = is_sel and "%#TabLineModSel#" or "%#TabLineMod#"
-			mod_str = mod_hl .. " 󰏫"
+			mod_str = mod_hl .. " ⏺"
 		end
 
 		local left = is_sel and "%#TabLineSep# " or " "
