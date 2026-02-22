@@ -5,38 +5,6 @@ return {
 		config = function()
 			local dap = require("dap")
 
-			-- JS debug adapter (from mason)
-			local js_debug_path = vim.fn.stdpath("data") .. "/mason/packages/js-debug-adapter"
-			if vim.fn.isdirectory(js_debug_path) == 1 then
-				dap.adapters["pwa-node"] = {
-					type = "server",
-					host = "localhost",
-					port = "${port}",
-					executable = {
-						command = "node",
-						args = { js_debug_path .. "/js-debug/src/dapDebugServer.js", "${port}" },
-					},
-				}
-				for _, lang in ipairs({ "javascript", "typescript" }) do
-					dap.configurations[lang] = {
-						{
-							type = "pwa-node",
-							request = "launch",
-							name = "Launch file",
-							program = "${file}",
-							cwd = "${workspaceFolder}",
-						},
-						{
-							type = "pwa-node",
-							request = "attach",
-							name = "Attach",
-							processId = require("dap.utils").pick_process,
-							cwd = "${workspaceFolder}",
-						},
-					}
-				end
-			end
-
 			-- Java remote attach configs
 			local function get_debug_port()
 				local cwd = vim.fn.getcwd()

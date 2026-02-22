@@ -41,41 +41,6 @@ return {
 			end
 		end
 
-		--- Collect generated source directories for a LinkedIn MP root.
-		--- Scans each submodule's src/ for directories like mainGeneratedDataTemplate/java,
-		--- mainGeneratedRest/java, generatedPegasusInterop/java, etc.
-		---@param root string project root directory
-		---@return string[] list of absolute paths to generated source dirs
-		local function find_generated_sources(root)
-			local sources = {}
-			local generated_patterns = {
-				"mainGeneratedDataTemplate/java",
-				"mainGeneratedRest/java",
-				"generatedPegasusInterop/java",
-				"generatedTestPegasusInterop/java",
-				"generatedImmutable/java",
-				"mainGeneratedTranslationKeys/java",
-				"generatedProto/java",
-			}
-			-- Check each submodule's src directory
-			local settings_file = root .. "/settings.gradle"
-			if vim.fn.filereadable(settings_file) == 1 then
-				local content = vim.fn.readfile(settings_file)
-				for _, line in ipairs(content) do
-					local module = line:match('"([%w%-_]+)"')
-					if module then
-						for _, pattern in ipairs(generated_patterns) do
-							local src_dir = root .. "/" .. module .. "/src/" .. pattern
-							if vim.fn.isdirectory(src_dir) == 1 then
-								table.insert(sources, src_dir)
-							end
-						end
-					end
-				end
-			end
-			return sources
-		end
-
 		local function start_jdtls()
 			-- Root detection: prefer settings.gradle / product-spec.json for LinkedIn MPs
 			local root_dir = vim.fs.root(0, { "settings.gradle", "product-spec.json", "mvnw", "gradlew", ".git" })
