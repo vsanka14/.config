@@ -28,7 +28,7 @@ autocmd("ColorScheme", {
 	desc = "Reapply italic highlights",
 })
 
--- Markdown-specific settings
+-- Markdown: wrap + display-line navigation so gutter numbers match gj/gk movement
 autocmd("FileType", {
 	group = augroup("markdown_settings", { clear = true }),
 	pattern = { "markdown", "markdown.mdx" },
@@ -37,11 +37,11 @@ autocmd("FileType", {
 		vim.opt_local.linebreak = true
 		vim.opt_local.conceallevel = 2
 		vim.opt_local.concealcursor = "nc"
+		vim.opt_local.statuscolumn = "%=%{v:lua.require('helpers.display-lines').statuscolumn()}"
 
-		-- Navigate by display lines instead of logical lines
 		local opts = { buffer = true, silent = true }
-		vim.keymap.set({ "n", "v" }, "j", "gj", opts)
-		vim.keymap.set({ "n", "v" }, "k", "gk", opts)
+		vim.keymap.set({ "n", "v", "o" }, "j", "gj", opts)
+		vim.keymap.set({ "n", "v", "o" }, "k", "gk", opts)
 		vim.keymap.set({ "n", "v" }, "0", "g0", opts)
 		vim.keymap.set({ "n", "v" }, "$", "g$", opts)
 	end,
