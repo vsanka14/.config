@@ -14,7 +14,7 @@ config.macos_window_background_blur = 20
 -- Font
 config.font = wezterm.font("JetBrainsMono Nerd Font", { weight = "DemiBold" })
 config.font_size = 12.0
-config.line_height = 1.2
+config.line_height = 1.3
 
 -- Window
 config.window_decorations = "RESIZE" -- No title bar, just resizable window
