@@ -50,6 +50,9 @@ return {
 			},
 		})
 
+		-- Surround (sa=add, sd=delete, sr=replace)
+		require("mini.surround").setup()
+
 		-- Git diff (gutter signs + overlay)
 		require("mini.diff").setup({
 			view = {

@@ -78,6 +78,32 @@ autocmd("BufWritePost", {
 	desc = "Restore buffer to treesitter-friendly state after save",
 })
 
+-- Inline git blame
+local blame_group = augroup("inline_blame", { clear = true })
+local blame = require("helpers.blame")
+
+autocmd("CursorHold", {
+	group = blame_group,
+	callback = blame.show,
+	desc = "Show inline git blame",
+})
+
+autocmd({ "CursorMoved", "InsertEnter" }, {
+	group = blame_group,
+	callback = function()
+		blame.clear(vim.api.nvim_get_current_buf())
+	end,
+	desc = "Clear inline blame",
+})
+
+autocmd("BufDelete", {
+	group = blame_group,
+	callback = function(args)
+		blame.clean_cache(args.buf)
+	end,
+	desc = "Clean blame cache",
+})
+
 -- Highlight on yank
 autocmd("TextYankPost", {
 	group = augroup("highlight_yank", { clear = true }),

@@ -23,7 +23,7 @@ opt.undofile = true
 opt.updatetime = 250
 opt.completeopt = "menuone,noselect,popup"
 opt.clipboard = "unnamedplus"
-opt.cursorline = true
+opt.cursorline = false
 opt.scrolloff = 8
 opt.cmdheight = 0
 opt.hlsearch = true
@@ -32,6 +32,7 @@ opt.list = true
 opt.listchars = { leadmultispace = "│ ", tab = "│ ", trail = "·" }
 opt.shiftwidth = 2
 opt.tabstop = 2
+opt.expandtab = true
 opt.foldmethod = "expr"
 opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
 opt.foldlevel = 99

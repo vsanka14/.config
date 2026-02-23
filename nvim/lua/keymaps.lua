@@ -38,6 +38,16 @@ map("n", "<Leader>gR", function()
 	MiniDiff.do_hunks(0, "reset", { line_start = 1, line_end = vim.fn.line("$") })
 end, { desc = "Reset buffer" })
 
+-- Open git blame commit diff
+map("n", "<Leader>gc", function()
+	require("helpers.blame").open_commit()
+end, { desc = "Blame commit diff" })
+
+-- Open blame PR in browser
+map("n", "<Leader>gp", function()
+	require("helpers.blame").open_pr()
+end, { desc = "Open blame PR in browser" })
+
 -- Diffview
 map("n", "<Leader>gd", "<cmd>DiffviewOpen<cr>", { desc = "Git diff view" })
 map("n", "<Leader>gh", "<cmd>DiffviewFileHistory %<cr>", { desc = "File git history" })
