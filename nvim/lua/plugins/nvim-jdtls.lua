@@ -5,6 +5,7 @@
 -- LinkedIn MP support: detects multi-module Gradle projects, configures Buildship
 -- import with proper memory/JVM settings, and registers generated source directories
 -- (mainGeneratedDataTemplate, mainGeneratedRest, etc.) so PDL-generated classes resolve.
+-- Read ~/documents/notes/jdlts-setup.md for more info.
 return {
 	"mfussenegger/nvim-jdtls",
 	ft = "java",
