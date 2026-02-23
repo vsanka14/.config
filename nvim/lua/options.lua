@@ -37,3 +37,13 @@ opt.foldmethod = "expr"
 opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
 opt.foldlevel = 99
 opt.foldlevelstart = 99
+
+-- Filetype registration
+vim.filetype.add({
+	extension = {
+		mdx = "markdown.mdx",
+	},
+})
+
+-- Use bash treesitter parser for .conf files (comments, strings, numbers)
+vim.treesitter.language.register("bash", "conf")

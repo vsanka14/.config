@@ -47,6 +47,7 @@ return {
 				astro = { glyph = "\u{f1cde}", hl = "MiniIconsOrange" },
 				mdx = { glyph = "\u{f0354}", hl = "MiniIconsAzure" },
 				hbs = { glyph = "\u{e60f}", hl = "MiniIconsOrange" },
+				conf = { glyph = "\u{f013}", hl = "MiniIconsGreen" },
 			},
 		})
 
