@@ -1,3 +1,5 @@
+-- Inline git blame: shows author, date, and summary as virtual text at EOL.
+-- Exposes actions to open the blame commit diff (DiffviewOpen) and the PR in browser.
 local M = {}
 local ns = vim.api.nvim_create_namespace("inline_blame")
 local cache = {} -- [bufnr] = { line, text, hash }
