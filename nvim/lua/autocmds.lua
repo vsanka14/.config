@@ -24,9 +24,6 @@ autocmd("ColorScheme", {
 		local keyword_hl = vim.api.nvim_get_hl(0, { name = "Keyword" })
 		keyword_hl.italic = true
 		vim.api.nvim_set_hl(0, "Keyword", keyword_hl)
-
-		-- Lighter indent/tab guide lines
-		vim.api.nvim_set_hl(0, "Whitespace", { fg = "#3b4261" })
 	end,
 	desc = "Reapply italic highlights",
 })
