@@ -52,7 +52,7 @@ function M.render()
 	local current = vim.api.nvim_get_current_buf()
 	local parts = {}
 
-	for _, buf in ipairs(bufs) do
+	for i, buf in ipairs(bufs) do
 		local is_sel = buf == current
 		local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":t")
 		if name == "" then
@@ -74,6 +74,7 @@ function M.render()
 			mod_str = mod_hl .. " ⏺"
 		end
 
+		local sep = (not is_sel and i > 1) and "%#TabLineSep#│" or ""
 		local left = is_sel and "%#TabLineSep# " or " "
 		local right = is_sel and "%#TabLineSep# " or " "
 
@@ -83,7 +84,8 @@ function M.render()
 		table.insert(
 			parts,
 			string.format(
-				"%%%dT%s%s %s %s%s%s%%T",
+				"%s%%%dT%s%s %s %s%s%s%%T",
+				sep,
 				buf,
 				left,
 				icon_hl,
@@ -95,7 +97,7 @@ function M.render()
 		)
 	end
 
-	return table.concat(parts, "%#TabLineFill#") .. "%#TabLineFill#%="
+	return table.concat(parts) .. "%#TabLineFill#%="
 end
 
 setup_highlights()
