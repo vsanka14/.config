@@ -28,12 +28,15 @@ autocmd("ColorScheme", {
 	desc = "Reapply italic highlights",
 })
 
--- MDX filetype registration
+-- Filetype registration
 vim.filetype.add({
 	extension = {
 		mdx = "markdown.mdx",
 	},
 })
+
+-- Use bash treesitter parser for .conf files (comments, strings, numbers)
+vim.treesitter.language.register("bash", "conf")
 
 -- Markdown-specific settings
 autocmd("FileType", {
