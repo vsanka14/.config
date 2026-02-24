@@ -15,6 +15,10 @@ return {
 			floats = "dark",
 		},
 		sidebars = { "qf", "help", "terminal" },
+		on_highlights = function(hl, c)
+			hl.Whitespace = { fg = "#292e42" }
+			hl.NonText = { fg = "#292e42" }
+		end,
 	},
 	config = function(_, opts)
 		require("tokyonight").setup(opts)
