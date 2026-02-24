@@ -20,7 +20,7 @@ case "$1" in
         n="$2"
         [[ "$n" =~ ^[0-9]+$ ]] || exit 1
         target=$(echo "$sessions" | sed -n "${n}p")
-        [[ -n "$target" ]] && tmux switch-client -t "$target"
+        [[ -n "$target" ]] && { tmux switch-client -t "$target" 2>/dev/null || exec tmux attach-session -t "$target"; }
         exit 0
         ;;
     status)
@@ -71,7 +71,7 @@ case "$1" in
                     --delimiter='\t' --with-nth=1.. \
               | cut -f2
         )
-        [[ -n "$target" ]] && tmux switch-client -t "$target"
+        [[ -n "$target" ]] && { tmux switch-client -t "$target" 2>/dev/null || exec tmux attach-session -t "$target"; }
         exit 0
         ;;
 esac
@@ -136,8 +136,4 @@ if ! tmux has-session -t="$selected_name" 2>/dev/null; then
     tmux new-session -ds "$selected_name" -c "$selected"
 fi
 
-if [[ -n "$TMUX" ]]; then
-    tmux switch-client -t "$selected_name"
-else
-    exec tmux attach-session -t "$selected_name"
-fi
+tmux switch-client -t "$selected_name" 2>/dev/null || exec tmux attach-session -t "$selected_name"
