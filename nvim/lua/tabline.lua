@@ -8,7 +8,6 @@ local function setup_highlights()
 	vim.api.nvim_set_hl(0, "TabLineBufSel", { fg = "#c0caf5", bg = sel_bg })
 	vim.api.nvim_set_hl(0, "TabLineMod", { fg = "#e0af68", bg = fill_bg })
 	vim.api.nvim_set_hl(0, "TabLineModSel", { fg = "#e0af68", bg = sel_bg })
-	vim.api.nvim_set_hl(0, "TabLineSep", { fg = sel_bg, bg = fill_bg })
 	vim.api.nvim_set_hl(0, "TabLineFill", { bg = fill_bg })
 end
 
@@ -74,28 +73,18 @@ function M.render()
 			mod_str = mod_hl .. " ⏺"
 		end
 
-		local left = is_sel and "%#TabLineSep# " or " "
-		local right = is_sel and "%#TabLineSep# " or " "
-
-		-- Active: extra right padding inside the tab background
-		local inner_right = is_sel and (buf_hl .. " ") or ""
-
-		table.insert(
-			parts,
-			string.format(
-				"%%%dT%s%s %s %s%s%s%%T",
-				buf,
-				left,
-				icon_hl,
-				icon,
-				buf_hl,
-				name,
-				mod_str .. inner_right .. right
-			)
-		)
+		table.insert(parts, string.format(
+			"%%%dT%s %s %s%s%s %%T",
+			buf,
+			icon_hl,
+			icon,
+			buf_hl,
+			name,
+			mod_str
+		))
 	end
 
-	return table.concat(parts, "%#TabLineFill#") .. "%#TabLineFill#%="
+	return table.concat(parts) .. "%#TabLineFill#%="
 end
 
 setup_highlights()
