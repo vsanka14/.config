@@ -104,6 +104,18 @@ autocmd("BufDelete", {
 	desc = "Clean blame cache",
 })
 
+-- Lazy-load Trino module on first SQL file
+autocmd("FileType", {
+	group = augroup("trino_setup", { clear = true }),
+	pattern = "sql",
+	once = true,
+	callback = function()
+		require("helpers.trino").setup()
+		vim.cmd("doautocmd FileType")
+	end,
+	desc = "Lazy-load Trino module on first SQL file",
+})
+
 -- Highlight on yank
 autocmd("TextYankPost", {
 	group = augroup("highlight_yank", { clear = true }),
