@@ -13,7 +13,7 @@ lua/
   statusline.lua  -- Custom statusline
   tabline.lua     -- Custom tabline
   lsp.lua         -- LSP configuration
-  trino.lua       -- Trino query support
+  trino.lua       -- Custom plugin for trino query support
   helpers/        -- Utility modules (git blame, floating terminal, icons, etc.)
   plugins/        -- Plugin specs loaded by lazy.nvim
 ```
@@ -26,7 +26,7 @@ Managed with [lazy.nvim](https://github.com/folke/lazy.nvim). Key plugins:
 - **conform** -- Formatting
 - **mason** -- LSP/tool installer
 - **nvim-jdtls** -- Java LSP
-- **nvim-dap** -- Debugging
+- **nvim-dap** -- Java Debugging
 - **treesitter** -- Syntax highlighting
 - **mini** -- Collection of small utilities
 - **diffview** -- Git diff viewer
