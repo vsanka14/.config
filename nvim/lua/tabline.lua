@@ -1,7 +1,7 @@
 local M = {}
 
 local sel_bg = "#1a1b26"
-local fill_bg = "#000000"
+local fill_bg = "#050505"
 
 local function setup_highlights()
 	vim.api.nvim_set_hl(0, "TabLineBuf", { fg = "#565f89", bg = fill_bg })
@@ -73,15 +73,7 @@ function M.render()
 			mod_str = mod_hl .. " ⏺"
 		end
 
-		table.insert(parts, string.format(
-			"%%%dT%s %s %s%s%s %%T",
-			buf,
-			icon_hl,
-			icon,
-			buf_hl,
-			name,
-			mod_str
-		))
+		table.insert(parts, string.format("%%%dT%s %s %s%s%s %%T", buf, icon_hl, icon, buf_hl, name, mod_str))
 	end
 
 	return table.concat(parts) .. "%#TabLineFill#%="
