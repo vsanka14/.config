@@ -1,6 +1,6 @@
 # Dotfiles
 
-macOS development environment with a consistent Tokyo Night theme.
+Personalized macOS development environment built around a keyboard-driven, terminal-centric, single-screen workflow.
 
 ## Tools
 
@@ -10,4 +10,5 @@ macOS development environment with a consistent Tokyo Night theme.
 - **Shell:** Zsh
 - **Tiling Window Manager:** AeroSpace
 - **Status Bar:** Sketchybar
+- **Key remapper**: Karabiner Elements
 - **File Manager:** Yazi
