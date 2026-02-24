@@ -5,9 +5,9 @@ Personalized macOS development environment built around a keyboard-driven, termi
 ## Tools
 
 - **Terminal:** Kitty
-- **Editor:** Neovim
 - **Multiplexer:** Tmux
 - **Shell:** Zsh
+- **Editor:** Neovim
 - **Tiling Window Manager:** AeroSpace
 - **Status Bar:** Sketchybar
 - **Key remapper**: Karabiner Elements
