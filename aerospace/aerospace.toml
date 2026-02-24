@@ -81,6 +81,9 @@ ctrl-shift-r = 'reload-config'
 # Reload sketchybar
 ctrl-shift-s = 'exec-and-forget sketchybar --reload'
 
+# Open app mode (ctrl+o, then key)
+ctrl-o = ['mode open', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=open']
+
 # ============================================
 # RESIZE MODE
 # ============================================
@@ -91,6 +94,20 @@ k = 'resize height -50'
 l = 'resize width +50'
 minus = 'resize smart -50'
 equal = 'resize smart +50'
+esc = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+enter = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+
+# ============================================
+# OPEN APP MODE (ctrl+o, then key)
+# ============================================
+[mode.open.binding]
+c = ['exec-and-forget open -a "Google Chrome"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+k = ['exec-and-forget open -a "kitty"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+s = ['exec-and-forget open "$HOME/Applications/Chrome Apps.localized/Slack.app"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+o = ['exec-and-forget open "$HOME/Applications/Chrome Apps.localized/Outlook (PWA).app"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+t = ['exec-and-forget open "$HOME/Applications/Chrome Apps.localized/Microsoft Teams (PWA).app"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+q = ['exec-and-forget open -a "QuickTime Player"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+a = ['exec-and-forget open -a "Activity Monitor"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 esc = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 enter = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 
@@ -129,15 +146,11 @@ if.app-id = 'net.kovidgoyal.kitty'
 run = 'move-node-to-workspace 2'
 
 [[on-window-detected]]
-if.app-id = 'com.tinyspeck.slackmacgap'
+if.app-name-regex-substring = '^Slack$'
 run = 'move-node-to-workspace 3'
 
 [[on-window-detected]]
-if.app-id = 'com.microsoft.Outlook'
-run = 'move-node-to-workspace 4'
-
-[[on-window-detected]]
-if.app-id = 'com.microsoft.teams2'
+if.app-name-regex-substring = 'Outlook'
 run = 'move-node-to-workspace 4'
 
 [[on-window-detected]]
