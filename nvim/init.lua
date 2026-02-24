@@ -1,11 +1,14 @@
 -- Bootstrap lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.uv.fs_stat(lazypath) then
-  vim.fn.system({
-    "git", "clone", "--filter=blob:none",
-    "https://github.com/folke/lazy.nvim.git",
-    "--branch=stable", lazypath,
-  })
+	vim.fn.system({
+		"git",
+		"clone",
+		"--filter=blob:none",
+		"https://github.com/folke/lazy.nvim.git",
+		"--branch=stable",
+		lazypath,
+	})
 end
 vim.opt.rtp:prepend(lazypath)
 
@@ -19,10 +22,10 @@ require("autocmds")
 
 -- Setup lazy.nvim (loads lua/plugins/*.lua)
 require("lazy").setup({
-  spec = { import = "plugins" },
-  install = { colorscheme = { "tokyonight" } },
-  checker = { enabled = false },
-  change_detection = { notify = false },
+	spec = { import = "plugins" },
+	install = { colorscheme = { "tokyonight" } },
+	checker = { enabled = false },
+	change_detection = { notify = false },
 })
 
 -- Modules that depend on plugins being available
@@ -33,19 +36,20 @@ require("lsp")
 
 -- Show startup time as a notification (only when launched directly, not as shell editor)
 vim.api.nvim_create_autocmd("VimEnter", {
-  callback = function()
-    if vim.fn.argc() == 0 and not vim.g.started_with_stdin then
-      vim.schedule(function()
-        local stats = require("lazy").stats()
-        local ms = math.floor(stats.startuptime * 100 + 0.5) / 100
-        vim.notify(string.format("Loaded %d plugins in %.2fms", stats.loaded, ms))
-      end)
-    end
-  end,
+	callback = function()
+		if vim.fn.argc() == 0 and not vim.g.started_with_stdin then
+			vim.schedule(function()
+				local stats = require("lazy").stats()
+				local ms = math.floor(stats.startuptime * 100 + 0.5) / 100
+				vim.notify(string.format("Loaded %d plugins in %.2fms", stats.loaded, ms))
+			end)
+		end
+	end,
 })
 
+-- Identify when nvim started in std-in mode
 vim.api.nvim_create_autocmd("StdinReadPre", {
-  callback = function()
-    vim.g.started_with_stdin = true
-  end,
+	callback = function()
+		vim.g.started_with_stdin = true
+	end,
 })
