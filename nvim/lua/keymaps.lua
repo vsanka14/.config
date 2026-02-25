@@ -80,18 +80,24 @@ map("n", "<Leader>e", function()
 	})
 end, { desc = "File Explorer (yazi)" })
 
--- Yank helpers
-map("n", "<Leader>ac", function()
+-- Yank helpers: yank file path, file path w/ code line(s), diagnostics, test module name, etc
+map("n", "<Leader>yp", function()
+	require("helpers.yank").copy_path()
+end, { desc = "Copy file path" })
+map("n", "<Leader>yc", function()
 	require("helpers.yank").copy_path_line()
 end, { desc = "Copy file path:line" })
-map("v", "<Leader>ac", function()
-	require("helpers.yank").copy_path_lines()
-end, { desc = "Copy file path:lines" })
-map("n", "<Leader>ad", function()
+map("n", "<Leader>yd", function()
 	require("helpers.yank").copy_diagnostic()
 end, { desc = "Copy diagnostic" })
+map("n", "<Leader>yt", function()
+	require("helpers.ember").copy_test_module()
+end, { desc = "Yank test module name" })
+map("v", "<Leader>yc", function()
+	require("helpers.yank").copy_path_lines()
+end, { desc = "Copy file path:lines" })
 
--- Ember helpers
+-- Ember file helpers
 map("n", "<Leader>oa", function()
 	require("helpers.ember").go_to_alternate()
 end, { desc = "Alternate Ember file" })
@@ -101,9 +107,6 @@ end, { desc = "Open Ember test" })
 map("n", "<Leader>os", function()
 	require("helpers.ember").open_source()
 end, { desc = "Open source from test" })
-map("n", "<Leader>yt", function()
-	require("helpers.ember").copy_test_module()
-end, { desc = "Yank test module name" })
 
 -- Mini.pick keymaps
 map("n", "<Leader>ff", function()
@@ -168,5 +171,15 @@ map("n", "<Leader>du", function()
 	require("dapui").toggle()
 end, { desc = "Toggle DAP UI" })
 
+-- Trino (SQL)
+map("n", "<Leader>qr", "<cmd>TrinoRun<cr>", { desc = "Trino: Run query" })
+map("v", "<Leader>qr", "<cmd>TrinoRunSelection<cr>", { desc = "Trino: Run selection" })
+map("n", "<Leader>qc", "<cmd>TrinoCluster<cr>", { desc = "Trino: Change cluster" })
+map("n", "<Leader>qu", "<cmd>TrinoAuthUser<cr>", { desc = "Trino: Change auth user" })
+map("n", "<Leader>qx", "<cmd>TrinoCancel<cr>", { desc = "Trino: Cancel query" })
+map("n", "<Leader>qC", "<cmd>TrinoClear<cr>", { desc = "Trino: Clear results" })
+map("n", "<Leader>qn", "<cmd>TrinoNext<cr>", { desc = "Trino: Next result" })
+map("n", "<Leader>qp", "<cmd>TrinoPrev<cr>", { desc = "Trino: Previous result" })
+
 -- Clear search highlights
-map("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear highlights" })
+map("n", "<Esc>", "<cmd>nohlsearch | redrawstatus<cr>", { desc = "Clear highlights" })

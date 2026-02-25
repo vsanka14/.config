@@ -70,7 +70,7 @@ ctrl-shift-backslash = 'join-with right'         # Join horizontally (ctrl+|)
 ctrl-shift-minus = 'join-with down'              # Join vertically (ctrl+_)
 
 # Resize mode
-ctrl-r = ['mode resize', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=resize']
+ctrl-cmd-r = ['mode resize', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=resize']
 
 # Close window (disabled to allow Neovim to use Ctrl+Q for quickfix)
 # ctrl-q = 'close'
@@ -82,7 +82,7 @@ ctrl-shift-r = 'reload-config'
 ctrl-shift-s = 'exec-and-forget sketchybar --reload'
 
 # Open app mode (ctrl+o, then key)
-ctrl-o = ['mode open', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=open']
+ctrl-cmd-o = ['mode open', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=open']
 
 # ============================================
 # RESIZE MODE

@@ -170,7 +170,7 @@ local function create_result_buffer(index, lines)
 
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 	vim.bo[buf].modifiable = false
-	vim.bo[buf].filetype = "csv"
+	vim.bo[buf].filetype = "markdown"
 
 	table.insert(state.result_buffers, { buf = buf, index = index })
 end
@@ -201,26 +201,14 @@ local function refresh_result_winbar()
 	end
 end
 
-local function enable_csvview_on_result()
+local function enable_markview_on_result()
 	vim.schedule(function()
 		if not is_result_win_valid() then
 			return
 		end
-
-		local ok, csvview = pcall(require, "csvview")
-		if not ok then
-			return
-		end
-
-		local current_win = vim.api.nvim_get_current_win()
-		vim.api.nvim_set_current_win(state.result_win)
-
-		if csvview.is_enabled() then
-			csvview.disable()
-		end
-		csvview.enable()
-
-		vim.api.nvim_set_current_win(current_win)
+		vim.wo[state.result_win].conceallevel = 2
+		vim.wo[state.result_win].concealcursor = "nc"
+		vim.wo[state.result_win].wrap = false
 	end)
 end
 
@@ -232,7 +220,7 @@ local function switch_to_result(index)
 	if entry and vim.api.nvim_buf_is_valid(entry.buf) then
 		vim.api.nvim_win_set_buf(state.result_win, entry.buf)
 		refresh_result_winbar()
-		enable_csvview_on_result()
+		enable_markview_on_result()
 	end
 end
 
@@ -281,7 +269,7 @@ local function open_result_split()
 	if is_result_win_valid() then
 		vim.api.nvim_win_set_buf(state.result_win, first_entry.buf)
 		refresh_result_winbar()
-		enable_csvview_on_result()
+		enable_markview_on_result()
 		return
 	end
 
@@ -293,7 +281,7 @@ local function open_result_split()
 	vim.api.nvim_win_set_buf(state.result_win, first_entry.buf)
 
 	refresh_result_winbar()
-	enable_csvview_on_result()
+	enable_markview_on_result()
 
 	if origin_win and vim.api.nvim_win_is_valid(origin_win) then
 		vim.api.nvim_set_current_win(origin_win)
@@ -370,7 +358,7 @@ local function run_single_query(query_info, password, otp, auth_user, on_complet
 		"sh",
 		"-c",
 		string.format(
-			"trino query -c %s -f %s --session li_authorization_user=%s --output-format CSV_HEADER > %s 2> %s",
+			"trino query -c %s -f %s --session li_authorization_user=%s --output-format MARKDOWN > %s 2> %s",
 			state.cluster,
 			query_file,
 			auth_user,
@@ -688,34 +676,6 @@ function M.setup()
 	vim.api.nvim_create_user_command("TrinoClear", clear_result_buffers, { desc = "Clear all Trino result buffers" })
 	vim.api.nvim_create_user_command("TrinoNext", trino_next_result, { desc = "Next Trino result buffer" })
 	vim.api.nvim_create_user_command("TrinoPrev", trino_prev_result, { desc = "Previous Trino result buffer" })
-
-	-- SQL file keymaps
-	vim.api.nvim_create_autocmd("FileType", {
-		pattern = "sql",
-		callback = function(args)
-			local bufnr = args.buf
-			local map = function(mode, lhs, rhs, desc)
-				vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
-			end
-
-			map("n", "<Leader>qr", trino_run, "Trino: Run query")
-			map("v", "<Leader>qr", function()
-				vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "x", false)
-				vim.schedule(trino_run_selection)
-			end, "Trino: Run selection")
-			map("n", "<Leader>qc", function()
-				trino_cluster({ args = "" })
-			end, "Trino: Change cluster")
-			map("n", "<Leader>qu", function()
-				trino_auth_user({ args = "" })
-			end, "Trino: Change auth user")
-			map("n", "<Leader>qx", trino_cancel, "Trino: Cancel query")
-			map("n", "<Leader>qC", clear_result_buffers, "Trino: Clear result buffers")
-			map("n", "<Leader>qn", trino_next_result, "Trino: Next result")
-			map("n", "<Leader>qp", trino_prev_result, "Trino: Previous result")
-		end,
-		desc = "Set up Trino keymaps for SQL files",
-	})
 end
 
 return M

@@ -1,5 +1,12 @@
 local M = {}
 
+--- Copy file path to clipboard
+function M.copy_path()
+	local path = vim.fn.expand("%")
+	vim.fn.setreg("+", path)
+	vim.notify("Copied: " .. path, vim.log.levels.INFO)
+end
+
 --- Copy file path with current line number to clipboard
 function M.copy_path_line()
 	local path = vim.fn.expand("%")
