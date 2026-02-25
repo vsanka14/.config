@@ -116,6 +116,24 @@ autocmd("FileType", {
 	desc = "Lazy-load Trino module on first SQL file",
 })
 
+-- Trino results: set filetype, prepend empty line for top border, disable wrap
+autocmd("BufWinEnter", {
+	group = augroup("trino_results", { clear = true }),
+	pattern = "trino://results/*",
+	callback = function(args)
+		local buf = args.buf
+		local lines = vim.api.nvim_buf_get_lines(buf, 0, 1, false)
+		if not lines[1] or lines[1] ~= "" then
+			vim.bo[buf].modifiable = true
+			vim.api.nvim_buf_set_lines(buf, 0, 0, false, { "" })
+			vim.bo[buf].modifiable = false
+		end
+		vim.bo[buf].filetype = "markdown"
+		vim.wo.wrap = false
+	end,
+	desc = "Prepare Trino result buffers for markdown rendering",
+})
+
 -- Highlight on yank
 autocmd("TextYankPost", {
 	group = augroup("highlight_yank", { clear = true }),

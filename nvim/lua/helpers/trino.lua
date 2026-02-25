@@ -170,7 +170,6 @@ local function create_result_buffer(index, lines)
 
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 	vim.bo[buf].modifiable = false
-	vim.bo[buf].filetype = "markdown"
 
 	table.insert(state.result_buffers, { buf = buf, index = index })
 end
@@ -201,17 +200,6 @@ local function refresh_result_winbar()
 	end
 end
 
-local function enable_markview_on_result()
-	vim.schedule(function()
-		if not is_result_win_valid() then
-			return
-		end
-		vim.wo[state.result_win].conceallevel = 2
-		vim.wo[state.result_win].concealcursor = "nc"
-		vim.wo[state.result_win].wrap = false
-	end)
-end
-
 local function switch_to_result(index)
 	if not is_result_win_valid() then
 		return
@@ -220,7 +208,6 @@ local function switch_to_result(index)
 	if entry and vim.api.nvim_buf_is_valid(entry.buf) then
 		vim.api.nvim_win_set_buf(state.result_win, entry.buf)
 		refresh_result_winbar()
-		enable_markview_on_result()
 	end
 end
 
@@ -269,7 +256,6 @@ local function open_result_split()
 	if is_result_win_valid() then
 		vim.api.nvim_win_set_buf(state.result_win, first_entry.buf)
 		refresh_result_winbar()
-		enable_markview_on_result()
 		return
 	end
 
@@ -281,7 +267,6 @@ local function open_result_split()
 	vim.api.nvim_win_set_buf(state.result_win, first_entry.buf)
 
 	refresh_result_winbar()
-	enable_markview_on_result()
 
 	if origin_win and vim.api.nvim_win_is_valid(origin_win) then
 		vim.api.nvim_set_current_win(origin_win)

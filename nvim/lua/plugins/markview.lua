@@ -1,9 +1,6 @@
 return {
-	"OXY2DEV/markview.nvim",
+	"MeanderingProgrammer/render-markdown.nvim",
+	dependencies = { "nvim-treesitter/nvim-treesitter", "echasnovski/mini.nvim" },
 	ft = { "markdown", "markdown.mdx" },
-	opts = {
-		preview = {
-			ignore_buftypes = {},
-		},
-	},
+	opts = {},
 }
