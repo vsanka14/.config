@@ -32,7 +32,13 @@ autocmd("ColorScheme", {
 autocmd("FileType", {
 	group = augroup("markdown_settings", { clear = true }),
 	pattern = { "markdown", "markdown.mdx" },
-	callback = function()
+	callback = function(args)
+		-- Trino result buffers use markdown filetype for table rendering but
+		-- have wrap disabled, so display-line mappings (gj/gk/g0/g$) don't apply
+		if vim.api.nvim_buf_get_name(args.buf):match("^trino://") then
+			return
+		end
+
 		vim.opt_local.wrap = true
 		vim.opt_local.linebreak = true
 		vim.opt_local.conceallevel = 2
