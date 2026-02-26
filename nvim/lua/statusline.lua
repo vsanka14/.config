@@ -115,6 +115,9 @@ local function update_git_branch()
 			if code ~= 0 then
 				cache.git_branch = ""
 			end
+			vim.schedule(function()
+				vim.cmd.redrawstatus()
+			end)
 		end,
 	})
 end
@@ -136,6 +139,7 @@ local function update_diagnostics()
 		end
 	end
 	cache.diag = table.concat(parts)
+	vim.cmd.redrawstatus()
 end
 
 local function update_lsp_clients()
@@ -149,6 +153,7 @@ local function update_lsp_clients()
 	else
 		cache.lsp_clients = ""
 	end
+	vim.cmd.redrawstatus()
 end
 
 local lsp_progress_map = {}
