@@ -1,12 +1,19 @@
 -- Trino query execution module for Neovim
--- Commands: TrinoRun, TrinoRunSelection, TrinoCluster, TrinoCancel, TrinoAuthUser, TrinoClearCache, TrinoClear, TrinoNext, TrinoPrev
+--
+-- :TrinoRun              Run whole buffer, or visual selection if in visual mode
+-- :TrinoCluster [name]   Switch cluster (holdem, war, faro). Interactive picker if no arg.
+-- :TrinoCancel           Cancel the running query
+-- :TrinoHeadlessUser [u] Set li_authorization_user. Interactive prompt if no arg.
+-- :TrinoClearCredentials Clear cached password/OTP
+-- :TrinoClear            Close result split and wipe result buffers
+-- :TrinoNext / TrinoPrev Cycle through result buffers
 
 local M = {}
 
 -- ============================================================================
 -- Constants
 -- ============================================================================
-local CREDENTIAL_CACHE_TTL = 900
+local CREDENTIAL_CACHE_TTL = 900 -- 15 minutes
 
 -- ============================================================================
 -- State Management
@@ -17,7 +24,7 @@ local state = {
 	loading_notif_id = nil,
 	cached_password = nil,
 	cached_otp = nil,
-	cached_auth_user = "convtrack",
+	headless_user = "convtrack", -- Default set to my most used headless user group
 	cache_timestamp = nil,
 	current_job = nil,
 	cancelled = false,
@@ -54,7 +61,7 @@ local function get_credentials()
 			vim.log.levels.INFO,
 			{ title = "Trino" }
 		)
-		return state.cached_password, state.cached_otp, state.cached_auth_user
+		return state.cached_password, state.cached_otp, state.headless_user
 	end
 
 	local password = vim.fn.inputsecret("Trino [" .. state.cluster .. "] - Password: ")
@@ -71,13 +78,12 @@ local function get_credentials()
 	state.cached_otp = otp
 	state.cache_timestamp = os.time()
 
-	return password, otp, state.cached_auth_user
+	return password, otp, state.headless_user
 end
 
 local function clear_credential_cache()
 	state.cached_password = nil
 	state.cached_otp = nil
-	state.cached_auth_user = "convtrack"
 	state.cache_timestamp = nil
 	vim.notify("Credential cache cleared", vim.log.levels.INFO, { title = "Trino" })
 end
@@ -328,7 +334,7 @@ end
 
 local function run_single_query(query_info, password, otp, auth_user, on_complete)
 	local query_file = "/tmp/trino_query.sql"
-	local temp_output_file = "/tmp/trino_output.csv"
+	local temp_output_file = "/tmp/trino_output.md"
 	local temp_stderr_file = "/tmp/trino_stderr.txt"
 
 	if not write_file(query_file, query_info.text) then
@@ -390,12 +396,12 @@ local function run_single_query(query_info, password, otp, auth_user, on_complet
 					vim.fn.delete(temp_output_file)
 					on_complete(false, stderr_content ~= "" and extract_error(stderr_content) or "Unknown error", nil)
 				else
-					local csv_lines = read_file_lines(temp_output_file)
+					local result_lines = read_file_lines(temp_output_file)
 					vim.fn.delete(temp_output_file)
-					if (not csv_lines or #csv_lines == 0) and stderr_content ~= "" then
+					if (not result_lines or #result_lines == 0) and stderr_content ~= "" then
 						on_complete(false, extract_error(stderr_content), nil)
 					else
-						on_complete(true, nil, csv_lines or {})
+						on_complete(true, nil, result_lines or {})
 					end
 				end
 			end)
@@ -437,7 +443,7 @@ local function run_queries_sequentially(queries, password, otp, auth_user, on_al
 			string.format("Query %d/%d on %s...", state.completed_count + 1, state.total_queries, state.cluster)
 		)
 
-		run_single_query(query_info, password, otp, auth_user, function(success, error_msg, csv_lines)
+		run_single_query(query_info, password, otp, auth_user, function(success, error_msg, result_lines)
 			if state.cancelled then
 				run_next()
 				return
@@ -448,7 +454,7 @@ local function run_queries_sequentially(queries, password, otp, auth_user, on_al
 				table.insert(state.failed_queries, { index = query_info.index, error = error_msg })
 				create_result_buffer(query_info.index, vim.split(error_msg or "Unknown error", "\n"))
 			else
-				create_result_buffer(query_info.index, csv_lines)
+				create_result_buffer(query_info.index, result_lines)
 			end
 
 			if not is_result_win_valid() then
@@ -554,20 +560,16 @@ end
 -- Public Commands
 -- ============================================================================
 
-local function trino_run()
+local function trino_run(args)
 	if vim.bo.filetype ~= "sql" then
 		vim.notify("TrinoRun only works in .sql files", vim.log.levels.WARN, { title = "Trino" })
 		return
 	end
-	execute_trino_query(get_buffer_content())
-end
-
-local function trino_run_selection()
-	if vim.bo.filetype ~= "sql" then
-		vim.notify("TrinoRunSelection only works in .sql files", vim.log.levels.WARN, { title = "Trino" })
-		return
+	if args.range > 0 then
+		execute_trino_query(get_visual_selection())
+	else
+		execute_trino_query(get_buffer_content())
 	end
-	execute_trino_query(get_visual_selection())
 end
 
 local function trino_cluster(args)
@@ -612,16 +614,16 @@ end
 local function trino_auth_user(args)
 	local user = args.args
 	if user and user ~= "" then
-		state.cached_auth_user = user
+		state.headless_user = user
 		state.cache_timestamp = os.time()
 		vim.notify("Auth user set to: " .. user, vim.log.levels.INFO, { title = "Trino" })
 	else
 		vim.ui.input({
 			prompt = "Auth user (li_authorization_user): ",
-			default = state.cached_auth_user or "",
+			default = state.headless_user or "",
 		}, function(input)
 			if input and input ~= "" then
-				state.cached_auth_user = input
+				state.headless_user = input
 				state.cache_timestamp = os.time()
 				vim.notify("Auth user set to: " .. input, vim.log.levels.INFO, { title = "Trino" })
 			end
@@ -635,12 +637,7 @@ end
 
 function M.setup()
 	-- User commands
-	vim.api.nvim_create_user_command("TrinoRun", trino_run, { desc = "Run current SQL buffer against Trino" })
-	vim.api.nvim_create_user_command(
-		"TrinoRunSelection",
-		trino_run_selection,
-		{ desc = "Run visual selection against Trino" }
-	)
+	vim.api.nvim_create_user_command("TrinoRun", trino_run, { range = true, desc = "Run SQL against Trino (buffer or selection)" })
 	vim.api.nvim_create_user_command("TrinoCluster", trino_cluster, {
 		nargs = "?",
 		complete = function()
@@ -649,12 +646,12 @@ function M.setup()
 		desc = "Set Trino cluster",
 	})
 	vim.api.nvim_create_user_command("TrinoCancel", trino_cancel, { desc = "Cancel running Trino query" })
-	vim.api.nvim_create_user_command("TrinoAuthUser", trino_auth_user, {
+	vim.api.nvim_create_user_command("TrinoHeadlessUser", trino_auth_user, {
 		nargs = "?",
 		desc = "Set Trino authorization user",
 	})
 	vim.api.nvim_create_user_command(
-		"TrinoClearCache",
+		"TrinoClearCredentials",
 		clear_credential_cache,
 		{ desc = "Clear cached Trino credentials" }
 	)
