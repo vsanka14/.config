@@ -3,7 +3,7 @@
 
 [mgr]
 # Show hidden files
-show_hidden = true
+show_hidden = false
 # Sort directories first
 sort_dir_first = true
 
