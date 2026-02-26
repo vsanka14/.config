@@ -2,10 +2,9 @@
 --
 -- :TrinoRun              Run whole buffer, or visual selection if in visual mode
 -- :TrinoCluster [name]   Switch cluster (holdem, war, faro). Interactive picker if no arg.
--- :TrinoCancel           Cancel the running query
+-- :TrinoCancel           Cancel all running queries
 -- :TrinoHeadlessUser [u] Set li_authorization_user. Interactive prompt if no arg.
 -- :TrinoClearToken       Clear cached SSO token (forces browser re-auth)
--- :TrinoClear            Close result split and wipe result buffers
 -- :TrinoNext / TrinoPrev Cycle through result buffers
 
 local M = {}
@@ -304,7 +303,7 @@ end
 local function run_single_query(query_info, auth_user, on_complete)
 	local query_file = "/tmp/trino_query.sql"
 	local temp_output_file = "/tmp/trino_output.md"
-	local temp_stderr_file = "/tmp/trino_stderr.txt"
+	local temp_log_file = "/tmp/trino_log.txt"
 
 	if not write_file(query_file, query_info.text) then
 		on_complete(false, "Failed to write query file", nil)
@@ -312,7 +311,7 @@ local function run_single_query(query_info, auth_user, on_complete)
 	end
 
 	vim.fn.delete(temp_output_file)
-	vim.fn.delete(temp_stderr_file)
+	vim.fn.delete(temp_log_file)
 
 	local trino_cmd = string.format(
 		"trino query -c %s -f %s --session li_authorization_user=%s --output-format MARKDOWN --external-authentication -- --network-logging HEADERS",
@@ -323,7 +322,7 @@ local function run_single_query(query_info, auth_user, on_complete)
 	if state.cached_access_token then
 		trino_cmd = trino_cmd .. " --access-token '" .. state.cached_access_token .. "'"
 	end
-	trino_cmd = trino_cmd .. string.format(" > %s 2> %s", temp_output_file, temp_stderr_file)
+	trino_cmd = trino_cmd .. string.format(" > %s 2> %s", temp_output_file, temp_log_file)
 
 	local cmd = { "sh", "-c", trino_cmd }
 
@@ -332,19 +331,19 @@ local function run_single_query(query_info, auth_user, on_complete)
 			vim.schedule(function()
 				state.current_job = nil
 
-				local stderr_lines = read_file_lines(temp_stderr_file) or {}
-				local stderr_content = table.concat(stderr_lines, "\n")
-				vim.fn.delete(temp_stderr_file)
+				local log_lines = read_file_lines(temp_log_file) or {}
+				local log_content = table.concat(log_lines, "\n")
+				vim.fn.delete(temp_log_file)
 
 				-- Cache/refresh bearer token from network log
-				local token = stderr_content:match("Authorization: Bearer ([^\n]+)")
+				local token = log_content:match("Authorization: Bearer ([^\n]+)")
 				if token then
 					state.cached_access_token = token
 				end
 
 				-- Strip network log noise for error handling
-				local clean_lines = strip_network_log(stderr_lines)
-				local clean_stderr = table.concat(clean_lines, "\n")
+				local clean_lines = strip_network_log(log_lines)
+				local clean_log = table.concat(clean_lines, "\n")
 
 				local function extract_error(content)
 					local error_start = content:match("(Query [%w_]+ failed.*)$")
@@ -353,20 +352,20 @@ local function run_single_query(query_info, auth_user, on_complete)
 					return error_start or content
 				end
 
-				local function stderr_has_errors(content)
+				local function query_has_errors(content)
 					return content:match("Query [%w_]+ failed") or content:match("FAILED")
 				end
 
-				local has_error = exit_code ~= 0 or stderr_has_errors(clean_stderr)
+				local has_error = exit_code ~= 0 or query_has_errors(clean_log)
 
 				if has_error then
 					vim.fn.delete(temp_output_file)
-					on_complete(false, clean_stderr ~= "" and extract_error(clean_stderr) or "Unknown error", nil)
+					on_complete(false, clean_log ~= "" and extract_error(clean_log) or "Unknown error", nil)
 				else
 					local result_lines = read_file_lines(temp_output_file)
 					vim.fn.delete(temp_output_file)
-					if (not result_lines or #result_lines == 0) and stderr_has_errors(clean_stderr) then
-						on_complete(false, extract_error(clean_stderr), nil)
+					if (not result_lines or #result_lines == 0) and query_has_errors(clean_log) then
+						on_complete(false, extract_error(clean_log), nil)
 					else
 						on_complete(true, nil, result_lines or {})
 					end
@@ -611,7 +610,6 @@ function M.setup()
 		desc = "Set Trino authorization user",
 	})
 	vim.api.nvim_create_user_command("TrinoClearToken", clear_token, { desc = "Clear cached SSO token" })
-	vim.api.nvim_create_user_command("TrinoClear", clear_result_buffers, { desc = "Clear all Trino result buffers" })
 	vim.api.nvim_create_user_command("TrinoNext", trino_next_result, { desc = "Next Trino result buffer" })
 	vim.api.nvim_create_user_command("TrinoPrev", trino_prev_result, { desc = "Previous Trino result buffer" })
 end
