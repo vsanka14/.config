@@ -1,11 +1,33 @@
--- Trino query execution module for Neovim
+-- trino.lua — Run Trino SQL queries from Neovim
 --
--- :TrinoRun              Run whole buffer, or visual selection if in visual mode
--- :TrinoCluster [name]   Switch cluster (holdem, war, faro). Interactive picker if no arg.
--- :TrinoCancel           Cancel all running queries
--- :TrinoHeadlessUser [u] Set li_authorization_user. Interactive prompt if no arg.
--- :TrinoClearToken       Clear cached SSO token (forces browser re-auth)
--- :TrinoNext / TrinoPrev Cycle through result buffers
+-- Dependencies: `trino` CLI (LinkedIn), `:TSInstall sql` (Tree-sitter parser)
+--
+-- Setup:
+--   require("trino").setup({
+--     cluster = "holdem",              -- default cluster (holdem | war | faro)
+--     headless_user = "myuser",        -- li_authorization_user (prompted if nil)
+--     split_height_pct = 50,           -- result split height as % of editor
+--   })
+--
+-- Commands:
+--   :TrinoRun              Run whole buffer, or visual selection
+--   :TrinoCluster [name]   Switch cluster. Interactive picker if no arg.
+--   :TrinoCancel           Cancel all running queries
+--   :TrinoHeadlessUser [u] Set li_authorization_user. Prompt if no arg.
+--   :TrinoClearToken       Clear cached SSO token (forces browser re-auth)
+--   :TrinoNext / TrinoPrev Cycle through result buffers
+--
+-- Suggested keymaps:
+--   vim.keymap.set("n", "<Leader>qr", "<cmd>TrinoRun<cr>")
+--   vim.keymap.set("v", "<Leader>qr", ":TrinoRun<cr>")
+--   vim.keymap.set("n", "<Leader>qc", "<cmd>TrinoCluster<cr>")
+--   vim.keymap.set("n", "<Leader>qu", "<cmd>TrinoHeadlessUser<cr>")
+--   vim.keymap.set("n", "<Leader>qx", "<cmd>TrinoCancel<cr>")
+--   vim.keymap.set("n", "<Leader>qn", "<cmd>TrinoNext<cr>")
+--   vim.keymap.set("n", "<Leader>qp", "<cmd>TrinoPrev<cr>")
+--
+-- Result buffers use the scheme trino://results/* with markdown filetype.
+-- You may want an autocmd to disable wrap or add padding for these buffers.
 
 local M = {}
 
@@ -15,9 +37,8 @@ local M = {}
 local state = {
 	cluster = "holdem",
 	start_time = nil,
-	loading_notif_id = nil,
 	cached_access_token = nil,
-	headless_user = "convtrack", -- Default set to my most used headless user group
+	headless_user = nil,
 	current_job = nil,
 	cancelled = false,
 	failed_queries = {},
@@ -88,18 +109,6 @@ local function split_queries(sql)
 	end
 
 	return queries
-end
-
--- ============================================================================
--- Notification Helpers
--- ============================================================================
-
-local function show_loading_notification(message)
-	vim.notify(message, vim.log.levels.INFO, { title = "Trino" })
-end
-
-local function dismiss_loading_notification()
-	-- mini.notify handles auto-dismiss
 end
 
 -- ============================================================================
@@ -301,9 +310,10 @@ local function strip_network_log(lines)
 end
 
 local function run_single_query(query_info, auth_user, on_complete)
-	local query_file = "/tmp/trino_query.sql"
-	local temp_output_file = "/tmp/trino_output.md"
-	local temp_log_file = "/tmp/trino_log.txt"
+	local base = vim.fn.tempname()
+	local query_file = base .. ".sql"
+	local temp_output_file = base .. "_output.md"
+	local temp_log_file = base .. "_log.txt"
 
 	if not write_file(query_file, query_info.text) then
 		on_complete(false, "Failed to write query file", nil)
@@ -402,8 +412,10 @@ local function run_queries_sequentially(queries, auth_user, on_all_complete)
 
 		local query_info = queries[current_index]
 
-		show_loading_notification(
-			string.format("Query %d/%d on %s...", state.completed_count + 1, state.total_queries, state.cluster)
+		vim.notify(
+			string.format("Query %d/%d on %s...", state.completed_count + 1, state.total_queries, state.cluster),
+			vim.log.levels.INFO,
+			{ title = "Trino" }
 		)
 
 		run_single_query(query_info, auth_user, function(success, error_msg, result_lines)
@@ -435,8 +447,6 @@ local function run_queries_sequentially(queries, auth_user, on_all_complete)
 end
 
 local function show_results()
-	dismiss_loading_notification()
-
 	if state.cancelled then
 		local success_count = state.total_queries
 			- #state.failed_queries
@@ -506,11 +516,28 @@ local function execute_trino_query(sql)
 	clear_result_buffers()
 	state.cancelled = false
 	state.start_time = vim.loop.hrtime()
-	show_loading_notification(string.format("Executing queries on %s...", state.cluster))
 
-	run_queries_sequentially(queries, state.headless_user, function()
-		show_results()
-	end)
+	local function proceed(user)
+		vim.notify(string.format("Executing queries on %s...", state.cluster), vim.log.levels.INFO, { title = "Trino" })
+		run_queries_sequentially(queries, user, function()
+			show_results()
+		end)
+	end
+
+	if not state.headless_user then
+		vim.ui.input({
+			prompt = "Auth user (li_authorization_user): ",
+		}, function(input)
+			if not input or input == "" then
+				vim.notify("Auth user is required", vim.log.levels.WARN, { title = "Trino" })
+				return
+			end
+			state.headless_user = input
+			proceed(input)
+		end)
+	else
+		proceed(state.headless_user)
+	end
 end
 
 -- ============================================================================
@@ -565,7 +592,6 @@ local function trino_cancel()
 		state.current_job = nil
 	end
 	state.start_time = nil
-	dismiss_loading_notification()
 end
 
 local function trino_auth_user(args)
@@ -590,7 +616,12 @@ end
 -- Setup: register commands and SQL-file keymaps
 -- ============================================================================
 
-function M.setup()
+function M.setup(opts)
+	opts = opts or {}
+	if opts.cluster ~= nil then state.cluster = opts.cluster end
+	if opts.headless_user ~= nil then state.headless_user = opts.headless_user end
+	if opts.split_height_pct ~= nil then state.split_height_pct = opts.split_height_pct end
+
 	-- User commands
 	vim.api.nvim_create_user_command(
 		"TrinoRun",

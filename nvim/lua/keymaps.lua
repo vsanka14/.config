@@ -177,7 +177,6 @@ map("v", "<Leader>qr", ":TrinoRun<cr>", { desc = "Trino: Run selection" })
 map("n", "<Leader>qc", "<cmd>TrinoCluster<cr>", { desc = "Trino: Change cluster" })
 map("n", "<Leader>qu", "<cmd>TrinoHeadlessUser<cr>", { desc = "Trino: Change auth user" })
 map("n", "<Leader>qx", "<cmd>TrinoCancel<cr>", { desc = "Trino: Cancel query" })
-map("n", "<Leader>qC", "<cmd>TrinoClear<cr>", { desc = "Trino: Clear results" })
 map("n", "<Leader>qn", "<cmd>TrinoNext<cr>", { desc = "Trino: Next result" })
 map("n", "<Leader>qp", "<cmd>TrinoPrev<cr>", { desc = "Trino: Previous result" })
 

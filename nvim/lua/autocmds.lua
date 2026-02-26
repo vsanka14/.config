@@ -116,7 +116,11 @@ autocmd("FileType", {
 	pattern = "sql",
 	once = true,
 	callback = function()
-		require("helpers.trino").setup()
+		require("helpers.trino").setup({
+			cluster = "holdem",
+			headless_user = "convtrack",
+			split_height_pct = 50,
+		})
 		vim.cmd("doautocmd FileType")
 	end,
 	desc = "Lazy-load Trino module on first SQL file",
