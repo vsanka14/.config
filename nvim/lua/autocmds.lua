@@ -132,6 +132,10 @@ autocmd("BufWinEnter", {
 	pattern = "trino://results/*",
 	callback = function(args)
 		local buf = args.buf
+		if vim.b[buf].trino_borders_added then
+			return
+		end
+		vim.b[buf].trino_borders_added = true
 		vim.bo[buf].modifiable = true
 		vim.api.nvim_buf_set_lines(buf, 0, 0, false, { "" })
 		vim.api.nvim_buf_set_lines(buf, -1, -1, false, { "" })

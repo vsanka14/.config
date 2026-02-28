@@ -68,6 +68,7 @@ local hl_defs = {
 	ModeReplace = { fg = "#1a1b26", bg = "#f7768e", bold = true },
 	ModeCommand = { fg = "#1a1b26", bg = "#e0af68", bold = true },
 	ModeTerm = { fg = "#1a1b26", bg = "#7dcfff", bold = true },
+	Macro = { fg = "#1a1b26", bg = "#f7768e", bold = true },
 	File = { fg = "#c0caf5", bg = "#24283b", bold = true },
 	Git = { fg = "#7aa2f7", bg = "#1a1b26" },
 	GitIcon = { fg = "#e0af68", bg = "#1a1b26" },
@@ -202,6 +203,9 @@ au({ "BufEnter", "FocusGained", "DirChanged" }, update_git_branch)
 au("DiagnosticChanged", update_diagnostics)
 au({ "LspAttach", "LspDetach", "BufEnter" }, update_lsp_clients)
 au("LspProgress", update_lsp_progress)
+au({ "RecordingEnter", "RecordingLeave" }, function()
+	vim.cmd.redrawstatus()
+end)
 
 update_git_branch()
 
@@ -214,6 +218,12 @@ function M.render()
 
 	-- Left: mode + search count + git
 	local left = hl(mode_hl[mode_label] or "Mode", " " .. mode_label .. " ")
+
+	-- Macro recording indicator
+	local reg = vim.fn.reg_recording()
+	if reg ~= "" then
+		left = left .. hl("Macro", " REC @" .. reg .. " ")
+	end
 
 	-- Search match count (only when searching)
 	if vim.v.hlsearch == 1 then
