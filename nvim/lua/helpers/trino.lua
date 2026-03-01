@@ -38,6 +38,8 @@ local state = {
 	cluster = "holdem",
 	start_time = nil,
 	cached_access_token = nil,
+	token_cached_at = nil,
+	token_ttl_hrs = 6,
 	headless_user = nil,
 	current_job = nil,
 	cancelled = false,
@@ -55,6 +57,7 @@ local state = {
 
 local function clear_token()
 	state.cached_access_token = nil
+	state.token_cached_at = nil
 	vim.notify("SSO token cleared. Next query will open browser.", vim.log.levels.INFO, { title = "Trino" })
 end
 
@@ -330,7 +333,17 @@ local function run_single_query(query_info, auth_user, on_complete)
 		auth_user
 	)
 	if state.cached_access_token then
-		trino_cmd = trino_cmd .. " --access-token '" .. state.cached_access_token .. "'"
+		if state.token_cached_at then
+			local age_hrs = (vim.loop.hrtime() - state.token_cached_at) / 1e9 / 3600
+			if age_hrs >= state.token_ttl_hrs then
+				state.cached_access_token = nil
+				state.token_cached_at = nil
+				vim.notify("SSO token expired (>" .. state.token_ttl_hrs .. "h). Re-authenticating...", vim.log.levels.INFO, { title = "Trino" })
+			end
+		end
+	end
+	if state.cached_access_token then
+		trino_cmd = trino_cmd .. " --access-token " .. vim.fn.shellescape(state.cached_access_token)
 	end
 	trino_cmd = trino_cmd .. string.format(" > %s 2> %s", temp_output_file, temp_log_file)
 
@@ -348,7 +361,12 @@ local function run_single_query(query_info, auth_user, on_complete)
 				-- Cache/refresh bearer token from network log
 				local token = log_content:match("Authorization: Bearer ([^\n]+)")
 				if token then
-					state.cached_access_token = token
+					token = vim.trim(token)
+					if state.cached_access_token ~= token then
+						state.cached_access_token = token
+						state.token_cached_at = vim.loop.hrtime()
+						vim.notify("SSO token cached", vim.log.levels.INFO, { title = "Trino" })
+					end
 				end
 
 				-- Strip network log noise for error handling
@@ -621,6 +639,7 @@ function M.setup(opts)
 	if opts.cluster ~= nil then state.cluster = opts.cluster end
 	if opts.headless_user ~= nil then state.headless_user = opts.headless_user end
 	if opts.split_height_pct ~= nil then state.split_height_pct = opts.split_height_pct end
+	if opts.token_ttl_hrs ~= nil then state.token_ttl_hrs = opts.token_ttl_hrs end
 
 	-- User commands
 	vim.api.nvim_create_user_command(
