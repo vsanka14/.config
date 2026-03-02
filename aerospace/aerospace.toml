@@ -103,7 +103,7 @@ enter = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_chang
 [mode.open.binding]
 c = ['exec-and-forget open -a "Google Chrome"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 k = ['exec-and-forget open -a "kitty"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
-s = ['exec-and-forget open "$HOME/Applications/Chrome Apps.localized/Slack.app"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+s = ['exec-and-forget open -a "Slack"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 o = ['exec-and-forget open "$HOME/Applications/Chrome Apps.localized/Outlook (PWA).app"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 t = ['exec-and-forget open "$HOME/Applications/Chrome Apps.localized/Microsoft Teams (PWA).app"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 q = ['exec-and-forget open -a "QuickTime Player"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
