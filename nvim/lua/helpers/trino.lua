@@ -104,7 +104,8 @@ local function split_queries(sql)
 		local node = root:named_child(i)
 		if node:type() == "statement" then
 			local text = vim.trim(vim.treesitter.get_node_text(node, sql))
-			if not text:match(";$") then
+			-- Tree-sitter strips the trailing semicolon; the trino CLI requires it
+		if not text:match(";$") then
 				text = text .. ";"
 			end
 			table.insert(queries, { index = #queries + 1, text = text })
@@ -559,7 +560,7 @@ local function execute_trino_query(sql)
 end
 
 -- ============================================================================
--- Public Commands
+-- Command Handlers
 -- ============================================================================
 
 local function trino_run(args)
