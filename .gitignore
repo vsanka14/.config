@@ -6,3 +6,5 @@ jgit/
 gh/
 .gitconfig
 DUAL_REMOTE.md
+zsh/.zsh_history
+zsh/.zcompdump*

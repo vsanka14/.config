@@ -10,6 +10,7 @@ sort_dir_first = true
 [preview]
 # Enable image preview (requires terminal support)
 image_filter = "triangle"
+image_quality = 90
 
 # Git plugin fetchers - shows git status next to files
 [[plugin.prepend_fetchers]]

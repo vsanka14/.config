@@ -30,6 +30,7 @@ zle -N zle-line-init
 # Set nvim as the default editor
 export EDITOR='nvim'
 export VISUAL='nvim'
+alias vim='nvim'
 
 # Enable edit-command-line widget
 autoload -Uz edit-command-line

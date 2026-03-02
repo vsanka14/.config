@@ -1,7 +1,13 @@
 #!/bin/bash
 
-if [ "$MODE" = "resize" ]; then
-    sketchybar --set mode_indicator drawing=on
-else
-    sketchybar --set mode_indicator drawing=off
-fi
+case "$MODE" in
+    resize)
+        sketchybar --set mode_indicator drawing=on icon="󰩨" icon.color=0xffff757f
+        ;;
+    open)
+        sketchybar --set mode_indicator drawing=on icon="󰀻" icon.color=0xff82aaff
+        ;;
+    *)
+        sketchybar --set mode_indicator drawing=off
+        ;;
+esac
