@@ -6,6 +6,13 @@ return {
 		config = function()
 			local dap = require("dap")
 
+			-- Breakpoint icons
+			vim.fn.sign_define("DapBreakpoint", { text = "󰝥", texthl = "DiagnosticError" })
+			vim.fn.sign_define("DapBreakpointCondition", { text = "󰝡", texthl = "DiagnosticWarn" })
+			vim.fn.sign_define("DapBreakpointRejected", { text = "󰝢", texthl = "DiagnosticError" })
+			vim.fn.sign_define("DapStopped", { text = "󰝣", texthl = "DiagnosticOk", linehl = "DapStoppedLine" })
+			vim.fn.sign_define("DapLogPoint", { text = "󰝤", texthl = "DiagnosticInfo" })
+
 			-- Java remote attach configs
 			local function get_debug_port()
 				local cwd = vim.fn.getcwd()
