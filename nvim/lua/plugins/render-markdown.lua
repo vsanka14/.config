@@ -6,5 +6,13 @@ return {
 		anti_conceal = {
 			enabled = false,
 		},
+		win_options = {
+			wrap = {
+				rendered = false,
+			},
+			concealcursor = {
+				rendered = "nc",
+			},
+		},
 	},
 }

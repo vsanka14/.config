@@ -28,32 +28,6 @@ autocmd("ColorScheme", {
 	desc = "Reapply italic highlights",
 })
 
--- Markdown: wrap + display-line navigation so gutter numbers match gj/gk movement
-autocmd("FileType", {
-	group = augroup("markdown_settings", { clear = true }),
-	pattern = { "markdown", "markdown.mdx" },
-	callback = function(args)
-		-- Trino result buffers use markdown filetype for table rendering but
-		-- have wrap disabled, so display-line mappings (gj/gk/g0/g$) don't apply
-		if vim.api.nvim_buf_get_name(args.buf):match("^trino://") then
-			return
-		end
-
-		vim.opt_local.wrap = true
-		vim.opt_local.linebreak = true
-		vim.opt_local.conceallevel = 2
-		vim.opt_local.concealcursor = "nc"
-		vim.opt_local.statuscolumn = "%=%{v:lua.require('helpers.display-lines').statuscolumn()}"
-
-		local opts = { buffer = true, silent = true }
-		vim.keymap.set({ "n", "v", "o" }, "j", "gj", opts)
-		vim.keymap.set({ "n", "v", "o" }, "k", "gk", opts)
-		vim.keymap.set({ "n", "v" }, "0", "g0", opts)
-		vim.keymap.set({ "n", "v" }, "$", "g$", opts)
-	end,
-	desc = "Markdown-specific options",
-})
-
 -- Glimmer unicode fix for .hbs files
 local glimmer_group = augroup("glimmer_unicode_fix", { clear = true })
 
