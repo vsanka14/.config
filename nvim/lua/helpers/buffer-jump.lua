@@ -1,6 +1,11 @@
 local M = {}
 
 function M.jump()
+	local function buf_name(buf)
+		local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":t")
+		return name ~= "" and name or "[No Name]"
+	end
+
 	local bufs = {}
 	for _, buf in ipairs(vim.api.nvim_list_bufs()) do
 		if vim.bo[buf].buflisted then
@@ -15,10 +20,7 @@ function M.jump()
 	local used = {}
 	local hints = {}
 	for _, buf in ipairs(bufs) do
-		local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":t")
-		if name == "" then
-			name = "[No Name]"
-		end
+		local name = buf_name(buf)
 		local hint = nil
 		for i = 1, #name do
 			local c = name:sub(i, i):lower()
@@ -50,10 +52,7 @@ function M.jump()
 	-- Build tabline string
 	local parts = {}
 	for _, buf in ipairs(bufs) do
-		local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":t")
-		if name == "" then
-			name = "[No Name]"
-		end
+		local name = buf_name(buf)
 		local h = hints[buf] or "?"
 		local is_current = buf == vim.api.nvim_get_current_buf()
 		local hint_hl = is_current and "%#BufferJumpHintSel#" or "%#BufferJumpHint#"

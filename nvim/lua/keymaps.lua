@@ -13,7 +13,7 @@ map("n", "<C-f>", "<C-f>zz", { desc = "Page down (centered)" })
 map("n", "<C-b>", "<C-b>zz", { desc = "Page up (centered)" })
 
 -- Buffer navigation
-map("n", "<Leader>bb", function()
+map("n", "<Leader>bj", function()
 	require("helpers.buffer-jump").jump()
 end, { desc = "Jump to buffer" })
 map("n", "<Leader>bn", "<cmd>bnext<cr>", { desc = "Next buffer" })
@@ -58,7 +58,7 @@ map("n", "<Leader>gH", "<cmd>DiffviewFileHistory<cr>", { desc = "Branch git hist
 map("n", "<Leader>gx", "<cmd>DiffviewClose<cr>", { desc = "Close diff view" })
 
 -- Lazygit
-map("n", "<Leader>gg", function()
+map("n", "<Leader>gl", function()
 	require("helpers.float-term").open("lazygit")
 end, { desc = "Open Lazygit" })
 
