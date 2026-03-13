@@ -51,11 +51,11 @@ map("n", "<Leader>gp", function()
 	require("helpers.blame").open_pr()
 end, { desc = "Open blame PR in browser" })
 
--- Diffview
-map("n", "<Leader>gd", "<cmd>DiffviewOpen<cr>", { desc = "Git diff view" })
-map("n", "<Leader>gh", "<cmd>DiffviewFileHistory %<cr>", { desc = "File git history" })
-map("n", "<Leader>gH", "<cmd>DiffviewFileHistory<cr>", { desc = "Branch git history" })
-map("n", "<Leader>gx", "<cmd>DiffviewClose<cr>", { desc = "Close diff view" })
+-- CodeDiff
+map("n", "<Leader>gd", "<cmd>CodeDiff<cr>", { desc = "Git diff view" })
+map("n", "<Leader>gh", "<cmd>CodeDiff history<cr>", { desc = "File git history" })
+map("n", "<Leader>gH", "<cmd>CodeDiff history<cr>", { desc = "Branch git history" })
+map("n", "<Leader>gx", "<cmd>CodeDiff q<cr>", { desc = "Close diff view" })
 
 -- Lazygit
 map("n", "<Leader>gl", function()
