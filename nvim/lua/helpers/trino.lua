@@ -327,25 +327,14 @@ local function run_single_query(query_info, auth_user, on_complete)
 	vim.fn.delete(temp_output_file)
 	vim.fn.delete(temp_log_file)
 
+	-- Let the CLI manage its own token cache via --external-authentication.
+	-- Passing --access-token ourselves conflicts ("should be specified only once").
 	local trino_cmd = string.format(
 		"trino query -c %s -f %s --session li_authorization_user=%s --output-format MARKDOWN --external-authentication -- --network-logging HEADERS",
 		state.cluster,
 		query_file,
 		auth_user
 	)
-	if state.cached_access_token then
-		if state.token_cached_at then
-			local age_hrs = (vim.loop.hrtime() - state.token_cached_at) / 1e9 / 3600
-			if age_hrs >= state.token_ttl_hrs then
-				state.cached_access_token = nil
-				state.token_cached_at = nil
-				vim.notify("SSO token expired (>" .. state.token_ttl_hrs .. "h). Re-authenticating...", vim.log.levels.INFO, { title = "Trino" })
-			end
-		end
-	end
-	if state.cached_access_token then
-		trino_cmd = trino_cmd .. " --access-token " .. vim.fn.shellescape(state.cached_access_token)
-	end
 	trino_cmd = trino_cmd .. string.format(" > %s 2> %s", temp_output_file, temp_log_file)
 
 	local cmd = { "sh", "-c", trino_cmd }
@@ -358,17 +347,6 @@ local function run_single_query(query_info, auth_user, on_complete)
 				local log_lines = read_file_lines(temp_log_file) or {}
 				local log_content = table.concat(log_lines, "\n")
 				vim.fn.delete(temp_log_file)
-
-				-- Cache/refresh bearer token from network log
-				local token = log_content:match("Authorization: Bearer ([^\n]+)")
-				if token then
-					token = vim.trim(token)
-					if state.cached_access_token ~= token then
-						state.cached_access_token = token
-						state.token_cached_at = vim.loop.hrtime()
-						vim.notify("SSO token cached", vim.log.levels.INFO, { title = "Trino" })
-					end
-				end
 
 				-- Strip network log noise for error handling
 				local clean_lines = strip_network_log(log_lines)
@@ -395,8 +373,21 @@ local function run_single_query(query_info, auth_user, on_complete)
 					vim.fn.delete(temp_output_file)
 					if (not result_lines or #result_lines == 0) and query_has_errors(clean_log) then
 						on_complete(false, extract_error(clean_log), nil)
+					elseif not result_lines or #result_lines == 0 then
+						-- Empty results are an error, not silent success
+						on_complete(false, "Query returned no results\n\n" .. clean_log, nil)
 					else
-						on_complete(true, nil, result_lines or {})
+						-- Only cache token on successful queries with actual results
+						local token = log_content:match("Authorization: Bearer ([^\n]+)")
+						if token then
+							token = vim.trim(token)
+							if state.cached_access_token ~= token then
+								state.cached_access_token = token
+								state.token_cached_at = vim.loop.hrtime()
+								vim.notify("SSO token cached", vim.log.levels.INFO, { title = "Trino" })
+							end
+						end
+						on_complete(true, nil, result_lines)
 					end
 				end
 			end)
