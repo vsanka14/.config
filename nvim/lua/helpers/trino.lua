@@ -37,12 +37,10 @@ local M = {}
 local state = {
 	cluster = "holdem",
 	start_time = nil,
-	cached_access_token = nil,
-	token_cached_at = nil,
-	token_ttl_hrs = 6,
 	headless_user = nil,
 	current_job = nil,
 	cancelled = false,
+	auth_in_progress = false,
 	failed_queries = {},
 	total_queries = 0,
 	completed_count = 0,
@@ -52,13 +50,79 @@ local state = {
 }
 
 -- ============================================================================
--- Token Management
+-- Authentication
 -- ============================================================================
 
+local function run_trino_auth(opts, callback)
+	opts = opts or {}
+	local cmd = string.format("trino auth --sso -c %s%s", state.cluster, opts.extra_args or "")
+	vim.notify("SSO authentication required. Complete login in your browser.", vim.log.levels.INFO, { title = "Trino" })
+
+	local buf = vim.api.nvim_create_buf(false, true)
+	vim.cmd("botright 5split")
+	local win = vim.api.nvim_get_current_win()
+	vim.api.nvim_win_set_buf(win, buf)
+
+	vim.fn.termopen(cmd, {
+		on_exit = function(_, code)
+			vim.schedule(function()
+				if vim.api.nvim_win_is_valid(win) then
+					vim.api.nvim_win_close(win, true)
+				end
+				if vim.api.nvim_buf_is_valid(buf) then
+					pcall(vim.api.nvim_buf_delete, buf, { force = true })
+				end
+				if code == 0 then
+					vim.notify("SSO authentication successful", vim.log.levels.INFO, { title = "Trino" })
+				else
+					vim.notify("SSO authentication failed (exit " .. code .. ")", vim.log.levels.ERROR, { title = "Trino" })
+				end
+				if callback then
+					callback(code)
+				end
+			end)
+		end,
+	})
+end
+
 local function clear_token()
-	state.cached_access_token = nil
-	state.token_cached_at = nil
-	vim.notify("SSO token cleared. Next query will open browser.", vim.log.levels.INFO, { title = "Trino" })
+	run_trino_auth({ extra_args = " --refresh-sso-cache" })
+end
+
+local function ensure_authenticated(callback)
+	if state.auth_in_progress then
+		vim.notify("Authentication already in progress", vim.log.levels.WARN, { title = "Trino" })
+		return
+	end
+
+	state.auth_in_progress = true
+	local probe_log = vim.fn.tempname()
+
+	local probe_cmd = string.format(
+		"trino query -c %s --external-authentication -q 'SELECT 1' > /dev/null 2> %s",
+		state.cluster,
+		probe_log
+	)
+
+	vim.fn.jobstart({ "sh", "-c", probe_cmd }, {
+		on_exit = function(_, exit_code)
+			vim.schedule(function()
+				vim.fn.delete(probe_log)
+
+				if exit_code == 4 then
+					run_trino_auth(nil, function(auth_exit_code)
+						state.auth_in_progress = false
+						if auth_exit_code == 0 then
+							callback()
+						end
+					end)
+				else
+					state.auth_in_progress = false
+					callback()
+				end
+			end)
+		end,
+	})
 end
 
 -- ============================================================================
@@ -327,10 +391,8 @@ local function run_single_query(query_info, auth_user, on_complete)
 	vim.fn.delete(temp_output_file)
 	vim.fn.delete(temp_log_file)
 
-	-- Let the CLI manage its own token cache via --external-authentication.
-	-- Passing --access-token ourselves conflicts ("should be specified only once").
 	local trino_cmd = string.format(
-		"trino query -c %s -f %s --session li_authorization_user=%s --output-format MARKDOWN --external-authentication -- --network-logging HEADERS",
+		"trino query -c %s -f %s --session li_authorization_user=%s --output-format MARKDOWN --external-authentication",
 		state.cluster,
 		query_file,
 		auth_user
@@ -345,10 +407,8 @@ local function run_single_query(query_info, auth_user, on_complete)
 				state.current_job = nil
 
 				local log_lines = read_file_lines(temp_log_file) or {}
-				local log_content = table.concat(log_lines, "\n")
 				vim.fn.delete(temp_log_file)
 
-				-- Strip network log noise for error handling
 				local clean_lines = strip_network_log(log_lines)
 				local clean_log = table.concat(clean_lines, "\n")
 
@@ -377,16 +437,6 @@ local function run_single_query(query_info, auth_user, on_complete)
 						-- Empty results are an error, not silent success
 						on_complete(false, "Query returned no results\n\n" .. clean_log, nil)
 					else
-						-- Only cache token on successful queries with actual results
-						local token = log_content:match("Authorization: Bearer ([^\n]+)")
-						if token then
-							token = vim.trim(token)
-							if state.cached_access_token ~= token then
-								state.cached_access_token = token
-								state.token_cached_at = vim.loop.hrtime()
-								vim.notify("SSO token cached", vim.log.levels.INFO, { title = "Trino" })
-							end
-						end
 						on_complete(true, nil, result_lines)
 					end
 				end
@@ -528,9 +578,11 @@ local function execute_trino_query(sql)
 	state.start_time = vim.loop.hrtime()
 
 	local function proceed(user)
-		vim.notify(string.format("Executing queries on %s...", state.cluster), vim.log.levels.INFO, { title = "Trino" })
-		run_queries_sequentially(queries, user, function()
-			show_results()
+		ensure_authenticated(function()
+			vim.notify(string.format("Executing queries on %s...", state.cluster), vim.log.levels.INFO, { title = "Trino" })
+			run_queries_sequentially(queries, user, function()
+				show_results()
+			end)
 		end)
 	end
 
@@ -631,7 +683,6 @@ function M.setup(opts)
 	if opts.cluster ~= nil then state.cluster = opts.cluster end
 	if opts.headless_user ~= nil then state.headless_user = opts.headless_user end
 	if opts.split_height_pct ~= nil then state.split_height_pct = opts.split_height_pct end
-	if opts.token_ttl_hrs ~= nil then state.token_ttl_hrs = opts.token_ttl_hrs end
 
 	-- User commands
 	vim.api.nvim_create_user_command(
