@@ -14,7 +14,7 @@
 --   :TrinoCluster [name]   Switch cluster. Interactive picker if no arg.
 --   :TrinoCancel           Cancel all running queries
 --   :TrinoHeadlessUser [u] Set li_authorization_user. Prompt if no arg.
---   :TrinoClearToken       Clear cached SSO token (forces browser re-auth)
+--   :TrinoAuth             Force SSO re-authentication
 --   :TrinoNext / TrinoPrev Cycle through result buffers
 --
 -- Suggested keymaps:
@@ -702,7 +702,7 @@ function M.setup(opts)
 		nargs = "?",
 		desc = "Set Trino authorization user",
 	})
-	vim.api.nvim_create_user_command("TrinoClearToken", clear_token, { desc = "Clear cached SSO token" })
+	vim.api.nvim_create_user_command("TrinoAuth", clear_token, { desc = "Force SSO re-authentication" })
 	vim.api.nvim_create_user_command("TrinoNext", trino_next_result, { desc = "Next Trino result buffer" })
 	vim.api.nvim_create_user_command("TrinoPrev", trino_prev_result, { desc = "Previous Trino result buffer" })
 end
