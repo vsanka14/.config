@@ -40,7 +40,6 @@ local state = {
 	headless_user = nil,
 	current_job = nil,
 	cancelled = false,
-	auth_in_progress = false,
 	failed_queries = {},
 	total_queries = 0,
 	completed_count = 0,
@@ -73,9 +72,13 @@ local function run_trino_auth(opts, callback)
 					pcall(vim.api.nvim_buf_delete, buf, { force = true })
 				end
 				if code == 0 then
-					vim.notify("SSO authentication successful", vim.log.levels.INFO, { title = "Trino" })
+					vim.notify("SSO authentication successful.", vim.log.levels.INFO, { title = "Trino" })
 				else
-					vim.notify("SSO authentication failed (exit " .. code .. ")", vim.log.levels.ERROR, { title = "Trino" })
+					vim.notify(
+						"SSO authentication failed (exit " .. code .. ")",
+						vim.log.levels.ERROR,
+						{ title = "Trino" }
+					)
 				end
 				if callback then
 					callback(code)
@@ -87,42 +90,6 @@ end
 
 local function clear_token()
 	run_trino_auth({ extra_args = " --refresh-sso-cache" })
-end
-
-local function ensure_authenticated(callback)
-	if state.auth_in_progress then
-		vim.notify("Authentication already in progress", vim.log.levels.WARN, { title = "Trino" })
-		return
-	end
-
-	state.auth_in_progress = true
-	local probe_log = vim.fn.tempname()
-
-	local probe_cmd = string.format(
-		"trino query -c %s --external-authentication -q 'SELECT 1' > /dev/null 2> %s",
-		state.cluster,
-		probe_log
-	)
-
-	vim.fn.jobstart({ "sh", "-c", probe_cmd }, {
-		on_exit = function(_, exit_code)
-			vim.schedule(function()
-				vim.fn.delete(probe_log)
-
-				if exit_code == 4 then
-					run_trino_auth(nil, function(auth_exit_code)
-						state.auth_in_progress = false
-						if auth_exit_code == 0 then
-							callback()
-						end
-					end)
-				else
-					state.auth_in_progress = false
-					callback()
-				end
-			end)
-		end,
-	})
 end
 
 -- ============================================================================
@@ -169,7 +136,7 @@ local function split_queries(sql)
 		if node:type() == "statement" then
 			local text = vim.trim(vim.treesitter.get_node_text(node, sql))
 			-- Tree-sitter strips the trailing semicolon; the trino CLI requires it
-		if not text:match(";$") then
+			if not text:match(";$") then
 				text = text .. ";"
 			end
 			table.insert(queries, { index = #queries + 1, text = text })
@@ -423,9 +390,20 @@ local function run_single_query(query_info, auth_user, on_complete)
 					return content:match("Query [%w_]+ failed") or content:match("FAILED")
 				end
 
+				local function is_auth_error(content)
+					return content:match("Authentication error")
+						or content:match("invalid SSO token")
+						or content:match("DataVault token")
+						or content:match("Unable to parse bearer token")
+						or content:match("SSO authentication required")
+				end
+
 				local has_error = exit_code ~= 0 or query_has_errors(clean_log)
 
-				if has_error then
+				if exit_code == 4 or is_auth_error(clean_log) then
+					vim.fn.delete(temp_output_file)
+					on_complete(false, "SSO token expired or missing. Run :TrinoAuth to re-authenticate", nil)
+				elseif has_error then
 					vim.fn.delete(temp_output_file)
 					on_complete(false, clean_log ~= "" and extract_error(clean_log) or "Unknown error", nil)
 				else
@@ -434,7 +412,6 @@ local function run_single_query(query_info, auth_user, on_complete)
 					if (not result_lines or #result_lines == 0) and query_has_errors(clean_log) then
 						on_complete(false, extract_error(clean_log), nil)
 					elseif not result_lines or #result_lines == 0 then
-						-- Empty results are an error, not silent success
 						on_complete(false, "Query returned no results\n\n" .. clean_log, nil)
 					else
 						on_complete(true, nil, result_lines)
@@ -578,11 +555,9 @@ local function execute_trino_query(sql)
 	state.start_time = vim.loop.hrtime()
 
 	local function proceed(user)
-		ensure_authenticated(function()
-			vim.notify(string.format("Executing queries on %s...", state.cluster), vim.log.levels.INFO, { title = "Trino" })
-			run_queries_sequentially(queries, user, function()
-				show_results()
-			end)
+		vim.notify(string.format("Executing queries on %s...", state.cluster), vim.log.levels.INFO, { title = "Trino" })
+		run_queries_sequentially(queries, user, function()
+			show_results()
 		end)
 	end
 
@@ -680,9 +655,15 @@ end
 
 function M.setup(opts)
 	opts = opts or {}
-	if opts.cluster ~= nil then state.cluster = opts.cluster end
-	if opts.headless_user ~= nil then state.headless_user = opts.headless_user end
-	if opts.split_height_pct ~= nil then state.split_height_pct = opts.split_height_pct end
+	if opts.cluster ~= nil then
+		state.cluster = opts.cluster
+	end
+	if opts.headless_user ~= nil then
+		state.headless_user = opts.headless_user
+	end
+	if opts.split_height_pct ~= nil then
+		state.split_height_pct = opts.split_height_pct
+	end
 
 	-- User commands
 	vim.api.nvim_create_user_command(
