@@ -53,132 +53,39 @@ local state = {
 -- Authentication
 -- ============================================================================
 
-local TOKEN_FILE = vim.fn.expand("~/.trino/sso_tokens.json")
-local AUTH_TIMEOUT_MS = 30000 -- 30 seconds
-
-local function run_trino_auth(opts, callback)
-	opts = opts or {}
-
+local function trino_auth()
 	if state.auth_job then
 		vim.notify("Authentication already in progress", vim.log.levels.WARN, { title = "Trino" })
 		return
 	end
 
-	local cmd = string.format("trino auth --sso -c %s%s", state.cluster, opts.extra_args or "")
-	local initial_stat = vim.uv.fs_stat(TOKEN_FILE)
-
+	local cmd = string.format("trino auth --sso -c %s", state.cluster)
+	local start = vim.uv.hrtime()
 	vim.notify("SSO authentication required. Complete login in your browser.", vim.log.levels.INFO, { title = "Trino" })
 
-	local done = false
-	local poll_handle = nil
-	local timer_handle = nil
-	local term_buf = nil
-	local term_win = nil
-
-	local function cleanup(code)
-		if done then
-			return
-		end
-		done = true
-
-		if poll_handle and not poll_handle:is_closing() then
-			poll_handle:stop()
-			poll_handle:close()
-		end
-		poll_handle = nil
-
-		if timer_handle and not timer_handle:is_closing() then
-			timer_handle:stop()
-			timer_handle:close()
-		end
-		timer_handle = nil
-
-		if state.auth_job then
-			pcall(vim.fn.jobstop, state.auth_job)
-		end
-		state.auth_job = nil
-
-		vim.schedule(function()
-			if term_win and vim.api.nvim_win_is_valid(term_win) then
-				vim.api.nvim_win_close(term_win, true)
-			end
-			if term_buf and vim.api.nvim_buf_is_valid(term_buf) then
-				pcall(vim.api.nvim_buf_delete, term_buf, { force = true })
-			end
-
-			if code == 0 then
-				vim.notify("SSO authentication successful.", vim.log.levels.INFO, { title = "Trino" })
-			else
-				vim.notify(
-					"SSO authentication failed (exit " .. tostring(code) .. ")",
-					vim.log.levels.ERROR,
-					{ title = "Trino" }
-				)
-			end
-			if callback then
-				callback(code)
-			end
-		end)
-	end
-
-	-- termopen gives the CLI a TTY it needs; hide the split immediately
-	term_buf = vim.api.nvim_create_buf(false, true)
-	local origin_win = vim.api.nvim_get_current_win()
-	vim.cmd("botright 1split")
-	term_win = vim.api.nvim_get_current_win()
-	vim.api.nvim_win_set_buf(term_win, term_buf)
-
-	state.auth_job = vim.fn.termopen(cmd, {
+	state.auth_job = vim.fn.jobstart(cmd, {
+		pty = true,
 		on_exit = function(_, exit_code)
-			cleanup(exit_code)
+			state.auth_job = nil
+			local elapsed = string.format("%.1fs", (vim.uv.hrtime() - start) / 1e9)
+			vim.schedule(function()
+				if exit_code == 0 then
+					vim.notify("SSO authentication successful (" .. elapsed .. ")", vim.log.levels.INFO, { title = "Trino" })
+				else
+					vim.notify(
+						"SSO authentication failed (exit " .. tostring(exit_code) .. ")",
+						vim.log.levels.ERROR,
+						{ title = "Trino" }
+					)
+				end
+			end)
 		end,
 	})
-
-	if vim.api.nvim_win_is_valid(term_win) then
-		vim.api.nvim_win_close(term_win, true)
-		term_win = nil
-	end
-	if vim.api.nvim_win_is_valid(origin_win) then
-		vim.api.nvim_set_current_win(origin_win)
-	end
 
 	if state.auth_job <= 0 then
 		state.auth_job = nil
 		vim.notify("Failed to start trino auth process", vim.log.levels.ERROR, { title = "Trino" })
-		if callback then
-			callback(-1)
-		end
-		return
 	end
-
-	-- Poll token file for creation/modification (kqueue is unreliable for atomic writes)
-	poll_handle = vim.uv.new_timer()
-	poll_handle:start(500, 500, function()
-		local cur_stat = vim.uv.fs_stat(TOKEN_FILE)
-		if cur_stat then
-			local is_new = not initial_stat
-			local is_changed = initial_stat
-				and (
-					cur_stat.mtime.sec > initial_stat.mtime.sec
-					or (cur_stat.mtime.sec == initial_stat.mtime.sec and cur_stat.mtime.nsec > initial_stat.mtime.nsec)
-				)
-			if is_new or is_changed then
-				cleanup(0)
-			end
-		end
-	end)
-
-	timer_handle = vim.uv.new_timer()
-	timer_handle:start(AUTH_TIMEOUT_MS, 0, function()
-		vim.schedule(function()
-			vim.notify("SSO authentication timed out.", vim.log.levels.ERROR, { title = "Trino" })
-		end)
-		cleanup(-1)
-	end)
-end
-
-local function clear_token()
-	run_trino_auth({ extra_args = " --refresh-sso-cache" })
 end
 
 -- ============================================================================
@@ -772,7 +679,7 @@ function M.setup(opts)
 		nargs = "?",
 		desc = "Set Trino authorization user",
 	})
-	vim.api.nvim_create_user_command("TrinoAuth", clear_token, { desc = "Force SSO re-authentication" })
+	vim.api.nvim_create_user_command("TrinoAuth", trino_auth, { desc = "SSO authentication" })
 	vim.api.nvim_create_user_command("TrinoNext", trino_next_result, { desc = "Next Trino result buffer" })
 	vim.api.nvim_create_user_command("TrinoPrev", trino_prev_result, { desc = "Previous Trino result buffer" })
 end
