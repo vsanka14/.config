@@ -61,7 +61,7 @@ local function trino_auth()
 
 	local cmd = string.format("trino auth --sso -c %s", state.cluster)
 	local start = vim.uv.hrtime()
-	vim.notify("SSO authentication required. Complete login in your browser.", vim.log.levels.INFO, { title = "Trino" })
+	vim.notify("SSO authentication in progress", vim.log.levels.INFO, { title = "Trino" })
 
 	state.auth_job = vim.fn.jobstart(cmd, {
 		pty = true,
@@ -70,7 +70,11 @@ local function trino_auth()
 			local elapsed = string.format("%.1fs", (vim.uv.hrtime() - start) / 1e9)
 			vim.schedule(function()
 				if exit_code == 0 then
-					vim.notify("SSO authentication successful (" .. elapsed .. ")", vim.log.levels.INFO, { title = "Trino" })
+					vim.notify(
+						"SSO authentication successful (" .. elapsed .. ")",
+						vim.log.levels.INFO,
+						{ title = "Trino" }
+					)
 				else
 					vim.notify(
 						"SSO authentication failed (exit " .. tostring(exit_code) .. ")",
