@@ -184,10 +184,10 @@ local function get_result_winbar()
 	local current_buf = vim.api.nvim_win_get_buf(state.result_win)
 	local parts = {}
 
-	for i, entry in ipairs(state.result_buffers) do
+	for _, entry in ipairs(state.result_buffers) do
 		local is_current = entry.buf == current_buf
 		local hl = is_current and "%#TabLineSel#" or "%#TabLine#"
-		table.insert(parts, string.format("%%%d@v:lua.TrinoSelectResult@%s %d %%X%%*", i, hl, entry.index))
+		table.insert(parts, string.format("%s %d %%*", hl, entry.index))
 	end
 
 	return table.concat(parts, "%#TabLineFill#|")
@@ -208,11 +208,6 @@ local function switch_to_result(index)
 		vim.api.nvim_win_set_buf(state.result_win, entry.buf)
 		refresh_result_winbar()
 	end
-end
-
--- Global click handler for winbar tabs
-_G.TrinoSelectResult = function(minwid)
-	switch_to_result(minwid)
 end
 
 local function clear_result_buffers()
