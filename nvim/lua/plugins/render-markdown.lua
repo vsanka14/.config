@@ -8,7 +8,7 @@ return {
 		},
 		win_options = {
 			wrap = {
-				rendered = false,
+				rendered = true,
 			},
 			concealcursor = {
 				rendered = "nc",

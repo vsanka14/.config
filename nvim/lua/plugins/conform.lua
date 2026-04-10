@@ -33,7 +33,14 @@ return {
 							table.insert(args, "--config")
 							table.insert(args, config_path)
 						end
-						if vim.fn.expand("%:e") == "hbs" then
+						local ext = vim.fn.expand("%:e")
+							if ext == "md" or ext == "mdx" then
+								table.insert(args, "--prose-wrap")
+								table.insert(args, "always")
+								table.insert(args, "--print-width")
+								table.insert(args, "120")
+							end
+							if ext == "hbs" then
 							table.insert(args, "--parser")
 							table.insert(args, "glimmer")
 						end
