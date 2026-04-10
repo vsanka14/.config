@@ -14,7 +14,6 @@
 --   :TrinoCluster [name]   Switch cluster. Interactive picker if no arg.
 --   :TrinoCancel           Cancel all running queries
 --   :TrinoHeadlessUser [u] Set li_authorization_user. Prompt if no arg.
---   :TrinoAuth             Force SSO re-authentication
 --   :TrinoNext / TrinoPrev Cycle through result buffers
 --
 -- Suggested keymaps:
@@ -39,8 +38,6 @@ local state = {
 	start_time = nil,
 	headless_user = nil,
 	current_job = nil,
-	auth_job = nil,
-	cancelled = false,
 	failed_queries = {},
 	total_queries = 0,
 	completed_count = 0,
@@ -48,49 +45,6 @@ local state = {
 	result_win = nil,
 	split_height_pct = 50,
 }
-
--- ============================================================================
--- Authentication
--- ============================================================================
-
-local function trino_auth()
-	if state.auth_job then
-		vim.notify("Authentication already in progress", vim.log.levels.WARN, { title = "Trino" })
-		return
-	end
-
-	local cmd = string.format("trino auth --sso -c %s", state.cluster)
-	local start = vim.uv.hrtime()
-	vim.notify("SSO authentication in progress", vim.log.levels.INFO, { title = "Trino" })
-
-	state.auth_job = vim.fn.jobstart(cmd, {
-		pty = true,
-		on_exit = function(_, exit_code)
-			state.auth_job = nil
-			local elapsed = string.format("%.1fs", (vim.uv.hrtime() - start) / 1e9)
-			vim.schedule(function()
-				if exit_code == 0 then
-					vim.notify(
-						"SSO authentication successful (" .. elapsed .. ")",
-						vim.log.levels.INFO,
-						{ title = "Trino" }
-					)
-				else
-					vim.notify(
-						"SSO authentication failed (exit " .. tostring(exit_code) .. ")",
-						vim.log.levels.ERROR,
-						{ title = "Trino" }
-					)
-				end
-			end)
-		end,
-	})
-
-	if state.auth_job <= 0 then
-		state.auth_job = nil
-		vim.notify("Failed to start trino auth process", vim.log.levels.ERROR, { title = "Trino" })
-	end
-end
 
 -- ============================================================================
 -- SQL Extraction Helpers
@@ -397,7 +351,7 @@ local function run_single_query(query_info, auth_user, on_complete)
 
 				if exit_code == 4 or is_auth_error(clean_log) then
 					vim.fn.delete(temp_output_file)
-					on_complete(false, "SSO token expired or missing. Run :TrinoAuth to re-authenticate", nil)
+					on_complete(false, "SSO token expired or missing. Run 'trino auth --sso' in your shell to re-authenticate", nil)
 				elseif has_error then
 					vim.fn.delete(temp_output_file)
 					on_complete(false, clean_log ~= "" and extract_error(clean_log) or "Unknown error", nil)
@@ -678,7 +632,6 @@ function M.setup(opts)
 		nargs = "?",
 		desc = "Set Trino authorization user",
 	})
-	vim.api.nvim_create_user_command("TrinoAuth", trino_auth, { desc = "SSO authentication" })
 	vim.api.nvim_create_user_command("TrinoNext", trino_next_result, { desc = "Next Trino result buffer" })
 	vim.api.nvim_create_user_command("TrinoPrev", trino_prev_result, { desc = "Previous Trino result buffer" })
 end
