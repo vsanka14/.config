@@ -6,6 +6,13 @@ map({ "n", "i", "v" }, "<C-s>", "<cmd>write<cr>", { desc = "Save file" })
 -- Redo with U
 map("n", "U", "<C-r>", { desc = "Redo" })
 
+-- Change without overwriting clipboard
+map({ "n", "v" }, "c", '"_c', { desc = "Change (no register)" })
+map("n", "C", '"_C', { desc = "Change to EOL (no register)" })
+
+-- Paste over selection without overwriting clipboard
+map("v", "p", '"_dP', { desc = "Paste over selection (no register)" })
+
 -- Centered scrolling
 map("n", "<C-d>", "<C-d>zz", { desc = "Scroll down (centered)" })
 map("n", "<C-u>", "<C-u>zz", { desc = "Scroll up (centered)" })
