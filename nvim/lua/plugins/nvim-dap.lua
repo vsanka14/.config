@@ -6,29 +6,13 @@ return {
 		config = function()
 			local dap = require("dap")
 
-			-- Java remote attach configs
-			local function get_debug_port()
-				local cwd = vim.fn.getcwd()
-				local port_map = {
-					["campaign%-manager%-api"] = 9999,
-					["tscp%-assets"] = 23456,
-				}
-				for project, port in pairs(port_map) do
-					if cwd:match(project) then
-						return port
-					end
-				end
-				return 9999
-			end
-
-			local port = get_debug_port()
 			dap.configurations.java = dap.configurations.java or {}
 			table.insert(dap.configurations.java, {
 				type = "java",
 				request = "attach",
-				name = string.format("Attach to Remote JVM (port %d)", port),
+				name = "Attach to cm-api (port 9999)",
 				hostName = "::1",
-				port = port,
+				port = 9999,
 			})
 		end,
 	},

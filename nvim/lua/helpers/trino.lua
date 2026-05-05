@@ -84,17 +84,49 @@ local function split_queries(sql)
 
 	local root = trees[1]:root()
 	local queries = {}
+	local cursor = 0 -- 0-indexed byte offset into sql
 
-	for i = 0, root:named_child_count() - 1 do
-		local node = root:named_child(i)
-		if node:type() == "statement" then
-			local text = vim.trim(vim.treesitter.get_node_text(node, sql))
-			-- Tree-sitter strips the trailing semicolon; the trino CLI requires it
-			if not text:match(";$") then
-				text = text .. ";"
-			end
-			table.insert(queries, { index = #queries + 1, text = text })
+	-- Walk the tree and slice the original SQL between `;` tokens. We rely on
+	-- tree-sitter only to locate terminators (which it identifies reliably even
+	-- inside strings/comments), not on `statement` node boundaries — a partial
+	-- parse of Trino-dialect syntax can otherwise fragment one statement into
+	-- several and produce stray semicolons mid-query.
+	local function is_semicolon(node)
+		-- Grammar-agnostic: some tree-sitter-sql variants name the token ";",
+		-- others "semicolon". Fall back to leaf-text comparison so either works.
+		if node:child_count() ~= 0 then
+			return false
 		end
+		local t = node:type()
+		if t == ";" or t == "semicolon" then
+			return true
+		end
+		return vim.treesitter.get_node_text(node, sql) == ";"
+	end
+
+	local function walk(node)
+		for child in node:iter_children() do
+			if is_semicolon(child) then
+				local _, _, end_byte = child:end_()
+				local text = vim.trim(sql:sub(cursor + 1, end_byte))
+				if text ~= "" and text ~= ";" then
+					table.insert(queries, { index = #queries + 1, text = text })
+				end
+				cursor = end_byte
+			else
+				walk(child)
+			end
+		end
+	end
+
+	walk(root)
+
+	local tail = vim.trim(sql:sub(cursor + 1))
+	if tail ~= "" then
+		if not tail:match(";$") then
+			tail = tail .. ";"
+		end
+		table.insert(queries, { index = #queries + 1, text = tail })
 	end
 
 	return queries
@@ -308,7 +340,7 @@ local function run_single_query(query_info, auth_user, on_complete)
 	vim.fn.delete(temp_log_file)
 
 	local trino_cmd = string.format(
-		"trino query -c %s -f %s --session li_authorization_user=%s --output-format MARKDOWN --external-authentication",
+		"trino query -c %s -f %s -u %s --sso --output-format MARKDOWN",
 		state.cluster,
 		query_file,
 		auth_user
@@ -351,7 +383,11 @@ local function run_single_query(query_info, auth_user, on_complete)
 
 				if exit_code == 4 or is_auth_error(clean_log) then
 					vim.fn.delete(temp_output_file)
-					on_complete(false, "SSO token expired or missing. Run 'trino auth --sso' in your shell to re-authenticate", nil)
+					on_complete(
+						false,
+						"SSO token expired or missing. Run 'trino auth --sso' in your shell to re-authenticate",
+						nil
+					)
 				elseif has_error then
 					vim.fn.delete(temp_output_file)
 					on_complete(false, clean_log ~= "" and extract_error(clean_log) or "Unknown error", nil)
