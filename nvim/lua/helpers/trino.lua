@@ -14,6 +14,7 @@
 --   :TrinoCluster [name]   Switch cluster. Interactive picker if no arg.
 --   :TrinoCancel           Cancel all running queries
 --   :TrinoHeadlessUser [u] Set li_authorization_user. Prompt if no arg.
+--   :TrinoAuth [cluster]   SSO auth in background (`trino auth setup`)
 --   :TrinoNext / TrinoPrev Cycle through result buffers
 --
 -- Suggested keymaps:
@@ -21,6 +22,7 @@
 --   vim.keymap.set("v", "<Leader>qr", ":TrinoRun<cr>")
 --   vim.keymap.set("n", "<Leader>qc", "<cmd>TrinoCluster<cr>")
 --   vim.keymap.set("n", "<Leader>qu", "<cmd>TrinoHeadlessUser<cr>")
+--   vim.keymap.set("n", "<Leader>qa", "<cmd>TrinoAuth<cr>")
 --   vim.keymap.set("n", "<Leader>qx", "<cmd>TrinoCancel<cr>")
 --   vim.keymap.set("n", "<Leader>qn", "<cmd>TrinoNext<cr>")
 --   vim.keymap.set("n", "<Leader>qp", "<cmd>TrinoPrev<cr>")
@@ -325,7 +327,7 @@ end
 local function run_single_query(query_info, auth_user, on_complete)
 	local base = vim.fn.tempname()
 	local query_file = base .. ".sql"
-	local temp_output_file = base .. "_output.md"
+	local temp_output_file = base .. "_output.txt"
 	local temp_log_file = base .. "_log.txt"
 
 	if not write_file(query_file, query_info.text) then
@@ -336,12 +338,8 @@ local function run_single_query(query_info, auth_user, on_complete)
 	vim.fn.delete(temp_output_file)
 	vim.fn.delete(temp_log_file)
 
-	local trino_cmd = string.format(
-		"trino query -c %s -f %s -u %s --sso --output table",
-		state.cluster,
-		query_file,
-		auth_user
-	)
+	local trino_cmd =
+		string.format("trino query -c %s -f %s -u %s --sso --output table", state.cluster, query_file, auth_user)
 	trino_cmd = trino_cmd .. string.format(" > %s 2> %s", temp_output_file, temp_log_file)
 
 	local cmd = { "sh", "-c", trino_cmd }
@@ -382,7 +380,7 @@ local function run_single_query(query_info, auth_user, on_complete)
 					vim.fn.delete(temp_output_file)
 					on_complete(
 						false,
-						"SSO token expired or missing. Run 'trino auth --sso' in your shell to re-authenticate",
+						"SSO token expired or missing. Run :TrinoAuth to re-authenticate",
 						nil
 					)
 				elseif has_error then
@@ -631,6 +629,76 @@ local function trino_auth_user(args)
 	end
 end
 
+local function trino_auth(args)
+	local cluster = (args.args ~= "" and args.args) or state.cluster
+	local valid_clusters = { holdem = true, war = true, faro = true }
+	if not valid_clusters[cluster] then
+		vim.notify("Invalid cluster. Use: holdem, war, or faro", vim.log.levels.ERROR, { title = "Trino" })
+		return
+	end
+
+	if state.auth_job then
+		vim.notify(
+			"Trino auth already in progress — complete it in your browser",
+			vim.log.levels.WARN,
+			{ title = "Trino" }
+		)
+		return
+	end
+
+	-- `-y` skips the confirmation prompt, `--interactive` forces the browser
+	-- SSO flow even though stdin is not a TTY (auto-detect would otherwise
+	-- pick --no-interactive and skip the flow), `--browser` auto-opens the
+	-- SSO URL. The CLI then waits silently for the OAuth callback.
+	local cmd = "trino auth setup -y --interactive --browser -c " .. vim.fn.shellescape(cluster)
+
+	local output_lines = {}
+
+	local function capture(_, data)
+		for _, line in ipairs(data or {}) do
+			if line ~= "" then
+				table.insert(output_lines, line)
+			end
+		end
+	end
+
+	local jid = vim.fn.jobstart(cmd, {
+		on_stdout = capture,
+		on_stderr = capture,
+		on_exit = function(_, exit_code)
+			vim.schedule(function()
+				state.auth_job = nil
+				if exit_code == 0 then
+					vim.notify(
+						"Trino auth complete for " .. cluster,
+						vim.log.levels.INFO,
+						{ title = "Trino" }
+					)
+				else
+					local tail = table.concat(output_lines, "\n")
+					vim.notify(
+						string.format("Trino auth failed (exit %d)\n%s", exit_code, tail),
+						vim.log.levels.ERROR,
+						{ title = "Trino" }
+					)
+				end
+			end)
+		end,
+	})
+
+	if jid <= 0 then
+		vim.notify("Failed to start trino auth", vim.log.levels.ERROR, { title = "Trino" })
+		return
+	end
+
+	state.auth_job = jid
+	vim.notify(
+		"Trino SSO auth started for " .. cluster .. " — complete it in your browser",
+		vim.log.levels.INFO,
+		{ title = "Trino" }
+	)
+end
+
 -- ============================================================================
 -- Setup: register commands and SQL-file keymaps
 -- ============================================================================
@@ -664,6 +732,13 @@ function M.setup(opts)
 	vim.api.nvim_create_user_command("TrinoHeadlessUser", trino_auth_user, {
 		nargs = "?",
 		desc = "Set Trino authorization user",
+	})
+	vim.api.nvim_create_user_command("TrinoAuth", trino_auth, {
+		nargs = "?",
+		complete = function()
+			return { "holdem", "war", "faro" }
+		end,
+		desc = "Authenticate (SSO) for a Trino cluster in the background",
 	})
 	vim.api.nvim_create_user_command("TrinoNext", trino_next_result, { desc = "Next Trino result buffer" })
 	vim.api.nvim_create_user_command("TrinoPrev", trino_prev_result, { desc = "Previous Trino result buffer" })
