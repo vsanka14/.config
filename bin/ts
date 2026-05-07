@@ -10,6 +10,8 @@
 #   (none)       Fuzzy-find a project dir → create/switch session (Alt+f)
 #   sessions     List active sessions in fzf and switch to one (Alt+s)
 #   go <n>       Jump to the nth session by creation order (Alt+1–9)
+#   prev         Switch to previous session in creation order (with wraparound)
+#   next         Switch to next session in creation order (with wraparound)
 #   status       Print status-bar dots for each session (used in status-right)
 #
 
@@ -21,6 +23,22 @@ case "$1" in
         [[ "$n" =~ ^[0-9]+$ ]] || exit 1
         target=$(echo "$sessions" | sed -n "${n}p")
         [[ -n "$target" ]] && { tmux switch-client -t "$target" 2>/dev/null || exec tmux attach-session -t "$target"; }
+        exit 0
+        ;;
+    prev|next)
+        sessions=$(tmux list-sessions -F '#{session_created}:#S' 2>/dev/null | sort -n | cut -d: -f2-)
+        count=$(echo "$sessions" | grep -c .)
+        [[ "$count" -le 1 ]] && exit 0
+        current=$(tmux display-message -p '#S')
+        idx=$(echo "$sessions" | grep -nxF "$current" | cut -d: -f1)
+        [[ -z "$idx" ]] && exit 0
+        if [[ "$1" == "next" ]]; then
+            target_idx=$(( idx % count + 1 ))
+        else
+            target_idx=$(( (idx - 2 + count) % count + 1 ))
+        fi
+        target=$(echo "$sessions" | sed -n "${target_idx}p")
+        [[ -n "$target" ]] && tmux switch-client -t "$target"
         exit 0
         ;;
     status)
