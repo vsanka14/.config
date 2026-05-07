@@ -25,7 +25,7 @@
 --   vim.keymap.set("n", "<Leader>qn", "<cmd>TrinoNext<cr>")
 --   vim.keymap.set("n", "<Leader>qp", "<cmd>TrinoPrev<cr>")
 --
--- Result buffers use the scheme trino://results/* with markdown filetype.
+-- Result buffers use the scheme trino://results/* and contain plain-text tables.
 -- You may want an autocmd to disable wrap or add padding for these buffers.
 
 local M = {}
@@ -108,7 +108,7 @@ local function split_queries(sql)
 		for child in node:iter_children() do
 			if is_semicolon(child) then
 				local _, _, end_byte = child:end_()
-				local text = vim.trim(sql:sub(cursor + 1, end_byte))
+				local text = (vim.trim(sql:sub(cursor + 1, end_byte)):gsub(";%s*$", ""))
 				if text ~= "" and text ~= ";" then
 					table.insert(queries, { index = #queries + 1, text = text })
 				end
@@ -121,11 +121,8 @@ local function split_queries(sql)
 
 	walk(root)
 
-	local tail = vim.trim(sql:sub(cursor + 1))
+	local tail = (vim.trim(sql:sub(cursor + 1)):gsub(";%s*$", ""))
 	if tail ~= "" then
-		if not tail:match(";$") then
-			tail = tail .. ";"
-		end
 		table.insert(queries, { index = #queries + 1, text = tail })
 	end
 
@@ -340,7 +337,7 @@ local function run_single_query(query_info, auth_user, on_complete)
 	vim.fn.delete(temp_log_file)
 
 	local trino_cmd = string.format(
-		"trino query -c %s -f %s -u %s --sso --output-format MARKDOWN",
+		"trino query -c %s -f %s -u %s --sso --output table",
 		state.cluster,
 		query_file,
 		auth_user
