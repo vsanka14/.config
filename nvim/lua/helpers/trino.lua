@@ -65,11 +65,16 @@ local function entry_buffers(src_buf)
 end
 
 local function close_result_window()
-	if is_result_win_valid() then
-		vim.api.nvim_win_close(state.result_win, true)
-	end
+	-- Clear state *before* the close call so that the WinClosed handler
+	-- (which sees win == state.result_win as its "user dismissed it" signal)
+	-- doesn't mark the previous source as dismissed when *we* are closing
+	-- the split programmatically.
+	local win = state.result_win
 	state.result_win = nil
 	state.window_source = nil
+	if win and vim.api.nvim_win_is_valid(win) then
+		vim.api.nvim_win_close(win, true)
+	end
 end
 
 local function delete_results_for(src_buf)

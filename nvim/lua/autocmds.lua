@@ -111,9 +111,18 @@ autocmd("BufEnter", {
 		if vim.bo[args.buf].filetype ~= "sql" then
 			return
 		end
-		if package.loaded["helpers.trino"] then
-			require("helpers.trino").on_buf_enter(args.buf)
+		if not package.loaded["helpers.trino"] then
+			return
 		end
+		-- Defer: BufEnter can fire mid-close of another window (e.g. a
+		-- float-term closing focuses the SQL buf), and Neovim refuses to
+		-- create a split during an in-flight close (E242).
+		local buf = args.buf
+		vim.schedule(function()
+			if vim.api.nvim_buf_is_valid(buf) then
+				require("helpers.trino").on_buf_enter(buf)
+			end
+		end)
 	end,
 	desc = "Trino: swap result split to current SQL file",
 })
