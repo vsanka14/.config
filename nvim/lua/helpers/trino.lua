@@ -12,24 +12,24 @@
 -- Commands:
 --   :TrinoRun              Run whole buffer, or visual selection
 --   :TrinoCluster [name]   Switch cluster. Interactive picker if no arg.
---   :TrinoCancel           Cancel the running query
+--   :TrinoCancel           Cancel the running query for the current SQL file
 --   :TrinoHeadlessUser [u] Set li_authorization_user. Prompt if no arg.
 --   :TrinoNext / TrinoPrev Cycle through result buffers for the current SQL file
 --
--- Result buffers are scoped per source SQL buffer. Switching to a different
--- SQL file swaps the result split's contents (or closes it if that file has
--- no stored results). Switching back swaps the previous results back in.
+-- Lifecycle hooks (wired from autocmds.lua):
+--   M.on_buf_enter(buf), M.on_win_closed(win), M.on_source_wiped(buf)
+--
+-- Everything is scoped per source SQL buffer: each file has its own running
+-- job, its own result buffers, and its own cancel state. Multiple files can
+-- run queries concurrently. Switching to a different SQL file swaps the
+-- result split's contents (or closes it if that file has no stored results).
 
 local M = {}
 
 local state = {
 	cluster = "holdem",
-	start_time = nil,
 	headless_user = nil,
-	current_job = nil,
-	-- Per-source results: src_buf (number) -> { buffers = { {buf, index}, ... } }
 	results_by_source = {},
-	-- Single shared split window. Its content is whichever source it's "showing".
 	result_win = nil,
 	window_source = nil,
 	split_height_pct = 50,
@@ -76,6 +76,10 @@ local function delete_results_for(src_buf)
 	local entry = state.results_by_source[src_buf]
 	if not entry then
 		return
+	end
+	if entry.job then
+		entry.job.cancelled = true
+		pcall(vim.fn.jobstop, entry.job.id)
 	end
 	for _, e in ipairs(entry.buffers) do
 		if vim.api.nvim_buf_is_valid(e.buf) then
@@ -274,15 +278,11 @@ local function split_output_chunks(lines)
 	return chunks
 end
 
-local function format_elapsed()
-	if not state.start_time then
-		return ""
+local function format_elapsed_ms(ms)
+	if ms > 1000 then
+		return string.format(" (%.1fs)", ms / 1000)
 	end
-	local elapsed_ms = (vim.loop.hrtime() - state.start_time) / 1e6
-	if elapsed_ms > 1000 then
-		return string.format(" (%.1fs)", elapsed_ms / 1000)
-	end
-	return string.format(" (%dms)", elapsed_ms)
+	return string.format(" (%dms)", ms)
 end
 
 local function show_error_for(src_buf, message)
@@ -311,6 +311,7 @@ local function show_results_for_lines(src_buf, out_lines)
 end
 
 local function run_trino(src_buf, sql, auth_user)
+	local start_time = vim.loop.hrtime()
 	local base = vim.fn.tempname()
 	local query_file = base .. ".sql"
 	local out_file = base .. "_out.txt"
@@ -326,30 +327,49 @@ local function run_trino(src_buf, sql, auth_user)
 		return
 	end
 
+	local cluster = state.cluster
 	local trino_cmd = string.format(
 		"trino query -c %s -f %s -u %s --sso --interactive --browser --output table > %s 2> %s",
-		state.cluster,
+		cluster,
 		query_file,
 		auth_user,
 		out_file,
 		log_file
 	)
 
-	vim.notify(
-		string.format("Executing on %s...", state.cluster),
-		vim.log.levels.INFO,
-		{ title = "Trino" }
-	)
+	vim.notify(string.format("Executing on %s...", cluster), vim.log.levels.INFO, { title = "Trino" })
+
+	local job = { id = nil, cancelled = false }
+	local entry = state.results_by_source[src_buf]
+	if not entry then
+		entry = { buffers = {} }
+		state.results_by_source[src_buf] = entry
+	end
+	entry.job = job
 
 	local job_id = vim.fn.jobstart({ "sh", "-c", trino_cmd }, {
 		on_exit = function(_, exit_code)
 			vim.schedule(function()
-				state.current_job = nil
+				local elapsed = format_elapsed_ms((vim.loop.hrtime() - start_time) / 1e6)
+				local title = "Trino [" .. cluster .. "]"
 
-				local elapsed = format_elapsed()
-				local title = "Trino [" .. state.cluster .. "]"
+				-- Source may have been wiped mid-query, or replaced by a newer
+				-- run. Only clear the job pointer if it's still ours.
+				local cur = state.results_by_source[src_buf]
+				if cur and cur.job == job then
+					cur.job = nil
+				end
 
-				if state.cancelled then
+				if not vim.api.nvim_buf_is_valid(src_buf) or not cur then
+					vim.fn.delete(query_file)
+					vim.fn.delete(out_file)
+					vim.fn.delete(log_file)
+					return
+				end
+
+				vim.fn.delete(query_file)
+
+				if job.cancelled then
 					vim.fn.delete(out_file)
 					vim.fn.delete(log_file)
 					show_error_for(src_buf, "Cancelled.")
@@ -382,11 +402,12 @@ local function run_trino(src_buf, sql, auth_user)
 	})
 
 	if job_id <= 0 then
+		entry.job = nil
 		vim.notify("Failed to start trino job", vim.log.levels.ERROR, { title = "Trino" })
 		return
 	end
 
-	state.current_job = job_id
+	job.id = job_id
 end
 
 local function execute_trino_query(src_buf, sql)
@@ -395,17 +416,15 @@ local function execute_trino_query(src_buf, sql)
 		return
 	end
 
-	if state.current_job then
+	local entry = state.results_by_source[src_buf]
+	if entry and entry.job then
 		vim.notify(
-			"Query already running. Cancel it first with :TrinoCancel",
+			"Query already running for this file. Cancel it first with :TrinoCancel",
 			vim.log.levels.WARN,
 			{ title = "Trino" }
 		)
 		return
 	end
-
-	state.cancelled = false
-	state.start_time = vim.loop.hrtime()
 
 	local function proceed(user)
 		run_trino(src_buf, sql, user)
@@ -469,14 +488,19 @@ local function trino_cluster(args)
 end
 
 local function trino_cancel()
-	if not state.current_job then
-		vim.notify("No running query to cancel", vim.log.levels.WARN, { title = "Trino" })
+	if vim.bo.filetype ~= "sql" then
+		vim.notify("TrinoCancel only works in .sql files", vim.log.levels.WARN, { title = "Trino" })
 		return
 	end
-	state.cancelled = true
-	vim.fn.jobstop(state.current_job)
-	state.current_job = nil
-	state.start_time = nil
+	local src_buf = vim.api.nvim_get_current_buf()
+	local entry = state.results_by_source[src_buf]
+	if not entry or not entry.job then
+		vim.notify("No running query for this file", vim.log.levels.WARN, { title = "Trino" })
+		return
+	end
+	entry.job.cancelled = true
+	pcall(vim.fn.jobstop, entry.job.id)
+	entry.job = nil
 end
 
 local function trino_auth_user(args)
@@ -494,6 +518,37 @@ local function trino_auth_user(args)
 				vim.notify("Auth user set to: " .. input, vim.log.levels.INFO, { title = "Trino" })
 			end
 		end)
+	end
+end
+
+-- ============================================================================
+-- Lifecycle hooks (wired from autocmds.lua)
+-- ============================================================================
+
+function M.on_buf_enter(buf)
+	local entry = state.results_by_source[buf]
+	if entry and not entry.dismissed then
+		show_results_for(buf)
+	else
+		close_result_window()
+	end
+end
+
+function M.on_win_closed(win)
+	if win ~= state.result_win then
+		return
+	end
+	local entry = state.window_source and state.results_by_source[state.window_source]
+	if entry then
+		entry.dismissed = true
+	end
+	state.result_win = nil
+	state.window_source = nil
+end
+
+function M.on_source_wiped(buf)
+	if state.results_by_source[buf] then
+		delete_results_for(buf)
 	end
 end
 
@@ -525,63 +580,17 @@ function M.setup(opts)
 		end,
 		desc = "Set Trino cluster",
 	})
-	vim.api.nvim_create_user_command("TrinoCancel", trino_cancel, { desc = "Cancel running Trino query" })
+	vim.api.nvim_create_user_command(
+		"TrinoCancel",
+		trino_cancel,
+		{ desc = "Cancel running Trino query for current file" }
+	)
 	vim.api.nvim_create_user_command("TrinoHeadlessUser", trino_auth_user, {
 		nargs = "?",
 		desc = "Set Trino authorization user",
 	})
 	vim.api.nvim_create_user_command("TrinoNext", trino_next_result, { desc = "Next Trino result buffer" })
 	vim.api.nvim_create_user_command("TrinoPrev", trino_prev_result, { desc = "Previous Trino result buffer" })
-
-	-- Per-file scoping: when entering a SQL buffer, swap the split to that
-	-- file's results (or close the split if it has none). Filtering on
-	-- filetype=="sql" means non-SQL buffers (the result buffers themselves,
-	-- terminals, docs) don't trigger any change.
-	local group = vim.api.nvim_create_augroup("TrinoResultsScope", { clear = true })
-	vim.api.nvim_create_autocmd("BufEnter", {
-		group = group,
-		callback = function(args)
-			if vim.bo[args.buf].filetype ~= "sql" then
-				return
-			end
-			local entry = state.results_by_source[args.buf]
-			if entry and not entry.dismissed then
-				show_results_for(args.buf)
-			else
-				close_result_window()
-			end
-		end,
-	})
-
-	-- When the user closes the result split (e.g. :q on it), mark its source
-	-- as dismissed so BufEnter doesn't immediately reopen the split. Running
-	-- a fresh query for that source clears the flag (delete_results_for wipes
-	-- the entry, the new entry has dismissed=false).
-	vim.api.nvim_create_autocmd("WinClosed", {
-		group = group,
-		callback = function(args)
-			local closed_win = tonumber(args.match)
-			if closed_win ~= state.result_win then
-				return
-			end
-			local entry = state.window_source and state.results_by_source[state.window_source]
-			if entry then
-				entry.dismissed = true
-			end
-			state.result_win = nil
-			state.window_source = nil
-		end,
-	})
-
-	-- Free a source's result buffers when the source is deleted/wiped.
-	vim.api.nvim_create_autocmd({ "BufDelete", "BufWipeout" }, {
-		group = group,
-		callback = function(args)
-			if state.results_by_source[args.buf] then
-				delete_results_for(args.buf)
-			end
-		end,
-	})
 end
 
 return M

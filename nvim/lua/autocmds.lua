@@ -100,6 +100,44 @@ autocmd("FileType", {
 	desc = "Lazy-load Trino module on first SQL file",
 })
 
+-- Trino: per-file result scoping. Wired via lifecycle hooks on the module so
+-- the plugin file stays free of autocmd setup. Guarded by `package.loaded` so
+-- these autocmds don't trigger the lazy-load — only FileType=sql should do that.
+local trino_scope = augroup("trino_results_scope", { clear = true })
+
+autocmd("BufEnter", {
+	group = trino_scope,
+	callback = function(args)
+		if vim.bo[args.buf].filetype ~= "sql" then
+			return
+		end
+		if package.loaded["helpers.trino"] then
+			require("helpers.trino").on_buf_enter(args.buf)
+		end
+	end,
+	desc = "Trino: swap result split to current SQL file",
+})
+
+autocmd("WinClosed", {
+	group = trino_scope,
+	callback = function(args)
+		if package.loaded["helpers.trino"] then
+			require("helpers.trino").on_win_closed(tonumber(args.match))
+		end
+	end,
+	desc = "Trino: track dismissal of result split",
+})
+
+autocmd({ "BufDelete", "BufWipeout" }, {
+	group = trino_scope,
+	callback = function(args)
+		if package.loaded["helpers.trino"] then
+			require("helpers.trino").on_source_wiped(args.buf)
+		end
+	end,
+	desc = "Trino: free result buffers when source is wiped",
+})
+
 -- Trino results: set filetype, insert empty lines for top and bottom borders, disable wrap
 autocmd("BufWinEnter", {
 	group = augroup("trino_results", { clear = true }),
@@ -128,4 +166,3 @@ autocmd("TextYankPost", {
 	end,
 	desc = "Highlight on yank",
 })
-
