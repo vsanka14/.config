@@ -1,10 +1,12 @@
 return {
 	{
 		"nvim-treesitter/nvim-treesitter",
+		-- repo archived; main is an incompatible rewrite, pin to legacy master.
+		branch = "master",
 		build = ":TSUpdate",
 		event = { "BufReadPost", "BufNewFile" },
 		dependencies = {
-			"nvim-treesitter/nvim-treesitter-textobjects",
+			{ "nvim-treesitter/nvim-treesitter-textobjects", branch = "master" },
 		},
 		opts = {
 			ensure_installed = {
