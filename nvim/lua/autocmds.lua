@@ -103,7 +103,7 @@ autocmd("FileType", {
 -- Trino results: set filetype, insert empty lines for top and bottom borders, disable wrap
 autocmd("BufWinEnter", {
 	group = augroup("trino_results", { clear = true }),
-	pattern = "trino://results/*",
+	pattern = "trino://*",
 	callback = function(args)
 		local buf = args.buf
 		if vim.b[buf].trino_borders_added then

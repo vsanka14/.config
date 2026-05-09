@@ -14,12 +14,11 @@
 --   :TrinoCluster [name]   Switch cluster. Interactive picker if no arg.
 --   :TrinoCancel           Cancel the running query
 --   :TrinoHeadlessUser [u] Set li_authorization_user. Prompt if no arg.
---   :TrinoNext / TrinoPrev Cycle through result buffers
+--   :TrinoNext / TrinoPrev Cycle through result buffers for the current SQL file
 --
--- Multi-statement files: the trino CLI runs all `;`-separated statements in
--- order and emits each result table separated by a blank line. We split the
--- single stdout stream on those blank lines and present one result buffer per
--- query, navigable via :TrinoNext / :TrinoPrev.
+-- Result buffers are scoped per source SQL buffer. Switching to a different
+-- SQL file swaps the result split's contents (or closes it if that file has
+-- no stored results). Switching back swaps the previous results back in.
 
 local M = {}
 
@@ -28,8 +27,11 @@ local state = {
 	start_time = nil,
 	headless_user = nil,
 	current_job = nil,
-	result_buffers = {},
+	-- Per-source results: src_buf (number) -> { buffers = { {buf, index}, ... } }
+	results_by_source = {},
+	-- Single shared split window. Its content is whichever source it's "showing".
 	result_win = nil,
+	window_source = nil,
 	split_height_pct = 50,
 }
 
@@ -44,47 +46,61 @@ local function get_visual_selection()
 	return table.concat(lines, "\n")
 end
 
-local function get_buffer_content()
-	local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+local function get_buffer_content(buf)
+	local lines = vim.api.nvim_buf_get_lines(buf or 0, 0, -1, false)
 	return table.concat(lines, "\n")
 end
 
 -- ============================================================================
--- Result Buffer Management
+-- Result Buffer Management (per-source)
 -- ============================================================================
 
 local function is_result_win_valid()
 	return state.result_win and vim.api.nvim_win_is_valid(state.result_win)
 end
 
-local function create_result_buffer(index, lines)
-	local buf = vim.api.nvim_create_buf(false, true)
-	if buf == 0 then
-		vim.notify("Failed to create result buffer", vim.log.levels.ERROR, { title = "Trino" })
+local function entry_buffers(src_buf)
+	local entry = state.results_by_source[src_buf]
+	return entry and entry.buffers or {}
+end
+
+local function close_result_window()
+	if is_result_win_valid() then
+		vim.api.nvim_win_close(state.result_win, true)
+	end
+	state.result_win = nil
+	state.window_source = nil
+end
+
+local function delete_results_for(src_buf)
+	local entry = state.results_by_source[src_buf]
+	if not entry then
 		return
 	end
-
-	pcall(vim.api.nvim_buf_set_name, buf, string.format("trino://results/%d", index))
-	vim.bo[buf].buftype = "nofile"
-	vim.bo[buf].bufhidden = "hide"
-	vim.bo[buf].swapfile = false
-
-	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-	vim.bo[buf].modifiable = false
-
-	table.insert(state.result_buffers, { buf = buf, index = index })
+	for _, e in ipairs(entry.buffers) do
+		if vim.api.nvim_buf_is_valid(e.buf) then
+			pcall(vim.api.nvim_buf_delete, e.buf, { force = true })
+		end
+	end
+	state.results_by_source[src_buf] = nil
+	if state.window_source == src_buf then
+		close_result_window()
+	end
 end
 
 local function get_result_winbar()
-	if #state.result_buffers == 0 or not is_result_win_valid() then
+	if not is_result_win_valid() or not state.window_source then
 		return ""
 	end
-
+	local buffers = entry_buffers(state.window_source)
+	if #buffers == 0 then
+		return ""
+	end
 	local current_buf = vim.api.nvim_win_get_buf(state.result_win)
 	local parts = {}
-	for _, entry in ipairs(state.result_buffers) do
-		local hl = (entry.buf == current_buf) and "%#TabLineSel#" or "%#TabLine#"
-		table.insert(parts, string.format("%s %d %%*", hl, entry.index))
+	for _, e in ipairs(buffers) do
+		local hl = (e.buf == current_buf) and "%#TabLineSel#" or "%#TabLine#"
+		table.insert(parts, string.format("%s %d %%*", hl, e.index))
 	end
 	return table.concat(parts, "%#TabLineFill#|")
 end
@@ -95,56 +111,49 @@ local function refresh_result_winbar()
 	end
 end
 
-local function clear_result_buffers()
-	if is_result_win_valid() then
-		vim.api.nvim_win_close(state.result_win, true)
-	end
-	state.result_win = nil
-
-	for _, entry in ipairs(state.result_buffers) do
-		if vim.api.nvim_buf_is_valid(entry.buf) then
-			pcall(vim.api.nvim_buf_delete, entry.buf, { force = true })
-		end
-	end
-	state.result_buffers = {}
-end
-
-local function switch_to_result(index)
-	if not is_result_win_valid() then
-		return
-	end
-	local entry = state.result_buffers[index]
-	if entry and vim.api.nvim_buf_is_valid(entry.buf) then
-		vim.api.nvim_win_set_buf(state.result_win, entry.buf)
-		refresh_result_winbar()
-	end
-end
-
-local function get_current_result_index()
-	if not is_result_win_valid() then
-		return nil
-	end
-	local current_buf = vim.api.nvim_win_get_buf(state.result_win)
-	for i, entry in ipairs(state.result_buffers) do
-		if entry.buf == current_buf then
-			return i
-		end
-	end
-	return nil
-end
-
-local function open_result_split()
-	if #state.result_buffers == 0 then
+local function create_result_buffer(src_buf, index, lines)
+	local buf = vim.api.nvim_create_buf(false, true)
+	if buf == 0 then
+		vim.notify("Failed to create result buffer", vim.log.levels.ERROR, { title = "Trino" })
 		return
 	end
 
-	local first_entry = state.result_buffers[1]
-	if not vim.api.nvim_buf_is_valid(first_entry.buf) then
+	local src_name = vim.api.nvim_buf_get_name(src_buf)
+	local short = src_name ~= "" and vim.fn.fnamemodify(src_name, ":t") or ("buf" .. src_buf)
+	pcall(vim.api.nvim_buf_set_name, buf, string.format("trino://%s/%d", short, index))
+	vim.bo[buf].buftype = "nofile"
+	vim.bo[buf].bufhidden = "hide"
+	vim.bo[buf].swapfile = false
+
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+	vim.bo[buf].modifiable = false
+
+	local entry = state.results_by_source[src_buf]
+	if not entry then
+		entry = { buffers = {} }
+		state.results_by_source[src_buf] = entry
+	end
+	table.insert(entry.buffers, { buf = buf, index = index })
+end
+
+-- Show the result split for src_buf, or close it if src_buf has no results.
+local function show_results_for(src_buf)
+	local buffers = entry_buffers(src_buf)
+	if #buffers == 0 then
+		close_result_window()
+		return
+	end
+
+	local first = buffers[1].buf
+	if not vim.api.nvim_buf_is_valid(first) then
 		return
 	end
 
 	if is_result_win_valid() then
-		vim.api.nvim_win_set_buf(state.result_win, first_entry.buf)
+		if state.window_source ~= src_buf then
+			vim.api.nvim_win_set_buf(state.result_win, first)
+			state.window_source = src_buf
+		end
 		refresh_result_winbar()
 		return
 	end
@@ -154,7 +163,8 @@ local function open_result_split()
 
 	vim.cmd(string.format("botright %dsplit", split_height))
 	state.result_win = vim.api.nvim_get_current_win()
-	vim.api.nvim_win_set_buf(state.result_win, first_entry.buf)
+	vim.api.nvim_win_set_buf(state.result_win, first)
+	state.window_source = src_buf
 
 	refresh_result_winbar()
 
@@ -163,30 +173,57 @@ local function open_result_split()
 	end
 end
 
+local function get_current_result_index()
+	if not is_result_win_valid() or not state.window_source then
+		return nil
+	end
+	local current_buf = vim.api.nvim_win_get_buf(state.result_win)
+	for i, e in ipairs(entry_buffers(state.window_source)) do
+		if e.buf == current_buf then
+			return i
+		end
+	end
+	return nil
+end
+
+local function switch_to_result(index)
+	if not is_result_win_valid() or not state.window_source then
+		return
+	end
+	local buffers = entry_buffers(state.window_source)
+	local e = buffers[index]
+	if e and vim.api.nvim_buf_is_valid(e.buf) then
+		vim.api.nvim_win_set_buf(state.result_win, e.buf)
+		refresh_result_winbar()
+	end
+end
+
 local function trino_next_result()
-	if #state.result_buffers == 0 then
+	if not state.window_source or #entry_buffers(state.window_source) == 0 then
 		vim.notify("No result buffers available", vim.log.levels.WARN, { title = "Trino" })
 		return
 	end
 	if not is_result_win_valid() then
-		open_result_split()
+		show_results_for(state.window_source)
 		return
 	end
+	local total = #entry_buffers(state.window_source)
 	local current_idx = get_current_result_index() or 0
-	switch_to_result((current_idx % #state.result_buffers) + 1)
+	switch_to_result((current_idx % total) + 1)
 end
 
 local function trino_prev_result()
-	if #state.result_buffers == 0 then
+	if not state.window_source or #entry_buffers(state.window_source) == 0 then
 		vim.notify("No result buffers available", vim.log.levels.WARN, { title = "Trino" })
 		return
 	end
 	if not is_result_win_valid() then
-		open_result_split()
+		show_results_for(state.window_source)
 		return
 	end
+	local total = #entry_buffers(state.window_source)
 	local current_idx = get_current_result_index() or 1
-	switch_to_result(((current_idx - 2) % #state.result_buffers) + 1)
+	switch_to_result(((current_idx - 2) % total) + 1)
 end
 
 -- ============================================================================
@@ -248,26 +285,32 @@ local function format_elapsed()
 	return string.format(" (%dms)", elapsed_ms)
 end
 
-local function show_error(message)
-	clear_result_buffers()
-	create_result_buffer(1, vim.split(message, "\n"))
-	open_result_split()
+local function show_error_for(src_buf, message)
+	delete_results_for(src_buf)
+	create_result_buffer(src_buf, 1, vim.split(message, "\n"))
+	-- Only swap the split if the user is currently focused on this source.
+	-- Otherwise the buffers stay in the map and will appear when they switch back.
+	if vim.api.nvim_get_current_buf() == src_buf then
+		show_results_for(src_buf)
+	end
 end
 
-local function show_results(out_lines)
+local function show_results_for_lines(src_buf, out_lines)
 	local chunks = split_output_chunks(out_lines)
 	if #chunks == 0 then
 		chunks = { { "Query returned no results." } }
 	end
 
-	clear_result_buffers()
+	delete_results_for(src_buf)
 	for i, chunk in ipairs(chunks) do
-		create_result_buffer(i, chunk)
+		create_result_buffer(src_buf, i, chunk)
 	end
-	open_result_split()
+	if vim.api.nvim_get_current_buf() == src_buf then
+		show_results_for(src_buf)
+	end
 end
 
-local function run_trino(sql, auth_user)
+local function run_trino(src_buf, sql, auth_user)
 	local base = vim.fn.tempname()
 	local query_file = base .. ".sql"
 	local out_file = base .. "_out.txt"
@@ -309,7 +352,7 @@ local function run_trino(sql, auth_user)
 				if state.cancelled then
 					vim.fn.delete(out_file)
 					vim.fn.delete(log_file)
-					show_error("Cancelled.")
+					show_error_for(src_buf, "Cancelled.")
 					vim.notify("Query cancelled" .. elapsed, vim.log.levels.WARN, { title = title })
 					return
 				end
@@ -319,7 +362,7 @@ local function run_trino(sql, auth_user)
 					local stderr = read_file_lines(log_file) or {}
 					vim.fn.delete(log_file)
 					local body = #stderr > 0 and table.concat(stderr, "\n") or ("Exit code " .. exit_code)
-					show_error(body)
+					show_error_for(src_buf, body)
 					vim.notify("Query failed" .. elapsed, vim.log.levels.ERROR, { title = title })
 					return
 				end
@@ -327,8 +370,8 @@ local function run_trino(sql, auth_user)
 				vim.fn.delete(log_file)
 				local out_lines = read_file_lines(out_file) or {}
 				vim.fn.delete(out_file)
-				show_results(out_lines)
-				local n = #state.result_buffers
+				show_results_for_lines(src_buf, out_lines)
+				local n = #entry_buffers(src_buf)
 				vim.notify(
 					string.format("%d result%s%s", n, n == 1 and "" or "s", elapsed),
 					vim.log.levels.INFO,
@@ -346,7 +389,7 @@ local function run_trino(sql, auth_user)
 	state.current_job = job_id
 end
 
-local function execute_trino_query(sql)
+local function execute_trino_query(src_buf, sql)
 	if not sql or sql:match("^%s*$") then
 		vim.notify("No SQL to execute", vim.log.levels.WARN, { title = "Trino" })
 		return
@@ -365,7 +408,7 @@ local function execute_trino_query(sql)
 	state.start_time = vim.loop.hrtime()
 
 	local function proceed(user)
-		run_trino(sql, user)
+		run_trino(src_buf, sql, user)
 	end
 
 	if not state.headless_user then
@@ -391,10 +434,11 @@ local function trino_run(args)
 		vim.notify("TrinoRun only works in .sql files", vim.log.levels.WARN, { title = "Trino" })
 		return
 	end
+	local src_buf = vim.api.nvim_get_current_buf()
 	if args.range > 0 then
-		execute_trino_query(get_visual_selection())
+		execute_trino_query(src_buf, get_visual_selection())
 	else
-		execute_trino_query(get_buffer_content())
+		execute_trino_query(src_buf, get_buffer_content(src_buf))
 	end
 end
 
@@ -488,6 +532,56 @@ function M.setup(opts)
 	})
 	vim.api.nvim_create_user_command("TrinoNext", trino_next_result, { desc = "Next Trino result buffer" })
 	vim.api.nvim_create_user_command("TrinoPrev", trino_prev_result, { desc = "Previous Trino result buffer" })
+
+	-- Per-file scoping: when entering a SQL buffer, swap the split to that
+	-- file's results (or close the split if it has none). Filtering on
+	-- filetype=="sql" means non-SQL buffers (the result buffers themselves,
+	-- terminals, docs) don't trigger any change.
+	local group = vim.api.nvim_create_augroup("TrinoResultsScope", { clear = true })
+	vim.api.nvim_create_autocmd("BufEnter", {
+		group = group,
+		callback = function(args)
+			if vim.bo[args.buf].filetype ~= "sql" then
+				return
+			end
+			local entry = state.results_by_source[args.buf]
+			if entry and not entry.dismissed then
+				show_results_for(args.buf)
+			else
+				close_result_window()
+			end
+		end,
+	})
+
+	-- When the user closes the result split (e.g. :q on it), mark its source
+	-- as dismissed so BufEnter doesn't immediately reopen the split. Running
+	-- a fresh query for that source clears the flag (delete_results_for wipes
+	-- the entry, the new entry has dismissed=false).
+	vim.api.nvim_create_autocmd("WinClosed", {
+		group = group,
+		callback = function(args)
+			local closed_win = tonumber(args.match)
+			if closed_win ~= state.result_win then
+				return
+			end
+			local entry = state.window_source and state.results_by_source[state.window_source]
+			if entry then
+				entry.dismissed = true
+			end
+			state.result_win = nil
+			state.window_source = nil
+		end,
+	})
+
+	-- Free a source's result buffers when the source is deleted/wiped.
+	vim.api.nvim_create_autocmd({ "BufDelete", "BufWipeout" }, {
+		group = group,
+		callback = function(args)
+			if state.results_by_source[args.buf] then
+				delete_results_for(args.buf)
+			end
+		end,
+	})
 end
 
 return M
