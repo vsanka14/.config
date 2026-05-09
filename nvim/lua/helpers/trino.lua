@@ -1,6 +1,6 @@
 -- trino.lua — Run Trino SQL queries from Neovim
 --
--- Dependencies: `trino` CLI (LinkedIn), `:TSInstall sql` (Tree-sitter parser)
+-- Dependencies: `trino` CLI (LinkedIn).
 --
 -- Setup:
 --   require("trino").setup({
@@ -12,37 +12,22 @@
 -- Commands:
 --   :TrinoRun              Run whole buffer, or visual selection
 --   :TrinoCluster [name]   Switch cluster. Interactive picker if no arg.
---   :TrinoCancel           Cancel all running queries
+--   :TrinoCancel           Cancel the running query
 --   :TrinoHeadlessUser [u] Set li_authorization_user. Prompt if no arg.
---   :TrinoAuth [cluster]   SSO auth in background (`trino auth setup`)
 --   :TrinoNext / TrinoPrev Cycle through result buffers
 --
--- Suggested keymaps:
---   vim.keymap.set("n", "<Leader>qr", "<cmd>TrinoRun<cr>")
---   vim.keymap.set("v", "<Leader>qr", ":TrinoRun<cr>")
---   vim.keymap.set("n", "<Leader>qc", "<cmd>TrinoCluster<cr>")
---   vim.keymap.set("n", "<Leader>qu", "<cmd>TrinoHeadlessUser<cr>")
---   vim.keymap.set("n", "<Leader>qa", "<cmd>TrinoAuth<cr>")
---   vim.keymap.set("n", "<Leader>qx", "<cmd>TrinoCancel<cr>")
---   vim.keymap.set("n", "<Leader>qn", "<cmd>TrinoNext<cr>")
---   vim.keymap.set("n", "<Leader>qp", "<cmd>TrinoPrev<cr>")
---
--- Result buffers use the scheme trino://results/* and contain plain-text tables.
--- You may want an autocmd to disable wrap or add padding for these buffers.
+-- Multi-statement files: the trino CLI runs all `;`-separated statements in
+-- order and emits each result table separated by a blank line. We split the
+-- single stdout stream on those blank lines and present one result buffer per
+-- query, navigable via :TrinoNext / :TrinoPrev.
 
 local M = {}
 
--- ============================================================================
--- State Management
--- ============================================================================
 local state = {
 	cluster = "holdem",
 	start_time = nil,
 	headless_user = nil,
 	current_job = nil,
-	failed_queries = {},
-	total_queries = 0,
-	completed_count = 0,
 	result_buffers = {},
 	result_win = nil,
 	split_height_pct = 50,
@@ -65,73 +50,6 @@ local function get_buffer_content()
 end
 
 -- ============================================================================
--- SQL Parsing with Tree-sitter
--- ============================================================================
-
-local function split_queries(sql)
-	local ok, parser = pcall(vim.treesitter.get_string_parser, sql, "sql")
-	if not ok then
-		vim.notify(
-			"SQL Tree-sitter parser not available. Run :TSInstall sql",
-			vim.log.levels.ERROR,
-			{ title = "Trino" }
-		)
-		return {}
-	end
-
-	local trees = parser:parse()
-	if not trees or #trees == 0 then
-		return {}
-	end
-
-	local root = trees[1]:root()
-	local queries = {}
-	local cursor = 0 -- 0-indexed byte offset into sql
-
-	-- Walk the tree and slice the original SQL between `;` tokens. We rely on
-	-- tree-sitter only to locate terminators (which it identifies reliably even
-	-- inside strings/comments), not on `statement` node boundaries — a partial
-	-- parse of Trino-dialect syntax can otherwise fragment one statement into
-	-- several and produce stray semicolons mid-query.
-	local function is_semicolon(node)
-		-- Grammar-agnostic: some tree-sitter-sql variants name the token ";",
-		-- others "semicolon". Fall back to leaf-text comparison so either works.
-		if node:child_count() ~= 0 then
-			return false
-		end
-		local t = node:type()
-		if t == ";" or t == "semicolon" then
-			return true
-		end
-		return vim.treesitter.get_node_text(node, sql) == ";"
-	end
-
-	local function walk(node)
-		for child in node:iter_children() do
-			if is_semicolon(child) then
-				local _, _, end_byte = child:end_()
-				local text = (vim.trim(sql:sub(cursor + 1, end_byte)):gsub(";%s*$", ""))
-				if text ~= "" and text ~= ";" then
-					table.insert(queries, { index = #queries + 1, text = text })
-				end
-				cursor = end_byte
-			else
-				walk(child)
-			end
-		end
-	end
-
-	walk(root)
-
-	local tail = (vim.trim(sql:sub(cursor + 1)):gsub(";%s*$", ""))
-	if tail ~= "" then
-		table.insert(queries, { index = #queries + 1, text = tail })
-	end
-
-	return queries
-end
-
--- ============================================================================
 -- Result Buffer Management
 -- ============================================================================
 
@@ -147,7 +65,6 @@ local function create_result_buffer(index, lines)
 	end
 
 	pcall(vim.api.nvim_buf_set_name, buf, string.format("trino://results/%d", index))
-
 	vim.bo[buf].buftype = "nofile"
 	vim.bo[buf].bufhidden = "hide"
 	vim.bo[buf].swapfile = false
@@ -159,39 +76,22 @@ local function create_result_buffer(index, lines)
 end
 
 local function get_result_winbar()
-	if #state.result_buffers == 0 then
-		return ""
-	end
-	if not is_result_win_valid() then
+	if #state.result_buffers == 0 or not is_result_win_valid() then
 		return ""
 	end
 
 	local current_buf = vim.api.nvim_win_get_buf(state.result_win)
 	local parts = {}
-
 	for _, entry in ipairs(state.result_buffers) do
-		local is_current = entry.buf == current_buf
-		local hl = is_current and "%#TabLineSel#" or "%#TabLine#"
+		local hl = (entry.buf == current_buf) and "%#TabLineSel#" or "%#TabLine#"
 		table.insert(parts, string.format("%s %d %%*", hl, entry.index))
 	end
-
 	return table.concat(parts, "%#TabLineFill#|")
 end
 
 local function refresh_result_winbar()
 	if is_result_win_valid() then
 		vim.wo[state.result_win].winbar = get_result_winbar()
-	end
-end
-
-local function switch_to_result(index)
-	if not is_result_win_valid() then
-		return
-	end
-	local entry = state.result_buffers[index]
-	if entry and vim.api.nvim_buf_is_valid(entry.buf) then
-		vim.api.nvim_win_set_buf(state.result_win, entry.buf)
-		refresh_result_winbar()
 	end
 end
 
@@ -207,6 +107,17 @@ local function clear_result_buffers()
 		end
 	end
 	state.result_buffers = {}
+end
+
+local function switch_to_result(index)
+	if not is_result_win_valid() then
+		return
+	end
+	local entry = state.result_buffers[index]
+	if entry and vim.api.nvim_buf_is_valid(entry.buf) then
+		vim.api.nvim_win_set_buf(state.result_win, entry.buf)
+		refresh_result_winbar()
+	end
 end
 
 local function get_current_result_index()
@@ -305,212 +216,134 @@ local function read_file_lines(path)
 	return lines
 end
 
-local function strip_network_log(lines)
-	local clean = {}
-	local in_block = false
+-- Trino's --output table emits a single empty line between consecutive query
+-- results. Slice on blank lines so each query gets its own buffer.
+local function split_output_chunks(lines)
+	local chunks = {}
+	local current = {}
 	for _, line in ipairs(lines) do
-		if line:match("^%-%-> ") or line:match("^<%-%- %d+") then
-			in_block = true
-		elseif line:match("^<%-%- END HTTP") then
-			in_block = false
-		elseif
-			not in_block
-			and not line:match("^org%.jline")
-			and not line:match("^WARNING: Unable to create a system terminal")
-		then
-			table.insert(clean, line)
+		if line == "" then
+			if #current > 0 then
+				table.insert(chunks, current)
+				current = {}
+			end
+		else
+			table.insert(current, line)
 		end
 	end
-	return clean
+	if #current > 0 then
+		table.insert(chunks, current)
+	end
+	return chunks
 end
 
-local function run_single_query(query_info, auth_user, on_complete)
+local function format_elapsed()
+	if not state.start_time then
+		return ""
+	end
+	local elapsed_ms = (vim.loop.hrtime() - state.start_time) / 1e6
+	if elapsed_ms > 1000 then
+		return string.format(" (%.1fs)", elapsed_ms / 1000)
+	end
+	return string.format(" (%dms)", elapsed_ms)
+end
+
+local function show_error(message)
+	clear_result_buffers()
+	create_result_buffer(1, vim.split(message, "\n"))
+	open_result_split()
+end
+
+local function show_results(out_lines)
+	local chunks = split_output_chunks(out_lines)
+	if #chunks == 0 then
+		chunks = { { "Query returned no results." } }
+	end
+
+	clear_result_buffers()
+	for i, chunk in ipairs(chunks) do
+		create_result_buffer(i, chunk)
+	end
+	open_result_split()
+end
+
+local function run_trino(sql, auth_user)
 	local base = vim.fn.tempname()
 	local query_file = base .. ".sql"
-	local temp_output_file = base .. "_output.txt"
-	local temp_log_file = base .. "_log.txt"
+	local out_file = base .. "_out.txt"
+	local log_file = base .. "_log.txt"
 
-	if not write_file(query_file, query_info.text) then
-		on_complete(false, "Failed to write query file", nil)
+	-- Trino CLI errors on a trailing `;` when the file contains a single
+	-- statement (it's expecting EOF). Inner `;` separators are fine, so we
+	-- only strip the very last one.
+	local sql_to_run = (sql:gsub(";%s*$", ""))
+
+	if not write_file(query_file, sql_to_run) then
+		vim.notify("Failed to write query file", vim.log.levels.ERROR, { title = "Trino" })
 		return
 	end
 
-	vim.fn.delete(temp_output_file)
-	vim.fn.delete(temp_log_file)
+	local trino_cmd = string.format(
+		"trino query -c %s -f %s -u %s --sso --interactive --browser --output table > %s 2> %s",
+		state.cluster,
+		query_file,
+		auth_user,
+		out_file,
+		log_file
+	)
 
-	local trino_cmd =
-		string.format("trino query -c %s -f %s -u %s --sso --output table", state.cluster, query_file, auth_user)
-	trino_cmd = trino_cmd .. string.format(" > %s 2> %s", temp_output_file, temp_log_file)
+	vim.notify(
+		string.format("Executing on %s...", state.cluster),
+		vim.log.levels.INFO,
+		{ title = "Trino" }
+	)
 
-	local cmd = { "sh", "-c", trino_cmd }
-
-	local job_id = vim.fn.jobstart(cmd, {
+	local job_id = vim.fn.jobstart({ "sh", "-c", trino_cmd }, {
 		on_exit = function(_, exit_code)
 			vim.schedule(function()
 				state.current_job = nil
 
-				local log_lines = read_file_lines(temp_log_file) or {}
-				vim.fn.delete(temp_log_file)
+				local elapsed = format_elapsed()
+				local title = "Trino [" .. state.cluster .. "]"
 
-				local clean_lines = strip_network_log(log_lines)
-				local clean_log = table.concat(clean_lines, "\n")
-
-				local function extract_error(content)
-					local error_start = content:match("(Query [%w_]+ failed.*)$")
-						or content:match("(FAILED.*)$")
-						or content:match("(Error:.*)$")
-					return error_start or content
+				if state.cancelled then
+					vim.fn.delete(out_file)
+					vim.fn.delete(log_file)
+					show_error("Cancelled.")
+					vim.notify("Query cancelled" .. elapsed, vim.log.levels.WARN, { title = title })
+					return
 				end
 
-				local function query_has_errors(content)
-					return content:match("Query [%w_]+ failed") or content:match("FAILED")
+				if exit_code ~= 0 then
+					vim.fn.delete(out_file)
+					local stderr = read_file_lines(log_file) or {}
+					vim.fn.delete(log_file)
+					local body = #stderr > 0 and table.concat(stderr, "\n") or ("Exit code " .. exit_code)
+					show_error(body)
+					vim.notify("Query failed" .. elapsed, vim.log.levels.ERROR, { title = title })
+					return
 				end
 
-				local function is_auth_error(content)
-					return content:match("Authentication error")
-						or content:match("invalid SSO token")
-						or content:match("DataVault token")
-						or content:match("Unable to parse bearer token")
-						or content:match("SSO authentication required")
-				end
-
-				local has_error = exit_code ~= 0 or query_has_errors(clean_log)
-
-				if exit_code == 4 or is_auth_error(clean_log) then
-					vim.fn.delete(temp_output_file)
-					on_complete(
-						false,
-						"SSO token expired or missing. Run :TrinoAuth to re-authenticate",
-						nil
-					)
-				elseif has_error then
-					vim.fn.delete(temp_output_file)
-					on_complete(false, clean_log ~= "" and extract_error(clean_log) or "Unknown error", nil)
-				else
-					local result_lines = read_file_lines(temp_output_file)
-					vim.fn.delete(temp_output_file)
-					if (not result_lines or #result_lines == 0) and query_has_errors(clean_log) then
-						on_complete(false, extract_error(clean_log), nil)
-					elseif not result_lines or #result_lines == 0 then
-						on_complete(false, "Query returned no results\n\n" .. clean_log, nil)
-					else
-						on_complete(true, nil, result_lines)
-					end
-				end
+				vim.fn.delete(log_file)
+				local out_lines = read_file_lines(out_file) or {}
+				vim.fn.delete(out_file)
+				show_results(out_lines)
+				local n = #state.result_buffers
+				vim.notify(
+					string.format("%d result%s%s", n, n == 1 and "" or "s", elapsed),
+					vim.log.levels.INFO,
+					{ title = title }
+				)
 			end)
 		end,
 	})
 
 	if job_id <= 0 then
-		on_complete(false, "Failed to start job", nil)
+		vim.notify("Failed to start trino job", vim.log.levels.ERROR, { title = "Trino" })
 		return
 	end
 
 	state.current_job = job_id
-end
-
-local function run_queries_sequentially(queries, auth_user, on_all_complete)
-	if #queries == 0 then
-		on_all_complete()
-		return
-	end
-
-	state.total_queries = #queries
-	state.completed_count = 0
-	state.failed_queries = {}
-
-	local current_index = 1
-
-	local function run_next()
-		if state.cancelled or current_index > #queries then
-			on_all_complete()
-			return
-		end
-
-		local query_info = queries[current_index]
-
-		vim.notify(
-			string.format("Query %d/%d on %s...", state.completed_count + 1, state.total_queries, state.cluster),
-			vim.log.levels.INFO,
-			{ title = "Trino" }
-		)
-
-		run_single_query(query_info, auth_user, function(success, error_msg, result_lines)
-			if state.cancelled then
-				run_next()
-				return
-			end
-
-			state.completed_count = state.completed_count + 1
-			if not success then
-				table.insert(state.failed_queries, { index = query_info.index, error = error_msg })
-				create_result_buffer(query_info.index, vim.split(error_msg or "Unknown error", "\n"))
-			else
-				create_result_buffer(query_info.index, result_lines)
-			end
-
-			if not is_result_win_valid() then
-				open_result_split()
-			else
-				refresh_result_winbar()
-			end
-
-			current_index = current_index + 1
-			run_next()
-		end)
-	end
-
-	run_next()
-end
-
-local function show_results()
-	if state.cancelled then
-		local success_count = state.total_queries
-			- #state.failed_queries
-			- (state.total_queries - state.completed_count)
-		local cancelled_count = state.total_queries - state.completed_count
-		vim.notify(
-			string.format("%d/%d queries completed, %d cancelled", success_count, state.total_queries, cancelled_count),
-			vim.log.levels.WARN,
-			{ title = "Trino [" .. state.cluster .. "]" }
-		)
-		state.total_queries = 0
-		return
-	end
-
-	local success_count = state.total_queries - #state.failed_queries
-	local failed_count = #state.failed_queries
-
-	local elapsed = ""
-	if state.start_time then
-		local elapsed_ms = (vim.loop.hrtime() - state.start_time) / 1e6
-		if elapsed_ms > 1000 then
-			elapsed = string.format(" (%.1fs)", elapsed_ms / 1000)
-		else
-			elapsed = string.format(" (%dms)", elapsed_ms)
-		end
-	end
-
-	local msg
-	if state.total_queries == 0 then
-		msg = "No data queries to execute"
-	elseif failed_count == 0 then
-		msg = string.format("%d/%d queries completed%s", success_count, state.total_queries, elapsed)
-	else
-		msg = string.format(
-			"%d/%d queries completed, %d failed%s",
-			success_count,
-			state.total_queries,
-			failed_count,
-			elapsed
-		)
-	end
-
-	vim.notify(
-		msg,
-		failed_count > 0 and vim.log.levels.WARN or vim.log.levels.INFO,
-		{ title = "Trino [" .. state.cluster .. "]" }
-	)
 end
 
 local function execute_trino_query(sql)
@@ -520,31 +353,23 @@ local function execute_trino_query(sql)
 	end
 
 	if state.current_job then
-		vim.notify("Query already running. Cancel it first with :TrinoCancel", vim.log.levels.WARN, { title = "Trino" })
+		vim.notify(
+			"Query already running. Cancel it first with :TrinoCancel",
+			vim.log.levels.WARN,
+			{ title = "Trino" }
+		)
 		return
 	end
 
-	local queries = split_queries(sql)
-	if #queries == 0 then
-		vim.notify("No valid SQL queries found", vim.log.levels.WARN, { title = "Trino" })
-		return
-	end
-
-	clear_result_buffers()
 	state.cancelled = false
 	state.start_time = vim.loop.hrtime()
 
 	local function proceed(user)
-		vim.notify(string.format("Executing queries on %s...", state.cluster), vim.log.levels.INFO, { title = "Trino" })
-		run_queries_sequentially(queries, user, function()
-			show_results()
-		end)
+		run_trino(sql, user)
 	end
 
 	if not state.headless_user then
-		vim.ui.input({
-			prompt = "Auth user (li_authorization_user): ",
-		}, function(input)
+		vim.ui.input({ prompt = "Auth user (li_authorization_user): " }, function(input)
 			if not input or input == "" then
 				vim.notify("Auth user is required", vim.log.levels.WARN, { title = "Trino" })
 				return
@@ -573,11 +398,12 @@ local function trino_run(args)
 	end
 end
 
+local VALID_CLUSTERS = { holdem = true, war = true, faro = true }
+
 local function trino_cluster(args)
 	local cluster = args.args
 	if cluster and cluster ~= "" then
-		local valid_clusters = { holdem = true, war = true, faro = true }
-		if valid_clusters[cluster] then
+		if VALID_CLUSTERS[cluster] then
 			state.cluster = cluster
 			vim.notify("Trino cluster set to: " .. cluster, vim.log.levels.INFO, { title = "Trino" })
 		else
@@ -599,15 +425,13 @@ local function trino_cluster(args)
 end
 
 local function trino_cancel()
-	if not state.current_job and state.total_queries == 0 then
+	if not state.current_job then
 		vim.notify("No running query to cancel", vim.log.levels.WARN, { title = "Trino" })
 		return
 	end
 	state.cancelled = true
-	if state.current_job then
-		vim.fn.jobstop(state.current_job)
-		state.current_job = nil
-	end
+	vim.fn.jobstop(state.current_job)
+	state.current_job = nil
 	state.start_time = nil
 end
 
@@ -629,78 +453,8 @@ local function trino_auth_user(args)
 	end
 end
 
-local function trino_auth(args)
-	local cluster = (args.args ~= "" and args.args) or state.cluster
-	local valid_clusters = { holdem = true, war = true, faro = true }
-	if not valid_clusters[cluster] then
-		vim.notify("Invalid cluster. Use: holdem, war, or faro", vim.log.levels.ERROR, { title = "Trino" })
-		return
-	end
-
-	if state.auth_job then
-		vim.notify(
-			"Trino auth already in progress — complete it in your browser",
-			vim.log.levels.WARN,
-			{ title = "Trino" }
-		)
-		return
-	end
-
-	-- `-y` skips the confirmation prompt, `--interactive` forces the browser
-	-- SSO flow even though stdin is not a TTY (auto-detect would otherwise
-	-- pick --no-interactive and skip the flow), `--browser` auto-opens the
-	-- SSO URL. The CLI then waits silently for the OAuth callback.
-	local cmd = "trino auth setup -y --interactive --browser -c " .. vim.fn.shellescape(cluster)
-
-	local output_lines = {}
-
-	local function capture(_, data)
-		for _, line in ipairs(data or {}) do
-			if line ~= "" then
-				table.insert(output_lines, line)
-			end
-		end
-	end
-
-	local jid = vim.fn.jobstart(cmd, {
-		on_stdout = capture,
-		on_stderr = capture,
-		on_exit = function(_, exit_code)
-			vim.schedule(function()
-				state.auth_job = nil
-				if exit_code == 0 then
-					vim.notify(
-						"Trino auth complete for " .. cluster,
-						vim.log.levels.INFO,
-						{ title = "Trino" }
-					)
-				else
-					local tail = table.concat(output_lines, "\n")
-					vim.notify(
-						string.format("Trino auth failed (exit %d)\n%s", exit_code, tail),
-						vim.log.levels.ERROR,
-						{ title = "Trino" }
-					)
-				end
-			end)
-		end,
-	})
-
-	if jid <= 0 then
-		vim.notify("Failed to start trino auth", vim.log.levels.ERROR, { title = "Trino" })
-		return
-	end
-
-	state.auth_job = jid
-	vim.notify(
-		"Trino SSO auth started for " .. cluster .. " — complete it in your browser",
-		vim.log.levels.INFO,
-		{ title = "Trino" }
-	)
-end
-
 -- ============================================================================
--- Setup: register commands and SQL-file keymaps
+-- Setup
 -- ============================================================================
 
 function M.setup(opts)
@@ -715,7 +469,6 @@ function M.setup(opts)
 		state.split_height_pct = opts.split_height_pct
 	end
 
-	-- User commands
 	vim.api.nvim_create_user_command(
 		"TrinoRun",
 		trino_run,
@@ -732,13 +485,6 @@ function M.setup(opts)
 	vim.api.nvim_create_user_command("TrinoHeadlessUser", trino_auth_user, {
 		nargs = "?",
 		desc = "Set Trino authorization user",
-	})
-	vim.api.nvim_create_user_command("TrinoAuth", trino_auth, {
-		nargs = "?",
-		complete = function()
-			return { "holdem", "war", "faro" }
-		end,
-		desc = "Authenticate (SSO) for a Trino cluster in the background",
 	})
 	vim.api.nvim_create_user_command("TrinoNext", trino_next_result, { desc = "Next Trino result buffer" })
 	vim.api.nvim_create_user_command("TrinoPrev", trino_prev_result, { desc = "Previous Trino result buffer" })
