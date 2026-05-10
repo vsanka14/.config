@@ -1,11 +1,12 @@
 return {
 	{
 		"nvim-treesitter/nvim-treesitter",
+		-- repo archived; main is an incompatible rewrite, pin to legacy master.
+		branch = "master",
 		build = ":TSUpdate",
 		event = { "BufReadPost", "BufNewFile" },
 		dependencies = {
-			"nvim-treesitter/nvim-treesitter-textobjects",
-			"windwp/nvim-ts-autotag",
+			{ "nvim-treesitter/nvim-treesitter-textobjects", branch = "master" },
 		},
 		opts = {
 			ensure_installed = {
@@ -32,8 +33,7 @@ return {
 			},
 			highlight = { enable = true },
 			indent = { enable = true },
-			autotag = { enable = true },
-			textobjects = {
+				textobjects = {
 				select = {
 					enable = true,
 					lookahead = true,
@@ -63,5 +63,10 @@ return {
 		config = function(_, opts)
 			require("nvim-treesitter.configs").setup(opts)
 		end,
+	},
+	{
+		"windwp/nvim-ts-autotag",
+		event = { "BufReadPost", "BufNewFile" },
+		opts = {},
 	},
 }

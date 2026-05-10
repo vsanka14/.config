@@ -6,6 +6,13 @@ map({ "n", "i", "v" }, "<C-s>", "<cmd>write<cr>", { desc = "Save file" })
 -- Redo with U
 map("n", "U", "<C-r>", { desc = "Redo" })
 
+-- Change without overwriting clipboard
+map({ "n", "v" }, "c", '"_c', { desc = "Change (no register)" })
+map("n", "C", '"_C', { desc = "Change to EOL (no register)" })
+
+-- Paste over selection without overwriting clipboard
+map("v", "p", '"_dP', { desc = "Paste over selection (no register)" })
+
 -- Centered scrolling
 map("n", "<C-d>", "<C-d>zz", { desc = "Scroll down (centered)" })
 map("n", "<C-u>", "<C-u>zz", { desc = "Scroll up (centered)" })
@@ -13,8 +20,11 @@ map("n", "<C-f>", "<C-f>zz", { desc = "Page down (centered)" })
 map("n", "<C-b>", "<C-b>zz", { desc = "Page up (centered)" })
 
 -- Buffer navigation
-map("n", "<Leader>bn", "<cmd>bnext<cr>", { desc = "Next buffer" })
-map("n", "<Leader>bp", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
+map("n", "<Leader>bj", function()
+	require("helpers.buffer-jump").jump()
+end, { desc = "Jump to buffer" })
+map("n", "<Leader>b.", "<cmd>bnext<cr>", { desc = "Next buffer" })
+map("n", "<Leader>b,", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
 map("n", "<Leader>bc", function()
 	local current = vim.api.nvim_get_current_buf()
 	for _, buf in ipairs(vim.api.nvim_list_bufs()) do
@@ -48,14 +58,14 @@ map("n", "<Leader>gp", function()
 	require("helpers.blame").open_pr()
 end, { desc = "Open blame PR in browser" })
 
--- Diffview
-map("n", "<Leader>gd", "<cmd>DiffviewOpen<cr>", { desc = "Git diff view" })
-map("n", "<Leader>gh", "<cmd>DiffviewFileHistory %<cr>", { desc = "File git history" })
-map("n", "<Leader>gH", "<cmd>DiffviewFileHistory<cr>", { desc = "Branch git history" })
-map("n", "<Leader>gx", "<cmd>DiffviewClose<cr>", { desc = "Close diff view" })
+-- CodeDiff
+map("n", "<Leader>gd", "<cmd>CodeDiff<cr>", { desc = "Git diff view" })
+map("n", "<Leader>gh", "<cmd>CodeDiff history<cr>", { desc = "File git history" })
+map("n", "<Leader>gH", "<cmd>CodeDiff history<cr>", { desc = "Branch git history" })
+map("n", "<Leader>gx", "<cmd>CodeDiff q<cr>", { desc = "Close diff view" })
 
 -- Lazygit
-map("n", "<Leader>gg", function()
+map("n", "<Leader>gl", function()
 	require("helpers.float-term").open("lazygit")
 end, { desc = "Open Lazygit" })
 
@@ -84,6 +94,9 @@ end, { desc = "File Explorer (yazi)" })
 map("n", "<Leader>yp", function()
 	require("helpers.yank").copy_path()
 end, { desc = "Copy file path" })
+map("n", "<Leader>yP", function()
+	require("helpers.yank").copy_abs_path()
+end, { desc = "Copy absolute file path" })
 map("n", "<Leader>yc", function()
 	require("helpers.yank").copy_path_line()
 end, { desc = "Copy file path:line" })
@@ -177,8 +190,8 @@ map("v", "<Leader>qr", ":TrinoRun<cr>", { desc = "Trino: Run selection" })
 map("n", "<Leader>qc", "<cmd>TrinoCluster<cr>", { desc = "Trino: Change cluster" })
 map("n", "<Leader>qu", "<cmd>TrinoHeadlessUser<cr>", { desc = "Trino: Change auth user" })
 map("n", "<Leader>qx", "<cmd>TrinoCancel<cr>", { desc = "Trino: Cancel query" })
-map("n", "<Leader>qn", "<cmd>TrinoNext<cr>", { desc = "Trino: Next result" })
-map("n", "<Leader>qp", "<cmd>TrinoPrev<cr>", { desc = "Trino: Previous result" })
+map("n", "<Leader>q.", "<cmd>TrinoNext<cr>", { desc = "Trino: Next result" })
+map("n", "<Leader>q,", "<cmd>TrinoPrev<cr>", { desc = "Trino: Previous result" })
 
 -- Clear search highlights
 map("n", "<Esc>", "<cmd>nohlsearch | redrawstatus<cr>", { desc = "Clear highlights" })

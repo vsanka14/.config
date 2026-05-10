@@ -28,32 +28,6 @@ autocmd("ColorScheme", {
 	desc = "Reapply italic highlights",
 })
 
--- Markdown: wrap + display-line navigation so gutter numbers match gj/gk movement
-autocmd("FileType", {
-	group = augroup("markdown_settings", { clear = true }),
-	pattern = { "markdown", "markdown.mdx" },
-	callback = function(args)
-		-- Trino result buffers use markdown filetype for table rendering but
-		-- have wrap disabled, so display-line mappings (gj/gk/g0/g$) don't apply
-		if vim.api.nvim_buf_get_name(args.buf):match("^trino://") then
-			return
-		end
-
-		vim.opt_local.wrap = true
-		vim.opt_local.linebreak = true
-		vim.opt_local.conceallevel = 2
-		vim.opt_local.concealcursor = "nc"
-		vim.opt_local.statuscolumn = "%=%{v:lua.require('helpers.display-lines').statuscolumn()}"
-
-		local opts = { buffer = true, silent = true }
-		vim.keymap.set({ "n", "v", "o" }, "j", "gj", opts)
-		vim.keymap.set({ "n", "v", "o" }, "k", "gk", opts)
-		vim.keymap.set({ "n", "v" }, "0", "g0", opts)
-		vim.keymap.set({ "n", "v" }, "$", "g$", opts)
-	end,
-	desc = "Markdown-specific options",
-})
-
 -- Glimmer unicode fix for .hbs files
 local glimmer_group = augroup("glimmer_unicode_fix", { clear = true })
 
@@ -126,10 +100,57 @@ autocmd("FileType", {
 	desc = "Lazy-load Trino module on first SQL file",
 })
 
+-- Trino: per-file result scoping. Wired via lifecycle hooks on the module so
+-- the plugin file stays free of autocmd setup. Guarded by `package.loaded` so
+-- these autocmds don't trigger the lazy-load — only FileType=sql should do that.
+local trino_scope = augroup("trino_results_scope", { clear = true })
+
+autocmd("BufEnter", {
+	group = trino_scope,
+	callback = function(args)
+		if vim.bo[args.buf].filetype ~= "sql" then
+			return
+		end
+		if not package.loaded["helpers.trino"] then
+			return
+		end
+		-- Defer: BufEnter can fire mid-close of another window (e.g. a
+		-- float-term closing focuses the SQL buf), and Neovim refuses to
+		-- create a split during an in-flight close (E242).
+		local buf = args.buf
+		vim.schedule(function()
+			if vim.api.nvim_buf_is_valid(buf) then
+				require("helpers.trino").on_buf_enter(buf)
+			end
+		end)
+	end,
+	desc = "Trino: swap result split to current SQL file",
+})
+
+autocmd("WinClosed", {
+	group = trino_scope,
+	callback = function(args)
+		if package.loaded["helpers.trino"] then
+			require("helpers.trino").on_win_closed(tonumber(args.match))
+		end
+	end,
+	desc = "Trino: track dismissal of result split",
+})
+
+autocmd({ "BufDelete", "BufWipeout" }, {
+	group = trino_scope,
+	callback = function(args)
+		if package.loaded["helpers.trino"] then
+			require("helpers.trino").on_source_wiped(args.buf)
+		end
+	end,
+	desc = "Trino: free result buffers when source is wiped",
+})
+
 -- Trino results: set filetype, insert empty lines for top and bottom borders, disable wrap
 autocmd("BufWinEnter", {
 	group = augroup("trino_results", { clear = true }),
-	pattern = "trino://results/*",
+	pattern = "trino://*",
 	callback = function(args)
 		local buf = args.buf
 		if vim.b[buf].trino_borders_added then

@@ -66,7 +66,7 @@ end
 
 function M.open_commit()
 	local entry = cache[vim.api.nvim_get_current_buf()]
-	if entry and entry.hash then vim.cmd("DiffviewOpen " .. entry.hash .. "^.." .. entry.hash) end
+	if entry and entry.hash then vim.cmd("CodeDiff " .. entry.hash .. "^.." .. entry.hash) end
 end
 
 function M.open_pr()

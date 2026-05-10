@@ -13,7 +13,6 @@ lua/
   statusline.lua  -- Custom statusline
   tabline.lua     -- Custom tabline
   lsp.lua         -- LSP configuration
-  trino.lua       -- Custom plugin for trino query support
   helpers/        -- Utility modules (git blame, floating terminal, icons, etc.)
   plugins/        -- Plugin specs loaded by lazy.nvim
 ```
