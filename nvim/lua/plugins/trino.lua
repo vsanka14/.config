@@ -1,6 +1,6 @@
 return {
-	dir = vim.fn.expand("~/code/trino.nvim"),
-	dev = true,
+	"linkedin-managed/trino.nvim",
+	url = "git@github.com:linkedin-managed/trino.nvim.git",
 	ft = "sql",
 	cmd = { "TrinoRun", "TrinoCluster", "TrinoCancel", "TrinoHeadlessUser", "TrinoNext", "TrinoPrev" },
 	opts = {
