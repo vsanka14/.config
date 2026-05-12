@@ -30,9 +30,9 @@ sketchybar --bar \
 
 # Default item settings
 sketchybar --default \
-    icon.font="$FONT:Bold:16.0" \
+    icon.font="$FONT:Bold:19.0" \
     icon.color=$FG_COLOR \
-    label.font="$FONT:Medium:12.0" \
+    label.font="$FONT:Medium:15.0" \
     label.color=$FG_COLOR \
     padding_left=4 \
     padding_right=4
