@@ -110,7 +110,7 @@ q = ['exec-and-forget open -a "QuickTime Player"', 'mode main', 'exec-and-forget
 a = ['exec-and-forget open -a "Activity Monitor"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 # Toggle screen recording (start/stop). On stop, prompts for a name and
 # re-encodes with ffmpeg to ~/Documents/screen-recordings/<name>.mov.
-r = ['exec-and-forget $HOME/.config/aerospace/scripts/screen-record-toggle.sh', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+r = ['exec-and-forget $HOME/.config/bin/screen-record-toggle', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 esc = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 enter = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 
