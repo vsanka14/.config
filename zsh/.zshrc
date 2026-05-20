@@ -58,8 +58,15 @@ else
   alias la='ls -lah --color=auto'
 fi
 
-# Oh My Posh prompt (tonybaloney theme - customized for tokyonight)
-eval "$(oh-my-posh init zsh --config ~/.config/ohmyposh-theme.json)"
+# Oh My Posh prompt (tonybaloney theme - customized for tokyonight).
+# Falls back to a plain tokyonight-colored prompt when oh-my-posh isn't
+# installed (e.g. on rdev, where the install script can't fetch binaries).
+if command -v oh-my-posh &> /dev/null; then
+  eval "$(oh-my-posh init zsh --config ~/.config/ohmyposh-theme.json)"
+else
+  setopt prompt_subst
+  PROMPT='%F{#7aa2f7}%n@%m%f %F{#bb9af7}%~%f %F{#7aa2f7}%#%f '
+fi
 
 # Tokyo Night fzf theme (from tokyonight.nvim extras)
 [ -f ~/.local/share/nvim/lazy/tokyonight.nvim/extras/fzf/tokyonight_night.sh ] && \
