@@ -195,3 +195,6 @@ map("n", "<Leader>q,", "<cmd>TrinoPrev<cr>", { desc = "Trino: Previous result" }
 
 -- Clear search highlights
 map("n", "<Esc>", "<cmd>nohlsearch | redrawstatus<cr>", { desc = "Clear highlights" })
+
+-- Zen mode (centered buffer, dimmed UI)
+map("n", "<Leader>z", "<cmd>ZenMode<cr>", { desc = "Toggle Zen Mode" })

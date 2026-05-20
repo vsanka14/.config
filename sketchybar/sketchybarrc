@@ -17,6 +17,10 @@ export FG_MUTED=0xff636da6            # Moon muted
 # Font
 FONT="JetBrainsMono Nerd Font"
 
+# Font sizes: uncomment one pair based on display
+ICON_SIZE=16.0;  LABEL_SIZE=12.0    # laptop
+# ICON_SIZE=19.0;  LABEL_SIZE=15.0  # external monitor
+
 # Bar appearance
 sketchybar --bar \
     height=32 \
@@ -30,9 +34,9 @@ sketchybar --bar \
 
 # Default item settings
 sketchybar --default \
-    icon.font="$FONT:Bold:16.0" \
+    icon.font="$FONT:Bold:$ICON_SIZE" \
     icon.color=$FG_COLOR \
-    label.font="$FONT:Medium:12.0" \
+    label.font="$FONT:Medium:$LABEL_SIZE" \
     label.color=$FG_COLOR \
     padding_left=4 \
     padding_right=4

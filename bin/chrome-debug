@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+# chrome-debug — launch a Chrome instance with the DevTools Protocol exposed,
+# print the chosen port to stdout so Claude / Playwright MCP can hook onto it.
+#
+# Several instances can run side-by-side: each launch picks a free port, and
+# the profile directory is the only thing that can collide. Pass an optional
+# name to keep a persistent profile (logins, cookies) across runs of the same
+# name; omit it to get a throwaway temp profile.
+#
+# Usage:
+#   chrome-debug                # ephemeral profile, prints port
+#   chrome-debug <name>         # named profile at ~/chrome-debug-profiles/<name>
+#   chrome-debug -h | --help
+#
+# Stdout: <port>
+# Stderr: human-readable status line, plus the MCP-add command to copy/paste.
+#
+# Hooking Claude up to the resulting browser:
+#   PORT=$(chrome-debug observe)
+#   claude mcp add playwright-$PORT -- \
+#       npx @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:$PORT
+# Then `/mcp` inside Claude should list the new server. Use a unique MCP name
+# per port if you want multiple browsers wired into one Claude session.
+
+set -euo pipefail
+
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+PROFILE_ROOT="$HOME/chrome-debug-profiles"
+
+case "${1:-}" in
+    -h|--help)
+        sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'
+        exit 0
+        ;;
+esac
+
+if [[ ! -x "$CHROME" ]]; then
+    echo "chrome-debug: Chrome not found at $CHROME" >&2
+    exit 1
+fi
+
+# Resolve profile dir
+if [[ $# -ge 1 ]]; then
+    name="$1"
+    profile_dir="$PROFILE_ROOT/$name"
+    mkdir -p "$profile_dir"
+
+    # Refuse if a live Chrome is already holding this profile. Chrome would
+    # reject the launch anyway, but we want a clean error instead of a flapping
+    # window. SingletonLock is a symlink "<host>-<pid>".
+    lock="$profile_dir/SingletonLock"
+    if [[ -L "$lock" ]]; then
+        target=$(readlink "$lock")
+        pid="${target##*-}"
+        if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+            echo "chrome-debug: profile '$name' is already in use by Chrome (pid $pid)" >&2
+            exit 1
+        fi
+        rm -f "$lock" "$profile_dir/SingletonCookie" "$profile_dir/SingletonSocket"
+    fi
+else
+    profile_dir=$(mktemp -d "${TMPDIR:-/tmp}/chrome-debug-XXXXXX")
+fi
+
+# Pick a free TCP port by binding to 0 and reading it back.
+port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("",0)); print(s.getsockname()[1]); s.close()')
+
+"$CHROME" \
+    --remote-debugging-port="$port" \
+    --user-data-dir="$profile_dir" \
+    --no-first-run \
+    --no-default-browser-check \
+    >/dev/null 2>&1 &
+
+chrome_pid=$!
+disown
+
+# Wait for the DevTools endpoint to come up (~5s budget).
+ready=0
+for _ in $(seq 1 50); do
+    if curl -sf "http://127.0.0.1:$port/json/version" >/dev/null 2>&1; then
+        ready=1
+        break
+    fi
+    sleep 0.1
+done
+
+if (( ! ready )); then
+    echo "chrome-debug: pid $chrome_pid started but DevTools never became ready on port $port" >&2
+    exit 1
+fi
+
+{
+    printf 'chrome-debug: pid=%s port=%s profile=%s\n' "$chrome_pid" "$port" "$profile_dir"
+} >&2
+
+echo "$port"
