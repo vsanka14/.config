@@ -154,7 +154,7 @@ selected_name=$(basename "$selected" | tr . _)
 if ! tmux has-session -t="$selected_name" 2>/dev/null; then
     tmux new-session -ds "$selected_name" -c "$selected"
     tmux split-window -h -t "$selected_name" -c "$selected" -l 30%
-    tmux send-keys -t "$selected_name".right 'claude' Enter
+    tmux send-keys -t "$selected_name".right 'copilot' Enter
     tmux select-pane -t "$selected_name" -L
     tmux send-keys -t "$selected_name".left 'nvim' Enter
 fi
