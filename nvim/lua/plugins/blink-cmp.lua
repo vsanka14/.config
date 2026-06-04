@@ -17,12 +17,12 @@ return {
 				mdx = {},
 				text = {},
 				-- Offline SQLite-backed dataset-name + column completion.
-				sql = { "meta_columns", "lsp", "path", "snippets", "buffer" },
+				sql = { "gridtable", "lsp", "path", "snippets", "buffer" },
 			},
 			providers = {
-				meta_columns = {
-					name = "Meta",
-					module = "blink-sources.meta_columns",
+				gridtable = {
+					name = "GridTable",
+					module = "helpers.gridtable",
 					-- The SQLite DB is built externally by ~/code/meta-gridtable-index/build_index.py.
 					opts = {
 						db_path = vim.fn.expand("~/.cache/meta-gridtable-index/index.sqlite3"),

@@ -1,4 +1,4 @@
--- blink-sources/meta_columns.lua - SQL dataset + field completion from SQLite.
+-- helpers/gridtable.lua - blink.cmp SQL dataset + field completion from SQLite.
 --
 -- Neovim is read-only in this flow. The DB is built outside Neovim by:
 --   python3 ~/code/meta-gridtable-index/build_index.py
