@@ -16,18 +16,17 @@ return {
 				markdown = {},
 				mdx = {},
 				text = {},
-				-- meta-backed dataset-name + column completion alongside SQL sources.
+				-- Offline SQLite-backed dataset-name + column completion.
 				sql = { "meta_columns", "lsp", "path", "snippets", "buffer" },
 			},
 			providers = {
 				meta_columns = {
 					name = "Meta",
 					module = "blink-sources.meta_columns",
-					-- Show other sources immediately; stream meta results in as
-					-- the async fetches resolve.
-					async = true,
+					-- The SQLite DB is built externally by ~/.config/bin/meta-gridtable-index.
 					opts = {
-						platform = "gridTable",
+						db_path = vim.fn.stdpath("cache") .. "/meta-gridtable.sqlite3",
+						list_limit = 500,
 					},
 				},
 			},
