@@ -23,9 +23,9 @@ return {
 				meta_columns = {
 					name = "Meta",
 					module = "blink-sources.meta_columns",
-					-- The SQLite DB is built externally by ~/.config/bin/meta-gridtable-index.
+					-- The SQLite DB is built externally by ~/code/meta-gridtable-index/build_index.py.
 					opts = {
-						db_path = vim.fn.stdpath("cache") .. "/meta-gridtable.sqlite3",
+						db_path = vim.fn.expand("~/.cache/meta-gridtable-index/index.sqlite3"),
 						list_limit = 500,
 					},
 				},

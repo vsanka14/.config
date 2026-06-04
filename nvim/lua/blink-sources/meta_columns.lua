@@ -13,7 +13,7 @@ local NameKind = Kind.Struct or Kind.Class or Kind.Module
 local Source = {}
 
 local config = {
-	db_path = vim.fn.stdpath("cache") .. "/meta-gridtable.sqlite3",
+	db_path = vim.fn.expand("~/.cache/meta-gridtable-index/index.sqlite3"),
 	sqlite_bin = "sqlite3",
 	list_limit = 500,
 }
