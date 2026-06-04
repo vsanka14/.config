@@ -9,7 +9,7 @@ return {
 			options = {
 				signcolumn = "no",
 				number = false,
-				relativenumber = false,
+				relativenumber = true,
 				cursorline = false,
 				cursorcolumn = false,
 				foldcolumn = "0",
