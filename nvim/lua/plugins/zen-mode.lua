@@ -4,7 +4,13 @@ return {
 	opts = {
 		window = {
 			backdrop = 0.95,
-			width = 90,
+			width = function()
+				local ft = vim.bo.filetype
+				if ft == "markdown" or ft == "markdown.mdx" then
+					return 140
+				end
+				return 120
+			end,
 			height = 1,
 			options = {
 				signcolumn = "no",

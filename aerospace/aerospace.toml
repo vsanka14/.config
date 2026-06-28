@@ -64,6 +64,7 @@ ctrl-shift-5 = 'move-node-to-workspace 5'
 ctrl-f = 'fullscreen'                            # Toggle fullscreen
 ctrl-comma = 'layout accordion horizontal'       # Stacked/accordion (default)
 ctrl-period = 'layout tiles horizontal vertical' # Side-by-side tiles
+ctrl-shift-space = 'layout floating tiling'      # Toggle floating <-> tiling
 
 # Join controls - tmux style (| horizontal, _ vertical)
 ctrl-shift-backslash = 'join-with right'         # Join horizontally (ctrl+|)
@@ -140,10 +141,6 @@ run = 'layout floating'
 [[on-window-detected]]
 if.app-id = 'com.google.Chrome'
 run = 'move-node-to-workspace 1'
-
-[[on-window-detected]]
-if.app-id = 'com.github.wez.wezterm'
-run = 'move-node-to-workspace 2'
 
 [[on-window-detected]]
 if.app-id = 'net.kovidgoyal.kitty'
