@@ -16,10 +16,20 @@ return {
 				markdown = {},
 				mdx = {},
 				text = {},
+				-- Offline SQLite-backed dataset-name + column completion.
+				sql = { "gridtable", "lsp", "path", "snippets", "buffer" },
 			},
-		},
-		completion = {
-			documentation = { auto_show = true },
+			providers = {
+				gridtable = {
+					name = "GridTable",
+					module = "helpers.gridtable",
+					-- The SQLite DB is built externally by ~/code/meta-gridtable-index/build_index.py.
+					opts = {
+						db_path = vim.fn.expand("~/.cache/meta-gridtable-index/index.sqlite3"),
+						list_limit = 500,
+					},
+				},
+			},
 		},
 	},
 }

@@ -103,9 +103,9 @@ SCAN_DIRS=(
 
 # Standalone directories to always include as options
 EXTRA_DIRS=(
-    "$HOME/.config"
-    "$HOME/.claude"
-    "$HOME/documents/notes"
+  "$HOME/.config"
+  "$HOME/.copilot"
+  "$HOME/documents/notes"
 )
 
 if [[ $# -eq 1 ]]; then
@@ -154,9 +154,12 @@ selected_name=$(basename "$selected" | tr . _)
 if ! tmux has-session -t="$selected_name" 2>/dev/null; then
     tmux new-session -ds "$selected_name" -c "$selected"
     tmux split-window -h -t "$selected_name" -c "$selected" -l 30%
-    tmux send-keys -t "$selected_name".right 'claude' Enter
+    tmux send-keys -t "$selected_name".right 'copilot' Enter
     tmux select-pane -t "$selected_name" -L
     tmux send-keys -t "$selected_name".left 'nvim' Enter
+    # Leave focus on the copilot pane so it starts with window-active-style
+    # applied (works around copilot's startup-time foreground color caching).
+    tmux select-pane -t "$selected_name" -R
 fi
 
 tmux switch-client -t "$selected_name" 2>/dev/null || exec tmux attach-session -t "$selected_name"

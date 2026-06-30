@@ -2,6 +2,12 @@
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.config/bin:$PATH"
 
+# Start Copilot CLI in allow-all mode by default for logistical/tool permissions.
+export COPILOT_ALLOW_ALL=true
+copilot() {
+  command copilot --allow-all "$@"
+}
+
 # Increase Node.js memory limit for large TypeScript projects
 export NODE_OPTIONS="--max-old-space-size=8192"
 

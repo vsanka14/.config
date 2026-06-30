@@ -92,3 +92,20 @@ autocmd("TextYankPost", {
 	end,
 	desc = "Highlight on yank",
 })
+
+-- Markdown checkbox keymaps (buffer-local)
+local markdown = require("helpers.markdown")
+
+autocmd("FileType", {
+	group = augroup("markdown_checkbox", { clear = true }),
+	pattern = "markdown",
+	callback = function(args)
+		local function map(lhs, rhs, desc)
+			vim.keymap.set("n", lhs, rhs, { buffer = args.buf, desc = desc })
+		end
+
+		map("<localleader>c", markdown.insert_checkbox, "Insert markdown checkbox")
+		map("<localleader>x", markdown.toggle_checkbox, "Toggle markdown checkbox")
+	end,
+	desc = "Markdown checkbox insert/toggle keymaps",
+})

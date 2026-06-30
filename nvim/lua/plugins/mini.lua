@@ -44,7 +44,7 @@ return {
 		-- Icons
 		require("mini.icons").setup({
 			extension = {
-				astro = { glyph = "\u{f1cde}", hl = "MiniIconsOrange" },
+				astro = { glyph = "\u{e6b3}", hl = "MiniIconsOrange" },
 				mdx = { glyph = "\u{f0354}", hl = "MiniIconsAzure" },
 				hbs = { glyph = "\u{e60f}", hl = "MiniIconsOrange" },
 				conf = { glyph = "\u{f013}", hl = "MiniIconsGreen" },
