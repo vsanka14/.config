@@ -219,8 +219,10 @@ FIXTURE_DIR="$fixture_dir" \
   "$picker"
 grep -Fxq -- '--track' "$fzf_args" || fail "fzf tracking was not enabled"
 grep -Fxq -- '--with-nth=7' "$fzf_args" || fail "fzf did not use the formatted display field"
-grep -Fxq -- '--preview-window=right,55%,border-left' "$fzf_args" ||
-  fail "fzf preview was not placed on the right"
+grep -Fxq -- '--border-label=  Agents ' "$fzf_args" ||
+  fail "fzf border label did not include the tmux icon"
+grep -Fxq -- '--preview-window=right,55%,border-left,follow' "$fzf_args" ||
+  fail "fzf preview was not placed on the right and pinned to the bottom"
 grep -Eq '^--bind=load:reload\(sleep 1; .* --list 2>/dev/null \|\| true\)$' "$fzf_args" ||
   fail "fzf periodic reload binding was not configured"
 

@@ -268,7 +268,7 @@ selection=$(
       --track \
       --reverse \
       --border=rounded \
-      --border-label=' ⚙ Agents ' \
+      --border-label='  Agents ' \
       --border-label-pos=3 \
       --prompt='  ' \
       --pointer='▶' \
@@ -278,7 +278,7 @@ selection=$(
       --with-nth=7 \
       --header='STATUS      TARGET                      TITLE' \
       --preview="$0 preview {2}" \
-      --preview-window='right,55%,border-left' \
+      --preview-window='right,55%,border-left,follow' \
       --bind="load:reload($refresh_command)"
 ) || exit 0
 
