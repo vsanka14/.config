@@ -199,6 +199,8 @@ list_rows() {
         status=$hook_status
         if [ "$status" = working ] && [ "$fallback" = awaiting ]; then
           status=awaiting
+        elif [ "$status" = awaiting ] && [ "$fallback" = working ]; then
+          status=working
         fi
       else
         status=$fallback

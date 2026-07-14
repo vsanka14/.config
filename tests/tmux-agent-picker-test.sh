@@ -111,7 +111,7 @@ cat >"$fixture_dir/processes" <<'EOF'
 EOF
 
 cat >"$fixture_dir/capture_1" <<'EOF'
-/ commands · ? help
+Working · esc interrupt
 EOF
 cat >"$fixture_dir/capture_2" <<'EOF'
 Do you want to allow this command?
@@ -179,16 +179,16 @@ rows=$(
 )
 
 assert_eq 4 "$(printf '%s\n' "$rows" | wc -l | tr -d ' ')" "eligible pane count"
-assert_eq $'1\t%1\talpha\talpha:1.1\t⏸ awaiting\tAwaiting Hook' \
-  "$(printf '%s\n' "$rows" | sed -n '1p' | cut -f1-6)" "fresh awaiting classification"
 assert_eq $'1\t%2\tbeta\tbeta:1.2\t⏸ awaiting\tPermission Fallback' \
-  "$(printf '%s\n' "$rows" | sed -n '2p' | cut -f1-6)" "permission fallback precedence"
+  "$(printf '%s\n' "$rows" | sed -n '1p' | cut -f1-6)" "permission fallback precedence"
+assert_eq $'2\t%1\talpha\talpha:1.1\t⚙ working\tAwaiting Hook' \
+  "$(printf '%s\n' "$rows" | sed -n '2p' | cut -f1-6)" "working fallback clears stale awaiting hook"
 assert_eq $'3\t%3\tgamma\tgamma:2.1\t✓ idle\tStale Worker' \
   "$(printf '%s\n' "$rows" | sed -n '3p' | cut -f1-6)" "stale state fallback"
 assert_eq $'4\t%4\tdelta\tdelta:1.1\t? unknown\tUnknown Session' \
   "$(printf '%s\n' "$rows" | sed -n '4p' | cut -f1-6)" "unknown classification"
-assert_eq 'awaiting    alpha:1.1                   Awaiting Hook' \
-  "$(printf '%s\n' "$rows" | sed -n '1p' | cut -f7)" "aligned display row"
+assert_eq 'working     alpha:1.1                   Awaiting Hook' \
+  "$(printf '%s\n' "$rows" | sed -n '2p' | cut -f7)" "aligned display row"
 [ ! -e "$state_dir/99.json" ] || fail "dead pane state was not pruned"
 
 ask_user_status=$(
