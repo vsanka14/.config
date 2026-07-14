@@ -8,7 +8,7 @@
 #
 # Subcommands:
 #   (none)       Fuzzy-find a project dir → create/switch session (Alt+f)
-#   sessions     List active sessions in fzf and switch to one (Alt+s)
+#   sessions     List active sessions in fzf; press 1–9 to switch (Alt+s)
 #   go <n>       Jump to the nth session by creation order (Alt+1–9)
 #   prev         Switch to previous session in creation order (with wraparound)
 #   next         Switch to next session in creation order (with wraparound)
@@ -86,6 +86,7 @@ case "$1" in
                     --pointer="▶" \
                     --padding=1 \
                     --color='bg:-1,gutter:-1,label:#7dcfff' \
+                    --bind='1:pos(1)+accept,2:pos(2)+accept,3:pos(3)+accept,4:pos(4)+accept,5:pos(5)+accept,6:pos(6)+accept,7:pos(7)+accept,8:pos(8)+accept,9:pos(9)+accept' \
                     --delimiter='\t' --with-nth=1.. \
               | cut -f2
         )
