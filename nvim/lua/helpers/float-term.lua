@@ -6,20 +6,40 @@ local M = {}
 ---@param opts? { width?: number, height?: number, on_exit?: fun() }
 function M.open(cmd, opts)
 	opts = opts or {}
-	local width = math.floor(vim.o.columns * (opts.width or 0.8))
-	local height = math.floor(vim.o.lines * (opts.height or 0.8))
+	local width_ratio = opts.width or 0.8
+	local height_ratio = opts.height or 0.8
+
+	local function window_config()
+		local width = math.floor(vim.o.columns * width_ratio)
+		local height = math.floor(vim.o.lines * height_ratio)
+
+		return {
+			relative = "editor",
+			width = width,
+			height = height,
+			col = math.floor((vim.o.columns - width) / 2),
+			row = math.floor((vim.o.lines - height) / 2),
+			style = "minimal",
+			border = "rounded",
+		}
+	end
+
 	local buf = vim.api.nvim_create_buf(false, true)
-	local win = vim.api.nvim_open_win(buf, true, {
-		relative = "editor",
-		width = width,
-		height = height,
-		col = math.floor((vim.o.columns - width) / 2),
-		row = math.floor((vim.o.lines - height) / 2),
-		style = "minimal",
-		border = "rounded",
+	local win = vim.api.nvim_open_win(buf, true, window_config())
+	local resize_group = vim.api.nvim_create_augroup("FloatTermResize_" .. buf, { clear = true })
+
+	vim.api.nvim_create_autocmd("VimResized", {
+		group = resize_group,
+		callback = function()
+			if vim.api.nvim_win_is_valid(win) then
+				vim.api.nvim_win_set_config(win, window_config())
+			end
+		end,
 	})
+
 	vim.fn.termopen(cmd, {
 		on_exit = function()
+			pcall(vim.api.nvim_del_augroup_by_id, resize_group)
 			if vim.api.nvim_win_is_valid(win) then
 				vim.api.nvim_win_close(win, true)
 			end
