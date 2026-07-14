@@ -4,6 +4,9 @@
 [mgr]
 # Show hidden files
 show_hidden = false
+# Sort by last modified time, newest first
+sort_by = "mtime"
+sort_reverse = true
 # Sort directories first
 sort_dir_first = true
 # parent | current | preview — wider preview pane = larger image rendering
