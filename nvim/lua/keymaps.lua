@@ -66,7 +66,18 @@ map("n", "<Leader>gx", "<cmd>CodeDiff q<cr>", { desc = "Close diff view" })
 
 -- Lazygit
 map("n", "<Leader>gl", function()
-	require("helpers.float-term").open("lazygit")
+	local config_file = vim.fn.tempname()
+	vim.fn.writefile({
+		"os:",
+		"  editPreset: nvim-remote",
+	}, config_file)
+
+	local cmd = string.format("lazygit --use-config-file=%s", vim.fn.shellescape(config_file))
+	require("helpers.float-term").open(cmd, {
+		on_exit = function()
+			vim.fn.delete(config_file)
+		end,
+	})
 end, { desc = "Open Lazygit" })
 
 -- Yazi file explorer
