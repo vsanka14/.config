@@ -187,7 +187,7 @@ assert_eq $'3\t%3\tgamma\tgamma:2.1\t✓ idle\tStale Worker' \
   "$(printf '%s\n' "$rows" | sed -n '3p' | cut -f1-6)" "stale state fallback"
 assert_eq $'4\t%4\tdelta\tdelta:1.1\t? unknown\tUnknown Session' \
   "$(printf '%s\n' "$rows" | sed -n '4p' | cut -f1-6)" "unknown classification"
-assert_eq 'awaiting    alpha:1.1                         Awaiting Hook' \
+assert_eq 'awaiting    alpha:1.1                   Awaiting Hook' \
   "$(printf '%s\n' "$rows" | sed -n '1p' | cut -f7)" "aligned display row"
 [ ! -e "$state_dir/99.json" ] || fail "dead pane state was not pruned"
 
@@ -223,5 +223,20 @@ grep -Fxq -- '--preview-window=right,55%,border-left' "$fzf_args" ||
   fail "fzf preview was not placed on the right"
 grep -Eq '^--bind=load:reload\(sleep 1; .* --list 2>/dev/null \|\| true\)$' "$fzf_args" ||
   fail "fzf periodic reload binding was not configured"
+
+cat >"$fixture_dir/preview-tmux" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >"$PREVIEW_ARGS_FILE"
+printf '\033[31mred\033[0m\n'
+EOF
+chmod +x "$fixture_dir/preview-tmux"
+preview_args=$temp_dir/preview-args
+preview_output=$(
+  PREVIEW_ARGS_FILE="$preview_args" \
+    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/preview-tmux" \
+    "$picker" preview %1
+)
+grep -Fxq -- '-e' "$preview_args" || fail "tmux preview did not preserve ANSI colors"
+assert_eq $'\033[31mred\033[0m' "$preview_output" "preview ANSI output"
 
 printf 'ok - tmux agent picker fixtures\n'

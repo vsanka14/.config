@@ -120,7 +120,7 @@ status_label() {
 format_display_row() {
   local status=$1 target=$2 title=$3 status_cell target_cell
   status_cell=$(printf '%-10s' "$status")
-  target_cell=$(printf '%-32.32s' "$target")
+  target_cell=$(printf '%-26.26s' "$target")
 
   if [ "${NO_COLOR:-0}" != 1 ]; then
     case "$status" in
@@ -238,7 +238,7 @@ switch_to_pane() {
 case "${1:-}" in
   preview)
     [ $# -eq 2 ] || die "preview requires a pane ID"
-    exec "$TMUX_BIN" capture-pane -p -t "$2" -S -20
+    exec "$TMUX_BIN" capture-pane -p -e -t "$2" -S -20
     ;;
   --list)
     list_rows
@@ -274,7 +274,7 @@ selection=$(
       --color='bg:-1,gutter:-1,label:#7dcfff' \
       --delimiter=$'\t' \
       --with-nth=7 \
-      --header='STATUS      TARGET                            TITLE' \
+      --header='STATUS      TARGET                      TITLE' \
       --preview="$0 preview {2}" \
       --preview-window='right,55%,border-left' \
       --bind="load:reload($refresh_command)"
