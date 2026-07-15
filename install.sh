@@ -50,7 +50,7 @@ brew install sketchybar || true
 success "Sketchybar installed"
 
 info "Installing GUI apps..."
-brew install --cask wezterm nikitabobko/tap/aerospace karabiner-elements || true
+brew install --cask kitty nikitabobko/tap/aerospace karabiner-elements || true
 success "GUI apps installed"
 
 info "Installing font..."

@@ -101,7 +101,7 @@ enter = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_chang
 [mode.open.binding]
 c = ['exec-and-forget open -a "Google Chrome"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 f = ['exec-and-forget open -a "Finder"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
-k = ['exec-and-forget open -a "WezTerm"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+k = ['exec-and-forget open -a "kitty"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 m = ['exec-and-forget open -a "Messages"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 s = ['exec-and-forget open -b com.tinyspeck.slackmacgap', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 o = ['exec-and-forget open "$HOME/Applications/Chrome Apps.localized/Outlook (PWA).app"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
@@ -144,7 +144,7 @@ if.app-id = 'com.google.Chrome'
 run = 'move-node-to-workspace 1'
 
 [[on-window-detected]]
-if.app-id = 'com.github.wez.wezterm'
+if.app-id = 'net.kovidgoyal.kitty'
 run = 'move-node-to-workspace 2'
 
 [[on-window-detected]]

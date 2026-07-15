@@ -20,7 +20,7 @@ cd ~/.config
 1. Installs Homebrew (if not present)
 2. Installs CLI tools: neovim, tmux, eza, fzf, yazi, fd, lazygit, oh-my-posh, zsh plugins
 3. Installs Sketchybar (status bar)
-4. Installs GUI apps: WezTerm, AeroSpace, Karabiner-Elements
+4. Installs GUI apps: Kitty, AeroSpace, Karabiner-Elements
 5. Installs JetBrainsMono Nerd Font
 6. Installs NVM and Node.js LTS
 7. Installs Bun runtime
@@ -145,9 +145,9 @@ Or reload config:
 sketchybar --reload
 ```
 
-### Neovim theme files not found (tmux/wezterm)
+### Neovim theme files not found (tmux)
 
-Tmux and WezTerm source theme files from the tokyonight.nvim plugin directory. These are created when Neovim plugins are installed.
+Tmux sources theme files from the tokyonight.nvim plugin directory. These are created when Neovim plugins are installed.
 
 **Fix:** Launch Neovim and wait for plugins to install:
 
@@ -163,5 +163,5 @@ Missing Nerd Font or font not set in terminal.
 **Fix:**
 
 1. Ensure font is installed: `brew install --cask font-jetbrains-mono-nerd-font`
-2. In WezTerm, the font is already configured in `wezterm/wezterm.lua`
+2. In Kitty, the font is already configured in `kitty/kitty.conf`
 3. If using another terminal, set the font to "JetBrainsMono Nerd Font"

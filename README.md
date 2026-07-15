@@ -4,7 +4,7 @@ Personalized macOS development environment built around a keyboard-driven, termi
 
 ## Tools
 
-- **Terminal:** WezTerm
+- **Terminal:** Kitty
 - **Multiplexer:** Tmux
 - **Shell:** Zsh
 - **Editor:** Neovim
