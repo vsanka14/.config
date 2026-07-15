@@ -195,15 +195,6 @@ map("n", "<Leader>du", function()
 	require("dapui").toggle()
 end, { desc = "Toggle DAP UI" })
 
--- Trino (SQL)
-map("n", "<Leader>qr", "<cmd>TrinoRun<cr>", { desc = "Trino: Run query" })
-map("v", "<Leader>qr", ":TrinoRun<cr>", { desc = "Trino: Run selection" })
-map("n", "<Leader>qc", "<cmd>TrinoCluster<cr>", { desc = "Trino: Change cluster" })
-map("n", "<Leader>qu", "<cmd>TrinoHeadlessUser<cr>", { desc = "Trino: Change auth user" })
-map("n", "<Leader>qx", "<cmd>TrinoCancel<cr>", { desc = "Trino: Cancel query" })
-map("n", "<Leader>q.", "<cmd>TrinoNext<cr>", { desc = "Trino: Next result" })
-map("n", "<Leader>q,", "<cmd>TrinoPrev<cr>", { desc = "Trino: Previous result" })
-
 -- Clear search highlights
 map("n", "<Esc>", "<cmd>nohlsearch | redrawstatus<cr>", { desc = "Clear highlights" })
 
