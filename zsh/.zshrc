@@ -70,6 +70,7 @@ eval "$(oh-my-posh init zsh --config ~/.config/ohmyposh-theme.json)"
 # Tokyo Night fzf theme (from tokyonight.nvim extras)
 [ -f ~/.local/share/nvim/lazy/tokyonight.nvim/extras/fzf/tokyonight_night.sh ] && \
   source ~/.local/share/nvim/lazy/tokyonight.nvim/extras/fzf/tokyonight_night.sh
+export FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS --color=label:#27a1b9"
 
 # Zsh plugins (works on both macOS and Linux)
 for plugin_dir in /opt/homebrew/share ~/.local/share; do
