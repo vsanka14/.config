@@ -4,12 +4,22 @@
 [mgr]
 # Show hidden files
 show_hidden = false
+# Sort by last modified time, newest first
+sort_by = "mtime"
+sort_reverse = true
 # Sort directories first
 sort_dir_first = true
+# parent | current | preview — wider preview pane = larger image rendering
+ratio = [1, 2, 5]
 
 [preview]
 # Enable image preview (requires terminal support)
 image_filter = "triangle"
+image_quality = 90
+# Cap image dimensions before downscaling to fit the preview pane.
+# Raised from defaults (600x900) so high-DPI terminals can fill the pane.
+max_width = 1920
+max_height = 1920
 
 # Git plugin fetchers - shows git status next to files
 [[plugin.prepend_fetchers]]

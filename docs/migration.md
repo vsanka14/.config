@@ -24,7 +24,7 @@ cd ~/.config
 5. Installs JetBrainsMono Nerd Font
 6. Installs NVM and Node.js LTS
 7. Installs Bun runtime
-8. Creates symlinks (`~/.zshrc` → `~/.config/zshrc`)
+8. Creates shell and Copilot hook symlinks
 9. Creates directories (`~/.local/bin`, `~/code`, `~/documents/docs`)
 10. Configures git global ignore
 11. Installs Neovim plugins via lazy.nvim
@@ -98,13 +98,11 @@ Then reload: `aerospace reload-config` or press `ctrl+shift+r`.
 
 ### `ts` command not working
 
-The symlink may point to an old user path from a different machine.
-
-**Fix:**
+Ensure the new script is executable and `~/.config/bin` is on `PATH`:
 
 ```bash
-rm ~/.config/bin/ts
-ln -s ~/.config/scripts/tmux-session-switcher.sh ~/.config/bin/ts
+chmod +x ~/.config/bin/ts
+export PATH="$HOME/.config/bin:$PATH"
 ```
 
 ### Git push fails with "could not read Username"

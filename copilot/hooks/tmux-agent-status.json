@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      { "command": "$HOME/.config/bin/tmux-agent-status sessionStart" }
+    ],
+    "userPromptSubmitted": [
+      { "command": "$HOME/.config/bin/tmux-agent-status userPromptSubmitted" }
+    ],
+    "preToolUse": [
+      { "command": "$HOME/.config/bin/tmux-agent-status preToolUse" }
+    ],
+    "postToolUse": [
+      { "command": "$HOME/.config/bin/tmux-agent-status postToolUse" }
+    ],
+    "permissionRequest": [
+      { "command": "$HOME/.config/bin/tmux-agent-status permissionRequest" }
+    ],
+    "agentStop": [
+      { "command": "$HOME/.config/bin/tmux-agent-status agentStop" }
+    ],
+    "sessionEnd": [
+      { "command": "$HOME/.config/bin/tmux-agent-status sessionEnd" }
+    ],
+    "subagentStart": [
+      { "command": "$HOME/.config/bin/tmux-agent-status subagentStart" }
+    ],
+    "subagentStop": [
+      { "command": "$HOME/.config/bin/tmux-agent-status subagentStop" }
+    ]
+  }
+}

@@ -88,34 +88,27 @@ fi
 
 # 5. Symlinks and directories
 info "Creating symlinks and directories..."
-ln -sf ~/.config/zshrc ~/.zshrc
-mkdir -p ~/.local/bin ~/code ~/documents/docs
+ln -sf ~/.config/zsh/.zshrc ~/.zshrc
+mkdir -p ~/.local/bin ~/.copilot/hooks ~/code ~/documents/docs
+ln -sf ~/.config/copilot/hooks/tmux-agent-status.json ~/.copilot/hooks/tmux-agent-status.json
 success "Symlinks and directories created"
 
-# 6. Fix ts symlink (in case it points to old path)
-info "Fixing bin symlinks..."
-if [[ -L ~/.config/bin/ts ]]; then
-    rm ~/.config/bin/ts
-fi
-ln -sf ~/.config/scripts/tmux-session-switcher.sh ~/.config/bin/ts
-success "Bin symlinks fixed"
-
-# 7. Git config
+# 6. Git config
 info "Configuring git..."
 git config --global core.excludesfile ~/.config/git/ignore
 success "Git configured"
 
-# 8. Neovim plugins
+# 7. Neovim plugins
 info "Installing Neovim plugins..."
 nvim --headless "+Lazy! sync" +qa 2>/dev/null || true
 success "Neovim plugins installed"
 
-# 9. Yazi plugin
+# 8. Yazi plugin
 info "Installing Yazi git plugin..."
 ya pkg add yazi-rs/plugins:git 2>/dev/null || true
 success "Yazi plugin installed"
 
-# 10. Start services
+# 9. Start services
 info "Starting services..."
 brew services start sketchybar 2>/dev/null || true
 open -a AeroSpace 2>/dev/null || true

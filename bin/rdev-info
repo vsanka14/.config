@@ -1,0 +1,94 @@
+#!/bin/bash
+#
+# rdev-info — print info about the rdev for the current directory.
+#
+# Looks up the mutagen sync whose Alpha URL is an ancestor of $PWD and
+# derives the rdev name from the Beta host. With --url / -v, also resolves
+# the rdev's Server URL via `rdev ls -a` (only meaningful for hostable
+# frontend MPs).
+#
+# Usage:
+#   rdev-info               # print rdev name (default; works for any MP)
+#   rdev-info --name        # same as default
+#   rdev-info --url         # print Server URL (errors if MP has no URL)
+#   rdev-info -v|--verbose  # print "<name>\t<url-or-dash>"
+#
+# Compose for actions:
+#   open "$(rdev-info --url)"     # open in browser
+#   ssh  "$(rdev-info | tr / _)"  # ssh into the rdev
+#
+
+set -euo pipefail
+
+mode="name"
+case "${1:-}" in
+    ""|--name)     mode="name" ;;
+    --url)         mode="url" ;;
+    -v|--verbose)  mode="verbose" ;;
+    -h|--help)
+        sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'
+        exit 0
+        ;;
+    *)
+        echo "rdev-info: unknown option: $1" >&2
+        exit 2
+        ;;
+esac
+
+pwd_dir="$(pwd -P)"
+
+# Find Beta host from the first sync whose Alpha URL is a prefix of $PWD.
+beta_host=$(mutagen sync list 2>/dev/null | awk -v pwd="${pwd_dir}/" '
+    /^Alpha:/  { in_alpha=1; in_beta=0; next }
+    /^Beta:/   { in_alpha=0; in_beta=1; next }
+    /^Status:/ { in_alpha=0; in_beta=0; next }
+    $1 == "URL:" {
+        url = $2
+        if (in_alpha) {
+            alpha_url = url
+        } else if (in_beta && alpha_url != "") {
+            if (index(pwd, alpha_url "/") == 1) {
+                colon = index(url, ":")
+                if (colon > 0) {
+                    print substr(url, 1, colon - 1)
+                    exit
+                }
+            }
+        }
+    }
+')
+
+if [[ -z "$beta_host" ]]; then
+    echo "rdev-info: no mutagen sync found covering $pwd_dir" >&2
+    exit 1
+fi
+
+# Beta host is "<repo>_<rdev-suffix>"; rdev names join them with "/".
+rdev_name="${beta_host%_*}/${beta_host##*_}"
+
+if [[ "$mode" == "name" ]]; then
+    echo "$rdev_name"
+    exit 0
+fi
+
+url=$(rdev ls -a 2>/dev/null | awk -F'|' -v target="$rdev_name" '
+    {
+        name = $1; gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
+        if (name == target) {
+            u = $6; gsub(/^[[:space:]]+|[[:space:]]+$/, "", u)
+            print u
+            exit
+        }
+    }
+')
+
+case "$mode" in
+    verbose) printf '%s\t%s\n' "$rdev_name" "${url:--}" ;;
+    url)
+        if [[ -z "$url" ]]; then
+            echo "rdev-info: no Server URL for rdev '$rdev_name' (not a hostable MP, or not running?)" >&2
+            exit 1
+        fi
+        echo "$url"
+        ;;
+esac

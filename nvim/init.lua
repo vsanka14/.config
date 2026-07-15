@@ -1,27 +1,55 @@
--- This file simply bootstraps the installation of Lazy.nvim and then calls other files for execution
--- This file doesn't necessarily need to be touched, BE CAUTIOUS editing this file and proceed at your own risk.
-local lazypath = vim.env.LAZY or vim.fn.stdpath "data" .. "/lazy/lazy.nvim"
-
-if not (vim.env.LAZY or (vim.uv or vim.loop).fs_stat(lazypath)) then
-  -- stylua: ignore
-  local result = vim.fn.system({ "git", "clone", "--filter=blob:none", "https://github.com/folke/lazy.nvim.git", "--branch=stable", lazypath })
-  if vim.v.shell_error ~= 0 then
-    -- stylua: ignore
-    vim.api.nvim_echo({ { ("Error cloning lazy.nvim:\n%s\n"):format(result), "ErrorMsg" }, { "Press any key to exit...", "MoreMsg" } }, true, {})
-    vim.fn.getchar()
-    vim.cmd.quit()
-  end
+-- Bootstrap lazy.nvim
+local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+if not vim.uv.fs_stat(lazypath) then
+	vim.fn.system({
+		"git",
+		"clone",
+		"--filter=blob:none",
+		"https://github.com/folke/lazy.nvim.git",
+		"--branch=stable",
+		lazypath,
+	})
 end
-
 vim.opt.rtp:prepend(lazypath)
 
--- validate that lazy is available
-if not pcall(require, "lazy") then
-  -- stylua: ignore
-  vim.api.nvim_echo({ { ("Unable to load lazy from: %s\n"):format(lazypath), "ErrorMsg" }, { "Press any key to exit...", "MoreMsg" } }, true, {})
-  vim.fn.getchar()
-  vim.cmd.quit()
-end
+-- Set leader before lazy
+vim.g.mapleader = " "
+vim.g.maplocalleader = ","
 
-require "lazy_setup"
-require "polish"
+-- Core modules
+require("options")
+require("autocmds")
+
+-- Setup lazy.nvim (loads lua/plugins/*.lua)
+require("lazy").setup({
+	spec = { import = "plugins" },
+	install = { colorscheme = { "tokyonight" } },
+	checker = { enabled = false },
+	change_detection = { notify = false },
+})
+
+-- Modules that depend on plugins being available
+require("keymaps")
+require("statusline")
+require("tabline")
+require("lsp")
+
+-- Show startup time as a notification (only when launched directly, not as shell editor)
+vim.api.nvim_create_autocmd("VimEnter", {
+	callback = function()
+		if vim.fn.argc() == 0 and not vim.g.started_with_stdin then
+			vim.schedule(function()
+				local stats = require("lazy").stats()
+				local ms = math.floor(stats.startuptime * 100 + 0.5) / 100
+				vim.notify(string.format("Loaded %d plugins in %.2fms", stats.loaded, ms))
+			end)
+		end
+	end,
+})
+
+-- Identify when nvim started in std-in mode
+vim.api.nvim_create_autocmd("StdinReadPre", {
+	callback = function()
+		vim.g.started_with_stdin = true
+	end,
+})

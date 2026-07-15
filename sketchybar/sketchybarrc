@@ -17,6 +17,10 @@ export FG_MUTED=0xff636da6            # Moon muted
 # Font
 FONT="JetBrainsMono Nerd Font"
 
+# Font sizes: uncomment one pair based on display
+ICON_SIZE=16.0;  LABEL_SIZE=12.0    # laptop
+# ICON_SIZE=19.0;  LABEL_SIZE=15.0  # external monitor
+
 # Bar appearance
 sketchybar --bar \
     height=32 \
@@ -30,15 +34,16 @@ sketchybar --bar \
 
 # Default item settings
 sketchybar --default \
-    icon.font="$FONT:Bold:16.0" \
+    icon.font="$FONT:Bold:$ICON_SIZE" \
     icon.color=$FG_COLOR \
-    label.font="$FONT:Medium:12.0" \
+    label.font="$FONT:Medium:$LABEL_SIZE" \
     label.color=$FG_COLOR \
     padding_left=4 \
     padding_right=4
 
-# Aerospace workspace event
+# Aerospace events
 sketchybar --add event aerospace_workspace_change
+sketchybar --add event aerospace_mode_change
 
 # Workspace icons (Nerd Font)
 # 1=browser, 2=terminal, 3=misc
@@ -63,6 +68,18 @@ for sid in 1 2 3; do
             script="$CONFIG_DIR/plugins/aerospace.sh" \
         --subscribe space.$sid aerospace_workspace_change
 done
+
+# Mode indicator (right side)
+sketchybar --add item mode_indicator right \
+    --set mode_indicator \
+        icon="󰩨" \
+        icon.color=$ACCENT_RED \
+        icon.padding_left=8 \
+        icon.padding_right=8 \
+        label.drawing=off \
+        drawing=off \
+        script="$CONFIG_DIR/plugins/mode.sh" \
+    --subscribe mode_indicator aerospace_mode_change
 
 # Battery (right side)
 sketchybar --add item battery right \

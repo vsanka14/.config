@@ -22,12 +22,12 @@ default-root-container-orientation = 'horizontal'
 
 # Gaps (minimal for clean look)
 [gaps]
-inner.horizontal = 8
-inner.vertical = 8
-outer.left = 8
-outer.bottom = 8
+inner.horizontal = 6
+inner.vertical = 6
+outer.left = 6
+outer.bottom = 6
 outer.top = 40
-outer.right = 8
+outer.right = 6
 
 # ============================================
 # MAIN KEYBINDINGS (using ctrl modifier)
@@ -40,7 +40,7 @@ ctrl-1 = 'workspace 1'
 ctrl-2 = 'workspace 2'
 ctrl-3 = 'workspace 3'
 
-# Window focus (ctrl+cmd+hjkl) - vim-style navigation
+# Window focus (ctrl+cmd+hjkl) — ctrl alone conflicts with terminal agents (ctrl+j = newline)
 ctrl-cmd-h = 'focus left'
 ctrl-cmd-j = 'focus down'
 ctrl-cmd-k = 'focus up'
@@ -61,13 +61,14 @@ ctrl-shift-3 = 'move-node-to-workspace 3'
 ctrl-f = 'fullscreen'                            # Toggle fullscreen
 ctrl-comma = 'layout accordion horizontal'       # Stacked/accordion (default)
 ctrl-period = 'layout tiles horizontal vertical' # Side-by-side tiles
+ctrl-shift-space = 'layout floating tiling'      # Toggle floating <-> tiling
 
 # Join controls - tmux style (| horizontal, _ vertical)
 ctrl-shift-backslash = 'join-with right'         # Join horizontally (ctrl+|)
 ctrl-shift-minus = 'join-with down'              # Join vertically (ctrl+_)
 
 # Resize mode
-ctrl-r = 'mode resize'
+ctrl-cmd-r = ['mode resize', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=resize']
 
 # Close window (disabled to allow Neovim to use Ctrl+Q for quickfix)
 # ctrl-q = 'close'
@@ -77,6 +78,9 @@ ctrl-shift-r = 'reload-config'
 
 # Reload sketchybar
 ctrl-shift-s = 'exec-and-forget sketchybar --reload'
+
+# Open app mode (ctrl+o, then key)
+ctrl-cmd-o = ['mode open', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=open']
 
 # ============================================
 # RESIZE MODE
@@ -88,8 +92,29 @@ k = 'resize height -50'
 l = 'resize width +50'
 minus = 'resize smart -50'
 equal = 'resize smart +50'
-esc = 'mode main'
-enter = 'mode main'
+esc = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+enter = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+
+# ============================================
+# OPEN APP MODE (ctrl+o, then key)
+# ============================================
+[mode.open.binding]
+c = ['exec-and-forget open -a "Google Chrome"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+f = ['exec-and-forget open -a "Finder"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+k = ['exec-and-forget open -a "WezTerm"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+m = ['exec-and-forget open -a "Messages"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+s = ['exec-and-forget open -b com.tinyspeck.slackmacgap', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+o = ['exec-and-forget open "$HOME/Applications/Chrome Apps.localized/Outlook (PWA).app"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+t = ['exec-and-forget open -a "Microsoft Teams"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+q = ['exec-and-forget open -a "QuickTime Player"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+a = ['exec-and-forget open -a "Activity Monitor"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+w = ['exec-and-forget open -a "WhatsApp"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+i = ['exec-and-forget open -a "iSTB"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+# Toggle screen recording (start/stop). On stop, prompts for a name and
+# re-encodes with ffmpeg to ~/Documents/screen-recordings/<name>.mov.
+r = ['exec-and-forget $HOME/.config/bin/screen-record-toggle', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+esc = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+enter = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 
 # ============================================
 # FLOATING WINDOWS (dialogs, settings, etc.)
@@ -123,17 +148,29 @@ if.app-id = 'com.github.wez.wezterm'
 run = 'move-node-to-workspace 2'
 
 [[on-window-detected]]
-if.app-id = 'com.tinyspeck.slackmacgap'
+if.app-name-regex-substring = '^Slack$'
 run = 'move-node-to-workspace 3'
 
 [[on-window-detected]]
-if.app-id = 'com.microsoft.Outlook'
+if.app-name-regex-substring = 'Outlook'
 run = 'move-node-to-workspace 3'
 
 [[on-window-detected]]
-if.app-id = 'com.microsoft.teams2'
+if.app-name-regex-substring = 'Microsoft Teams'
+run = 'move-node-to-workspace 3'
+
+[[on-window-detected]]
+if.app-name-regex-substring = '^WhatsApp$'
 run = 'move-node-to-workspace 3'
 
 [[on-window-detected]]
 if.app-id = 'com.apple.finder'
+run = 'move-node-to-workspace 3'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.MobileSMS'
+run = 'move-node-to-workspace 3'
+
+[[on-window-detected]]
+if.app-name-regex-substring = 'iSTB'
 run = 'move-node-to-workspace 3'

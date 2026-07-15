@@ -1,25 +1,74 @@
--- Customize Treesitter
-
----@type LazySpec
 return {
-  "nvim-treesitter/nvim-treesitter",
-  dependencies = {
-    "andymass/vim-matchup", -- Enhanced bracket matching
-  },
-  opts = {
-    ensure_installed = {
-      "lua",
-      "vim",
-      "markdown",
-      "markdown_inline",
-      "tsx",
-      "javascript",
-      "typescript",
-      "glimmer",
-      "java",
-    },
-    matchup = {
-      enable = true, -- Enable treesitter integration for vim-matchup
-    },
-  },
+	{
+		"nvim-treesitter/nvim-treesitter",
+		-- repo archived; main is an incompatible rewrite, pin to legacy master.
+		branch = "master",
+		build = ":TSUpdate",
+		event = { "BufReadPost", "BufNewFile" },
+		dependencies = {
+			{ "nvim-treesitter/nvim-treesitter-textobjects", branch = "master" },
+		},
+		opts = {
+			ensure_installed = {
+				"bash",
+				"lua",
+				"luap",
+				"vim",
+				"vimdoc",
+				"markdown",
+				"markdown_inline",
+				"astro",
+				"svelte",
+				"tsx",
+				"javascript",
+				"typescript",
+				"jsdoc",
+				"glimmer",
+				"java",
+				"xml",
+				"html",
+				"sql",
+				"json",
+				"yaml",
+				"css",
+				"scss",
+			},
+			highlight = { enable = true },
+			indent = { enable = true },
+				textobjects = {
+				select = {
+					enable = true,
+					lookahead = true,
+					keymaps = {
+						["af"] = "@function.outer",
+						["if"] = "@function.inner",
+						["ac"] = "@class.outer",
+						["ic"] = "@class.inner",
+						["aa"] = "@parameter.outer",
+						["ia"] = "@parameter.inner",
+					},
+				},
+				move = {
+					enable = true,
+					set_jumps = true,
+					goto_next_start = {
+						["]f"] = "@function.outer",
+						["]c"] = "@class.outer",
+					},
+					goto_previous_start = {
+						["[f"] = "@function.outer",
+						["[c"] = "@class.outer",
+					},
+				},
+			},
+		},
+		config = function(_, opts)
+			require("nvim-treesitter.configs").setup(opts)
+		end,
+	},
+	{
+		"windwp/nvim-ts-autotag",
+		event = { "BufReadPost", "BufNewFile" },
+		opts = {},
+	},
 }
