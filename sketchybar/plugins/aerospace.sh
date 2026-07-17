@@ -10,6 +10,10 @@ declare -A WORKSPACE_COLORS=(
 )
 FG_MUTED=0xff636da6               # Moon muted
 ITEM_BG_COLOR=0xcc1e2030          # Moon background
+BOUNCE_HEIGHT=5
+BOUNCE_REBOUND=-2
+BOUNCE_SETTLE=1
+BOUNCE_DURATION=8
 
 # Get focused workspace from aerospace
 FOCUSED_WORKSPACE=$(aerospace list-workspaces --focused)
@@ -18,19 +22,21 @@ FOCUSED_WORKSPACE=$(aerospace list-workspaces --focused)
 # Background changes are instant (before --animate), icon changes are animated
 for i in 1 2 3 4 5; do
     if [ "$i" = "$FOCUSED_WORKSPACE" ]; then
-        # Focused space: instant background, animate icon bounce
+        # Focused space: instant background, then lift, rebound, and settle.
         sketchybar --set space.$i \
-            icon.y_offset=3 \
             background.drawing=on \
             background.color=$ITEM_BG_COLOR \
-            --animate tanh 20 --set space.$i \
+            --animate sin $BOUNCE_DURATION --set space.$i \
             icon.color=${WORKSPACE_COLORS[$i]} \
+            icon.y_offset=$BOUNCE_HEIGHT \
+            icon.y_offset=$BOUNCE_REBOUND \
+            icon.y_offset=$BOUNCE_SETTLE \
             icon.y_offset=0
     else
         # Non-focused: instant background off, animate icon
         sketchybar --set space.$i \
             background.drawing=off \
-            --animate tanh 15 --set space.$i \
+            --animate sin 12 --set space.$i \
             icon.color=$FG_MUTED \
             icon.y_offset=0
     fi
