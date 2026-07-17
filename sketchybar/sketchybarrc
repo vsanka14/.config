@@ -22,6 +22,7 @@ if [ "$DISPLAY_PROFILE" = "external" ]; then
     BAR_COLOR=0x1a000000
     ICON_SIZE=28.0
     LABEL_SIZE=15.0
+    CLOCK_LABEL_SIZE=14.0
     BAR_HEIGHT=80
     BLUR_RADIUS=50
     BAR_PADDING=120
@@ -35,6 +36,7 @@ else
     BAR_COLOR=0xcc0d0f18
     ICON_SIZE=16.0
     LABEL_SIZE=12.0
+    CLOCK_LABEL_SIZE=14.0
     BAR_HEIGHT=32
     BLUR_RADIUS=30
     BAR_PADDING=8
@@ -141,6 +143,7 @@ sketchybar --add item clock right \
         update_freq=10 \
         icon.padding_right=6 \
         icon.color=$ACCENT_PURPLE \
+        label.font="$FONT:Medium:$CLOCK_LABEL_SIZE" \
         script="$CONFIG_DIR/plugins/clock.sh"
 
 # Clock container
