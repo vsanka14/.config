@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Colors (Tokyo Night Moon)
-export BAR_COLOR=0xcc0d0f18           # ~0.80 opacity, matching wezterm
 export ITEM_BG_COLOR=0xee2a2f45       # Moon darker, enhanced visibility
 export CONTAINER_BG_COLOR=0x991e2030   # Moon bg_dark, ~0.60 opacity
 export ACCENT_BLUE=0xff82aaff         # Blue
@@ -17,18 +16,45 @@ export FG_MUTED=0xff636da6            # Moon muted
 # Font
 FONT="JetBrainsMono Nerd Font"
 
-# Font sizes: uncomment one pair based on display
-ICON_SIZE=16.0;  LABEL_SIZE=12.0    # laptop
-# ICON_SIZE=19.0;  LABEL_SIZE=15.0  # external monitor
+# Select sizing based on whether the large external display is connected.
+DISPLAY_PROFILE=$("$CONFIG_DIR/plugins/display.sh" --profile)
+if [ "$DISPLAY_PROFILE" = "external" ]; then
+    BAR_COLOR=0x1a000000
+    ICON_SIZE=28.0
+    LABEL_SIZE=15.0
+    BAR_HEIGHT=80
+    BLUR_RADIUS=50
+    BAR_PADDING=120
+    DEFAULT_PADDING=12
+    SPACE_ICON_PADDING=14
+    SPACE_BG_CORNER_RADIUS=10
+    SPACE_BG_HEIGHT=48
+    SHOW_BATTERY=false
+else
+    DISPLAY_PROFILE=laptop
+    BAR_COLOR=0xcc0d0f18
+    ICON_SIZE=16.0
+    LABEL_SIZE=12.0
+    BAR_HEIGHT=32
+    BLUR_RADIUS=30
+    BAR_PADDING=8
+    DEFAULT_PADDING=4
+    SPACE_ICON_PADDING=8
+    SPACE_BG_CORNER_RADIUS=4
+    SPACE_BG_HEIGHT=20
+    SHOW_BATTERY=true
+fi
+export BAR_COLOR
+printf '%s\n' "$DISPLAY_PROFILE" > "/tmp/sketchybar-display-profile-${UID}"
 
 # Bar appearance
 sketchybar --bar \
-    height=32 \
-    blur_radius=30 \
+    height=$BAR_HEIGHT \
+    blur_radius=$BLUR_RADIUS \
     position=top \
     sticky=on \
-    padding_left=8 \
-    padding_right=8 \
+    padding_left=$BAR_PADDING \
+    padding_right=$BAR_PADDING \
     color=$BAR_COLOR \
     shadow=off
 
@@ -38,8 +64,8 @@ sketchybar --default \
     icon.color=$FG_COLOR \
     label.font="$FONT:Medium:$LABEL_SIZE" \
     label.color=$FG_COLOR \
-    padding_left=4 \
-    padding_right=4
+    padding_left=$DEFAULT_PADDING \
+    padding_right=$DEFAULT_PADDING
 
 # Aerospace events
 sketchybar --add event aerospace_workspace_change
@@ -59,11 +85,11 @@ for sid in 1 2 3 4 5; do
     sketchybar --add item space.$sid left \
         --set space.$sid \
             icon="${SPACE_ICONS[$sid]}" \
-            icon.padding_left=8 \
-            icon.padding_right=8 \
+            icon.padding_left=$SPACE_ICON_PADDING \
+            icon.padding_right=$SPACE_ICON_PADDING \
             background.color=$ITEM_BG_COLOR \
-            background.corner_radius=4 \
-            background.height=20 \
+            background.corner_radius=$SPACE_BG_CORNER_RADIUS \
+            background.height=$SPACE_BG_HEIGHT \
             background.drawing=off \
             label.drawing=off \
             script="$CONFIG_DIR/plugins/aerospace.sh" \
@@ -82,30 +108,32 @@ sketchybar --add item mode_indicator right \
         script="$CONFIG_DIR/plugins/mode.sh" \
     --subscribe mode_indicator aerospace_mode_change
 
-# Battery (right side)
-sketchybar --add item battery right \
-    --set battery \
-        update_freq=120 \
-        icon.padding_right=6 \
-        icon.color=$ACCENT_ORANGE \
-        script="$CONFIG_DIR/plugins/battery.sh" \
-    --subscribe battery system_woke power_source_change
+if [ "$SHOW_BATTERY" = true ]; then
+    # Battery (right side)
+    sketchybar --add item battery right \
+        --set battery \
+            update_freq=120 \
+            icon.padding_right=6 \
+            icon.color=$ACCENT_ORANGE \
+            script="$CONFIG_DIR/plugins/battery.sh" \
+        --subscribe battery system_woke power_source_change
 
-# Battery container
-sketchybar --add bracket battery_container battery \
-    --set battery_container \
-        background.color=$CONTAINER_BG_COLOR \
-        background.corner_radius=6 \
-        background.height=24 \
-        background.drawing=on
+    # Battery container
+    sketchybar --add bracket battery_container battery \
+        --set battery_container \
+            background.color=$CONTAINER_BG_COLOR \
+            background.corner_radius=6 \
+            background.height=24 \
+            background.drawing=on
 
-# Spacer between containers
-sketchybar --add item spacer right \
-    --set spacer \
-        width=8 \
-        background.drawing=off \
-        icon.drawing=off \
-        label.drawing=off
+    # Spacer between containers
+    sketchybar --add item spacer right \
+        --set spacer \
+            width=8 \
+            background.drawing=off \
+            icon.drawing=off \
+            label.drawing=off
+fi
 
 # Clock (right side)
 sketchybar --add item clock right \
@@ -122,6 +150,14 @@ sketchybar --add bracket clock_container clock \
         background.corner_radius=6 \
         background.height=24 \
         background.drawing=on
+
+# Reload when the external display is connected or disconnected.
+sketchybar --add item display_watcher left \
+    --set display_watcher \
+        drawing=off \
+        update_freq=5 \
+        script="$CONFIG_DIR/plugins/display.sh" \
+    --subscribe display_watcher display_change system_woke
 
 # Force initial update
 sketchybar --update
