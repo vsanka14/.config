@@ -31,6 +31,7 @@ if [ "$DISPLAY_PROFILE" = "external" ]; then
     SPACE_BG_CORNER_RADIUS=10
     SPACE_BG_HEIGHT=48
     SHOW_BATTERY=false
+    SHOW_FRONT_APP=true
 else
     DISPLAY_PROFILE=laptop
     BAR_COLOR=0xcc0d0f18
@@ -45,6 +46,7 @@ else
     SPACE_BG_CORNER_RADIUS=4
     SPACE_BG_HEIGHT=20
     SHOW_BATTERY=true
+    SHOW_FRONT_APP=false
 fi
 export BAR_COLOR
 printf '%s\n' "$DISPLAY_PROFILE" > "/tmp/sketchybar-display-profile-${UID}"
@@ -97,6 +99,30 @@ for sid in 1 2 3 4 5; do
             script="$CONFIG_DIR/plugins/aerospace.sh" \
         --subscribe space.$sid aerospace_workspace_change
 done
+
+if [ "$SHOW_FRONT_APP" = true ]; then
+    # Focused application (center)
+    sketchybar --add item front_app center \
+        --set front_app \
+            icon=" " \
+            icon.width=24 \
+            icon.padding_left=10 \
+            icon.padding_right=6 \
+            icon.background.drawing=on \
+            icon.background.height=20 \
+            icon.background.corner_radius=4 \
+            icon.background.image.scale=0.8 \
+            label.font="$FONT:Medium:13.0" \
+            label.max_chars=32 \
+            label.padding_left=4 \
+            label.padding_right=12 \
+            background.color=$CONTAINER_BG_COLOR \
+            background.corner_radius=12 \
+            background.height=40 \
+            background.drawing=on \
+            script="$CONFIG_DIR/plugins/front_app.sh" \
+        --subscribe front_app front_app_switched aerospace_workspace_change
+fi
 
 # Mode indicator (right side)
 sketchybar --add item mode_indicator right \
