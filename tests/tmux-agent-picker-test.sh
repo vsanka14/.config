@@ -223,8 +223,9 @@ grep -Fxq -- '--border-label=  Agents ' "$fzf_args" ||
   fail "fzf border label did not include the tmux icon"
 grep -Fxq -- '--preview-window=right,55%,border-left,follow' "$fzf_args" ||
   fail "fzf preview was not placed on the right and pinned to the bottom"
-grep -Eq '^--bind=load:reload\(sleep 1; .* --list 2>/dev/null \|\| true\)$' "$fzf_args" ||
-  fail "fzf periodic reload binding was not configured"
+if grep -Eq '^--bind=load:reload' "$fzf_args"; then
+  fail "fzf startup still triggers a redundant delayed reload"
+fi
 
 cat >"$fixture_dir/preview-tmux" <<'EOF'
 #!/usr/bin/env bash
