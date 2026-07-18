@@ -23,6 +23,8 @@ if [ "$DISPLAY_PROFILE" = "external" ]; then
     ICON_SIZE=24.0
     LABEL_SIZE=15.0
     CLOCK_LABEL_SIZE=14.0
+    STATUS_ICON_WIDTH=30
+    STATUS_ICON_SCALE=0.38
     BAR_HEIGHT=80
     BLUR_RADIUS=50
     BAR_PADDING=120
@@ -38,6 +40,8 @@ else
     ICON_SIZE=16.0
     LABEL_SIZE=12.0
     CLOCK_LABEL_SIZE=12.0
+    STATUS_ICON_WIDTH=20
+    STATUS_ICON_SCALE=0.25
     BAR_HEIGHT=32
     BLUR_RADIUS=30
     BAR_PADDING=8
@@ -169,17 +173,32 @@ if [ "$SHOW_BATTERY" = true ]; then
             label.drawing=off
 fi
 
-# Clock (right side)
+# Date and time (right side)
 sketchybar --add item clock right \
     --set clock \
         update_freq=10 \
-        icon.padding_right=6 \
-        icon.color=$ACCENT_PURPLE \
+        icon=" " \
+        icon.width=$STATUS_ICON_WIDTH \
+        icon.padding_right=4 \
+        icon.background.drawing=on \
+        icon.background.image="$CONFIG_DIR/icons/clock.png" \
+        icon.background.image.scale=$STATUS_ICON_SCALE \
         label.font="$FONT:Medium:$CLOCK_LABEL_SIZE" \
         script="$CONFIG_DIR/plugins/clock.sh"
 
-# Clock container
-sketchybar --add bracket clock_container clock \
+sketchybar --add item calendar right \
+    --set calendar \
+        icon=" " \
+        icon.width=$STATUS_ICON_WIDTH \
+        icon.padding_right=4 \
+        icon.background.drawing=on \
+        icon.background.image="$CONFIG_DIR/icons/calendar.png" \
+        icon.background.image.scale=$STATUS_ICON_SCALE \
+        label.font="$FONT:Medium:$CLOCK_LABEL_SIZE" \
+        label.padding_right=8
+
+# Date and time container
+sketchybar --add bracket clock_container calendar clock \
     --set clock_container \
         background.color=$CONTAINER_BG_COLOR \
         background.corner_radius=6 \
