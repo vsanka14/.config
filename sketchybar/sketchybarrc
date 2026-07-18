@@ -75,8 +75,8 @@ sketchybar --default \
 sketchybar --add event aerospace_workspace_change
 sketchybar --add event aerospace_mode_change
 
-# Workspace icons (Nerd Font)
-declare -A SPACE_ICONS=(
+# Workspace icons (Nerd Font). Keep this indexed for macOS Bash 3.2.
+SPACE_ICONS=(
     [1]="󰖟"   # browser
     [2]="󰆍"   # terminal/dev
     [3]="󰒱"   # slack
@@ -95,10 +95,16 @@ for sid in 1 2 3 4 5; do
             background.corner_radius=$SPACE_BG_CORNER_RADIUS \
             background.height=$SPACE_BG_HEIGHT \
             background.drawing=off \
-            label.drawing=off \
-            script="$CONFIG_DIR/plugins/aerospace.sh" \
-        --subscribe space.$sid aerospace_workspace_change
+            label.drawing=off
 done
+
+# Keep one event owner: subscribing every space would run the all-space update
+# five times and repeatedly cancel/restart the same animation queue.
+sketchybar --add item workspace_observer left \
+    --set workspace_observer \
+        drawing=off \
+        script="$CONFIG_DIR/plugins/aerospace.sh" \
+    --subscribe workspace_observer aerospace_workspace_change
 
 if [ "$SHOW_FRONT_APP" = true ]; then
     # Focused application (center)
