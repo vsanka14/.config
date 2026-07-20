@@ -104,8 +104,7 @@ autocmd("FileType", {
 			vim.keymap.set("n", lhs, rhs, { buffer = args.buf, desc = desc })
 		end
 
-		map("<localleader>c", markdown.insert_checkbox, "Insert markdown checkbox")
-		map("<localleader>x", markdown.toggle_checkbox, "Toggle markdown checkbox")
+		map("<C-t>", markdown.toggle_or_insert_checkbox, "Toggle or insert markdown checkbox")
 	end,
-	desc = "Markdown checkbox insert/toggle keymaps",
+	desc = "Markdown checkbox keymap",
 })
