@@ -115,12 +115,14 @@ status_label() {
     return
   fi
 
+  # Truecolor Tokyo Night hexes, matched exactly to the status-bar pill/radar:
+  # awaiting #f7768e, working #e0af68, done #3fb950, idle #9ece6a, unknown #565f89.
   case "$status" in
-    awaiting) printf '\033[38;5;203m⏸ awaiting\033[0m' ;;
-    working) printf '\033[38;5;221m⚙ working\033[0m' ;;
-    done) printf '\033[38;5;155m✓ done\033[0m' ;;
-    idle) printf '\033[38;5;114m✓ idle\033[0m' ;;
-    *) printf '\033[38;5;245m? unknown\033[0m' ;;
+    awaiting) printf '\033[38;2;247;118;142m⏸ awaiting\033[0m' ;;
+    working) printf '\033[38;2;224;175;104m⚙ working\033[0m' ;;
+    done) printf '\033[38;2;63;185;80m✓ done\033[0m' ;;
+    idle) printf '\033[38;2;158;206;106m✓ idle\033[0m' ;;
+    *) printf '\033[38;2;86;95;137m? unknown\033[0m' ;;
   esac
 }
 
@@ -310,13 +312,16 @@ format_display_row() {
   target_cell=$(printf '%-26.26s' "$target")
 
   if [ "${NO_COLOR:-0}" != 1 ]; then
+    # Status column: exact status-bar pill hexes (truecolor).
     case "$status" in
-      awaiting) status_cell=$(printf '\033[38;5;203m%s\033[0m' "$status_cell") ;;
-      working) status_cell=$(printf '\033[38;5;221m%s\033[0m' "$status_cell") ;;
-      done) status_cell=$(printf '\033[38;5;155m%s\033[0m' "$status_cell") ;;
-      idle) status_cell=$(printf '\033[38;5;114m%s\033[0m' "$status_cell") ;;
-      *) status_cell=$(printf '\033[38;5;245m%s\033[0m' "$status_cell") ;;
+      awaiting) status_cell=$(printf '\033[38;2;247;118;142m%s\033[0m' "$status_cell") ;;
+      working) status_cell=$(printf '\033[38;2;224;175;104m%s\033[0m' "$status_cell") ;;
+      done) status_cell=$(printf '\033[38;2;63;185;80m%s\033[0m' "$status_cell") ;;
+      idle) status_cell=$(printf '\033[38;2;158;206;106m%s\033[0m' "$status_cell") ;;
+      *) status_cell=$(printf '\033[38;2;86;95;137m%s\033[0m' "$status_cell") ;;
     esac
+    # Target column in the blue session accent (#7aa2f7) used by status-left.
+    target_cell=$(printf '\033[38;2;122;162;247m%s\033[0m' "$target_cell")
   fi
 
   printf '%s  %s  %s' "$status_cell" "$target_cell" "$title"
@@ -488,7 +493,7 @@ selection=$(
       --prompt='  ' \
       --pointer='▶' \
       --padding=1 \
-      --color='bg:-1,gutter:#3b4261,label:#7dcfff' \
+      --color='bg:-1,fg+:#c0caf5,bg+:#292e42,hl:#7aa2f7,hl+:#7dcfff,gutter:#3b4261,border:#3b4261,label:#7dcfff,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89,info:#565f89,spinner:#7dcfff' \
       --delimiter=$'\t' \
       --with-nth=7 \
       --header='STATUS      TARGET                      TITLE' \
