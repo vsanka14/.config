@@ -47,7 +47,7 @@ state_status() {
     | select(.status == "idle" or .status == "working" or .status == "awaiting")
     | select((.updated_epoch | type) == "number")
     | select(.updated_epoch <= ($now + 300))
-    | [.status, .updated_epoch] | @tsv
+    | [.status, .updated_epoch, (.flash.kind // ""), (.flash.until_epoch // 0)] | @tsv
   ' "$state_file" 2>/dev/null
 }
 
@@ -96,8 +96,9 @@ status_rank() {
   case "$1" in
     awaiting) printf '1\n' ;;
     working) printf '2\n' ;;
-    idle) printf '3\n' ;;
-    *) printf '4\n' ;;
+    done) printf '3\n' ;;
+    idle) printf '4\n' ;;
+    *) printf '5\n' ;;
   esac
 }
 
@@ -107,6 +108,7 @@ status_label() {
     case "$status" in
       awaiting) printf '⏸ awaiting' ;;
       working) printf '⚙ working' ;;
+      done) printf '✓ done' ;;
       idle) printf '✓ idle' ;;
       *) printf '? unknown' ;;
     esac
@@ -116,36 +118,59 @@ status_label() {
   case "$status" in
     awaiting) printf '\033[38;5;203m⏸ awaiting\033[0m' ;;
     working) printf '\033[38;5;221m⚙ working\033[0m' ;;
+    done) printf '\033[38;5;155m✓ done\033[0m' ;;
     idle) printf '\033[38;5;114m✓ idle\033[0m' ;;
     *) printf '\033[38;5;245m? unknown\033[0m' ;;
   esac
 }
 
+# One pane target inside the current-session pill. The pane numbers keep full
+# per-status colours: awaiting=red, working=yellow, completion flash=cyan ✓,
+# idle=green, unknown=neutral.
+pill_cell() {
+  local rank=$1 pane_target=$2
+  case "$rank" in
+    1) printf '#[fg=#f7768e,bold]%s ' "$pane_target" ;;
+    2) printf '#[fg=#e0af68,bold]%s ' "$pane_target" ;;
+    3) printf '#[fg=#3fb950,bold]✓%s ' "$pane_target" ;;
+    4) printf '#[fg=#9ece6a,nobold]%s ' "$pane_target" ;;
+    *) printf '#[fg=#565f89,nobold]%s ' "$pane_target" ;;
+  esac
+}
+
+# Colour of a session's radar dot. Priority: awaiting (red) > completion flash
+# (green) > current session (green) > other agent (neutral) > no agent (dim). The
+# ◉ vs ● glyph — not the colour — marks the current session, so awaiting still
+# reads red even on the session you're in.
+# priority: 0=awaiting, 1=done flash, 2=agent present, empty=no agent.
+dot_color() {
+  local priority=$1 is_current=$2
+  case "$priority" in
+    0) printf '#f7768e'; return ;;
+    1) printf '#3fb950'; return ;;
+  esac
+  if [ "$is_current" = 1 ]; then printf '#9ece6a'; return; fi
+  case "$priority" in
+    2) printf '#565f89' ;;
+    *) printf '#414868' ;;
+  esac
+}
+
+# Renders the status-right: current-session pill (glyph coloured by the global
+# most-urgent status) followed by a cross-session radar (one dot per session,
+# coloured by that session's most-urgent agent).
 tmux_status() {
-  local session=$1 rank pane_id row_session target label title display pane_target
-  local found=0 output= attention_sessions= attention_positions= attention=
-  local session_order session_position
+  local session=$1
+  local session_order session_count
   session_order=$(
     "$TMUX_BIN" list-sessions -F '#{session_created}	#{session_name}' 2>/dev/null |
       sort -n |
       cut -f2-
   )
-  while IFS=$'\t' read -r rank pane_id row_session target label title display; do
-    if [ "$row_session" = "$session" ]; then
-      pane_target=${target#*:}
-      found=1
-      case "$rank" in
-        1) output="$output #[fg=#f7768e,bold]${pane_target} " ;;
-        2) output="$output #[fg=#e0af68,bold]${pane_target} " ;;
-        3) output="$output #[fg=#9ece6a]${pane_target} " ;;
-        *) output="$output #[fg=#565f89]${pane_target} " ;;
-      esac
-    elif [ "$rank" -eq 1 ] &&
-      ! printf '%s\n' "$attention_sessions" | grep -Fxq "$row_session"; then
-      attention_sessions="${attention_sessions}${attention_sessions:+
-}$row_session"
-    fi
-  done < <(
+  session_count=$(printf '%s' "$session_order" | grep -c .)
+
+  local rows
+  rows=$(
     list_rows |
       awk -F '\t' '
         BEGIN { OFS = "\t" }
@@ -160,27 +185,73 @@ tmux_status() {
       cut -f3-
   )
 
-  if [ -n "$attention_sessions" ]; then
-    while IFS= read -r row_session; do
-      session_position=$(
-        printf '%s\n' "$session_order" |
-          awk -v session="$row_session" '$0 == session { print NR; exit }'
-      )
-      [ -n "$session_position" ] || continue
-      attention_positions="${attention_positions}${attention_positions:+
-}$session_position"
-    done <<<"$attention_sessions"
-    attention=$(printf '%s\n' "$attention_positions" | sort -n | paste -sd, -)
-  fi
-  if [ -n "$attention" ]; then
-    [ -z "$output" ] ||
-      output="$output #[fg=#565f89,nobold]│"
-    output="$output #[fg=#f7768e,bold]! $attention"
-    found=1
+  # Most-urgent priority per session (0=awaiting, 1=done flash, 2=other agent),
+  # computed in awk to stay bash 3.2 safe. done outranks working here so a
+  # completion still flashes green even alongside a working pane.
+  local prioritymap
+  prioritymap=$(printf '%s\n' "$rows" | awk -F '\t' '
+    $1 ~ /^[0-9]+$/ {
+      p = ($1 == 1) ? 0 : ($1 == 3) ? 1 : 2
+      if (!($3 in best) || p < best[$3]) best[$3] = p
+    }
+    END { for (s in best) print s "\t" best[s] }
+  ')
+
+  local global_priority
+  global_priority=$(printf '%s\n' "$prioritymap" | awk -F '\t' 'BEGIN { m = 9 } $2 != "" { if ($2 < m) m = $2 } END { print m }')
+  [ -n "$global_priority" ] || global_priority=9
+
+  # Pill cells for the current session, in pane order.
+  local pill= rank pane_id row_session target label title display pane_target
+  while IFS=$'\t' read -r rank pane_id row_session target label title display; do
+    [ -n "${rank:-}" ] || continue
+    case "$rank" in *[!0-9]*) continue ;; esac
+    [ "$row_session" = "$session" ] || continue
+    pane_target=${target#*:}
+    pill="$pill$(pill_cell "$rank" "$pane_target")"
+  done <<<"$rows"
+
+  # Pill \u2014 only when the current session actually has agent panes.
+  local pill_block=
+  if [ -n "$pill" ]; then
+    local glyph_fg
+    case "$global_priority" in
+      0) glyph_fg="#f7768e" ;;
+      1) glyph_fg="#3fb950" ;;
+      *) glyph_fg="#7dcfff" ;;
+    esac
+    pill_block="#[fg=${glyph_fg},bg=#24283b,bold]   ${pill}#[bg=#050505,nobold]"
   fi
 
-  [ "$found" -eq 1 ] || return
-  printf '#[fg=#7dcfff,bg=#24283b,bold]  %s #[bg=#050505] #[default]' "$output"
+  # Radar \u2014 one dot per session (creation order); only when >1 session exists.
+  local radar=
+  if [ "${session_count:-0}" -gt 1 ]; then
+    local name glyph color dots= current_flag best
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      if [ "$name" = "$session" ]; then
+        glyph="◉"
+        current_flag=1
+      else
+        glyph="●"
+        current_flag=0
+      fi
+      best=$(printf '%s\n' "$prioritymap" | awk -F '\t' -v s="$name" '$1 == s { print $2; exit }')
+      color=$(dot_color "$best" "$current_flag")
+      dots="$dots#[fg=${color}]${glyph} "
+    done <<<"$session_order"
+    radar="$dots"
+  fi
+
+  [ -n "$pill_block" ] || [ -n "$radar" ] || return
+
+  local out=
+  [ -n "$pill_block" ] && out="$pill_block"
+  if [ -n "$radar" ]; then
+    [ -n "$out" ] && out="$out "
+    out="$out$radar"
+  fi
+  printf '%s#[default]' "$out"
 }
 
 format_display_row() {
@@ -192,6 +263,7 @@ format_display_row() {
     case "$status" in
       awaiting) status_cell=$(printf '\033[38;5;203m%s\033[0m' "$status_cell") ;;
       working) status_cell=$(printf '\033[38;5;221m%s\033[0m' "$status_cell") ;;
+      done) status_cell=$(printf '\033[38;5;155m%s\033[0m' "$status_cell") ;;
       idle) status_cell=$(printf '\033[38;5;114m%s\033[0m' "$status_cell") ;;
       *) status_cell=$(printf '\033[38;5;245m%s\033[0m' "$status_cell") ;;
     esac
@@ -260,7 +332,7 @@ list_rows() {
     status=unknown
 
     if state_data=$(state_status "$state_file" "$pane_id"); then
-      IFS=$'\t' read -r hook_status updated_epoch <<<"$state_data"
+      IFS=$'\t' read -r hook_status updated_epoch flash_kind flash_until <<<"$state_data"
       age=$((NOW - updated_epoch))
       if [ "$age" -le "$STALE_SECONDS" ]; then
         status=$hook_status
@@ -271,6 +343,9 @@ list_rows() {
         fi
       else
         status=$fallback
+      fi
+      if [ "$status" = idle ] && [ "$flash_kind" = done ] && [ "${flash_until:-0}" -gt "$NOW" ]; then
+        status=done
       fi
     else
       status=$fallback

@@ -23,7 +23,8 @@ assert_eq() {
 run_hook() {
   local event=$1 payload=${2:-}
   printf '{"hookName":"%s","sessionId":"session-1"%s}' "$event" "$payload" |
-    COPILOT_HOME="$temp_dir/copilot-home" TMUX_PANE='%7' "$hook"
+    COPILOT_HOME="$temp_dir/copilot-home" TMUX_PANE='%7' \
+      TMUX_AGENT_STATUS_REFRESH=0 "$hook"
 }
 
 state_value() {
@@ -47,6 +48,27 @@ assert_eq working "$(state_value .status)" "subagent keeps parent working"
 assert_eq test-agent "$(state_value .subagent_name)" "subagent metadata"
 run_hook agentStop ',"stopReason":"end_turn"'
 assert_eq idle "$(state_value .status)" "agentStop status"
+assert_eq done "$(state_value '.flash.kind')" "agentStop after working flashes done"
+
+# Isolated flash-transition coverage on a separate pane.
+flash_home="$temp_dir/copilot-home"
+flash_run() {
+  local event=$1
+  printf '{"hookName":"%s","sessionId":"flash"}' "$event" |
+    COPILOT_HOME="$flash_home" TMUX_PANE='%20' TMUX_AGENT_STATUS_REFRESH=0 "$hook"
+}
+flash_val() { jq -r "$1 // \"null\"" "$flash_home/agent-status/20.json"; }
+
+flash_run sessionStart
+assert_eq null "$(flash_val '.flash.kind')" "fresh sessionStart does not flash done"
+flash_run preToolUse
+flash_run subagentStop
+assert_eq working "$(flash_val '.status')" "subagentStop keeps working"
+assert_eq null "$(flash_val '.flash.kind')" "subagentStop does not flash done"
+flash_run agentStop
+assert_eq idle "$(flash_val '.status')" "agentStop settles idle"
+assert_eq done "$(flash_val '.flash.kind')" "agentStop after working flashes done (isolated)"
+rm -f "$flash_home/agent-status/20.json"
 
 if grep -Eq 'must not persist|toolInput|prompt' "$temp_dir/copilot-home/agent-status/7.json"; then
   fail "state persisted sensitive payload data"
@@ -186,9 +208,9 @@ assert_eq $'1\t%2\tbeta\tbeta:1.2\t⏸ awaiting\tPermission Fallback' \
   "$(printf '%s\n' "$rows" | sed -n '1p' | cut -f1-6)" "permission fallback precedence"
 assert_eq $'2\t%1\talpha\talpha:1.1\t⚙ working\tAwaiting Hook' \
   "$(printf '%s\n' "$rows" | sed -n '2p' | cut -f1-6)" "working fallback clears stale awaiting hook"
-assert_eq $'3\t%3\tgamma\tgamma:2.1\t✓ idle\tStale Worker' \
+assert_eq $'4\t%3\tgamma\tgamma:2.1\t✓ idle\tStale Worker' \
   "$(printf '%s\n' "$rows" | sed -n '3p' | cut -f1-6)" "stale state fallback"
-assert_eq $'4\t%4\tdelta\tdelta:1.1\t? unknown\tUnknown Session' \
+assert_eq $'5\t%4\tdelta\tdelta:1.1\t? unknown\tUnknown Session' \
   "$(printf '%s\n' "$rows" | sed -n '4p' | cut -f1-6)" "unknown classification"
 assert_eq 'working     alpha:1.1                   Awaiting Hook' \
   "$(printf '%s\n' "$rows" | sed -n '2p' | cut -f7)" "aligned display row"
@@ -227,7 +249,7 @@ tmux_status=$(
     NO_COLOR=1 \
     "$picker" --tmux-status beta
 )
-assert_eq '#[fg=#7dcfff,bg=#24283b,bold]   #[fg=#f7768e,bold]1.2  #[fg=#9ece6a]1.3  #[fg=#9ece6a]1.10  #[bg=#050505] #[default]' \
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#565f89]● #[fg=#f7768e]◉ #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$tmux_status" "tmux status rendering"
 
 cross_session_status=$(
@@ -239,8 +261,60 @@ cross_session_status=$(
     NO_COLOR=1 \
     "$picker" --tmux-status alpha
 )
-assert_eq '#[fg=#7dcfff,bg=#24283b,bold]   #[fg=#e0af68,bold]1.1  #[fg=#565f89,nobold]│ #[fg=#f7768e,bold]! 2 #[bg=#050505] #[default]' \
-  "$cross_session_status" "cross-session attention rendering"
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.1 #[bg=#050505,nobold] #[fg=#9ece6a]◉ #[fg=#f7768e]● #[fg=#565f89]● #[fg=#565f89]● #[default]' \
+  "$cross_session_status" "cross-session radar rendering"
+
+# Transient completion (done) flash: an idle pane carrying an unexpired
+# flash.kind=done renders as rank 3 "done", then decays back to idle.
+cat >>"$fixture_dir/panes" <<'EOF'
+%8	beta	1	4	800	Finished Task - GitHub Copilot
+EOF
+cat >>"$fixture_dir/processes" <<'EOF'
+800 1 bash
+801 800 copilot
+EOF
+cat >"$fixture_dir/capture_8" <<'EOF'
+/ commands · ? help
+EOF
+jq -n \
+  '{pane_id:"%8", session_id:"test", status:"idle", event:"agentStop",
+    updated_at:"test", updated_epoch:2000000000,
+    flash:{kind:"done", until_epoch:2000000005}}' \
+  >"$state_dir/8.json"
+
+done_row=$(
+  FIXTURE_DIR="$fixture_dir" \
+    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
+    TMUX_AGENT_PICKER_NOW=2000000000 \
+    NO_COLOR=1 \
+    "$picker" --list | awk -F '\t' '$2 == "%8" { print $1 "\t" $5 }'
+)
+assert_eq $'3\t✓ done' "$done_row" "active done flash renders as done"
+
+decayed_row=$(
+  FIXTURE_DIR="$fixture_dir" \
+    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
+    TMUX_AGENT_PICKER_NOW=2000000100 \
+    NO_COLOR=1 \
+    "$picker" --list | awk -F '\t' '$2 == "%8" { print $1 "\t" $5 }'
+)
+assert_eq $'4\t✓ idle' "$decayed_row" "expired done flash decays to idle"
+flash_status=$(
+  FIXTURE_DIR="$fixture_dir" \
+    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
+    TMUX_AGENT_PICKER_NOW=2000000000 \
+    NO_COLOR=1 \
+    "$picker" --tmux-status beta
+)
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#3fb950,bold]✓1.4 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#565f89]● #[fg=#f7768e]◉ #[fg=#565f89]● #[fg=#565f89]● #[default]' \
+  "$flash_status" "completion flash renders green in the pill"
+rm -f "$state_dir/8.json"
 
 ask_user_status=$(
   printf '%s\n' \

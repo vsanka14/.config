@@ -9,6 +9,30 @@ trap 'exit 0' ERR HUP INT TERM
 
 command -v jq >/dev/null 2>&1 || exit 0
 
+TMUX_BIN=${TMUX_AGENT_STATUS_TMUX_BIN:-tmux}
+DONE_FLASH_TTL=${TMUX_AGENT_STATUS_DONE_TTL:-3}
+
+refresh_enabled() {
+  [ "${TMUX_AGENT_STATUS_REFRESH:-1}" != 0 ] || return 1
+  command -v "$TMUX_BIN" >/dev/null 2>&1
+}
+
+# Instant, status-only redraw so a transition shows without waiting for the
+# next status-interval tick.
+emit_refresh() {
+  refresh_enabled || return 0
+  "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 || true
+}
+
+# One-shot delayed redraw so a transient "done" flash decays crisply at expiry
+# instead of lingering until the next poll.
+schedule_refresh() {
+  refresh_enabled || return 0
+  [ "${TMUX_AGENT_STATUS_SCHEDULE_REFRESH:-1}" != 0 ] || return 0
+  ( sleep "$DONE_FLASH_TTL"; "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 ) >/dev/null 2>&1 &
+  disown 2>/dev/null || true
+}
+
 valid_pane_id() {
   case "$1" in
     %|%*[!0-9]*|[!%]*|'') return 1 ;;
@@ -119,8 +143,14 @@ case "$process_pid" in
   *[!0-9]*|'') process_pid=0 ;;
 esac
 
+prev_status=
+if [ -f "$state_file" ] && [ ! -L "$state_file" ]; then
+  prev_status=$(jq -r '.status // empty' "$state_file" 2>/dev/null) || prev_status=
+fi
+
 if [ "$status" = removed ]; then
   rm -f -- "$state_file" 2>/dev/null
+  emit_refresh
   exit 0
 fi
 
@@ -147,6 +177,16 @@ subagent_name=$(printf '%.120s' "$subagent_name")
 updated_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null) || exit 0
 updated_epoch=$(date '+%s' 2>/dev/null) || exit 0
 
+# Edge-triggered transient signal: only a real completion (agentStop after the
+# agent was working) flashes "done". Fresh sessionStart idle and subagentStop
+# must not flash.
+flash_kind=
+flash_until=0
+if [ "$event" = agentStop ] && [ "$prev_status" = working ]; then
+  flash_kind=done
+  flash_until=$((updated_epoch + DONE_FLASH_TTL))
+fi
+
 temp_file=$(mktemp "$state_dir/.tmux-agent-status.XXXXXX" 2>/dev/null) || exit 0
 trap 'rm -f -- "$temp_file" 2>/dev/null; exit 0' ERR HUP INT TERM
 
@@ -158,8 +198,10 @@ jq -n \
   --arg tool_name "$tool_name" \
   --arg subagent_name "$subagent_name" \
   --arg updated_at "$updated_at" \
+  --arg flash_kind "$flash_kind" \
   --argjson process_pid "$process_pid" \
-  --argjson updated_epoch "$updated_epoch" '
+  --argjson updated_epoch "$updated_epoch" \
+  --argjson flash_until "$flash_until" '
   {
     pane_id: $pane_id,
     session_id: $session_id,
@@ -171,8 +213,14 @@ jq -n \
   }
   + (if $tool_name == "" then {} else {tool_name: $tool_name} end)
   + (if $subagent_name == "" then {} else {subagent_name: $subagent_name} end)
+  + (if $flash_kind == "" then {} else {flash: {kind: $flash_kind, until_epoch: $flash_until}} end)
 ' >"$temp_file" 2>/dev/null || exit 0
 
 chmod 600 "$temp_file" 2>/dev/null || exit 0
 mv -f -- "$temp_file" "$state_file" 2>/dev/null || exit 0
+
+if [ "$prev_status" != "$status" ] || [ -n "$flash_kind" ]; then
+  emit_refresh
+fi
+[ "$flash_kind" = done ] && schedule_refresh
 exit 0

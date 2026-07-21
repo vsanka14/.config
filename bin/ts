@@ -12,7 +12,6 @@
 #   go <n>       Jump to the nth session by creation order (Alt+1–9)
 #   prev         Switch to previous session in creation order (with wraparound)
 #   next         Switch to next session in creation order (with wraparound)
-#   status       Print status-bar dots for each session (used in status-right)
 #
 
 # --- Subcommands: go / status ---
@@ -42,23 +41,9 @@ case "$1" in
         exit 0
         ;;
     status)
-        sessions=$(tmux list-sessions -F '#{session_created}:#S' 2>/dev/null | sort -n | cut -d: -f2-)
-        current="$2"
-        count=$(echo "$sessions" | grep -c .)
-        if [[ "$count" -le 1 ]]; then
-            echo ""
-            exit 0
-        fi
-        parts=()
-        for ((i = 1; i <= count; i++)); do
-            name=$(echo "$sessions" | sed -n "${i}p")
-            if [[ "$name" == "$current" ]]; then
-                parts+=("#[fg=#9ece6a]●")
-            else
-                parts+=("#[fg=#414868]●")
-            fi
-        done
-        echo "${parts[*]} "
+        # Retired: cross-session status dots are now rendered by
+        # bin/tmux-agent-picker --tmux-status (agent-aware radar). Kept as a
+        # no-op so any stale status-right reference degrades gracefully.
         exit 0
         ;;
     sessions)
