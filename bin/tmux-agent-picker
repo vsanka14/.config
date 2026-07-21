@@ -26,7 +26,7 @@ capture_footer() {
 live_status() {
   local content=$1
   if printf '%s\n' "$content" | grep -Eiq \
-    'do you want to (allow|run|continue)|allow (once|always)|permission required|approval required|select.*(allow|deny)|yes, and don.t ask|press (enter|y) to (allow|continue)|to select .* enter to confirm .* esc to cancel'; then
+    'do you want to (allow|run|continue)|allow (once|always)|permission required|approval required|select.*(allow|deny)|yes, and don.t ask|press (enter|y) to (allow|continue)|to select .* enter to confirm .* esc to cancel|asking user|type your answer|enter to submit .* esc to cancel'; then
     printf 'awaiting\n'
   elif printf '%s\n' "$content" | grep -Eiq \
     'esc (interrupt|stop)|ctrl[+]c (cancel|stop)|(^|[[:space:]])◉[[:space:]].*[[:space:]]·'; then
@@ -119,6 +119,68 @@ status_label() {
     idle) printf '\033[38;5;114m✓ idle\033[0m' ;;
     *) printf '\033[38;5;245m? unknown\033[0m' ;;
   esac
+}
+
+tmux_status() {
+  local session=$1 rank pane_id row_session target label title display pane_target
+  local found=0 output= attention_sessions= attention_positions= attention=
+  local session_order session_position
+  session_order=$(
+    "$TMUX_BIN" list-sessions -F '#{session_created}	#{session_name}' 2>/dev/null |
+      sort -n |
+      cut -f2-
+  )
+  while IFS=$'\t' read -r rank pane_id row_session target label title display; do
+    if [ "$row_session" = "$session" ]; then
+      pane_target=${target#*:}
+      found=1
+      case "$rank" in
+        1) output="$output #[fg=#f7768e,bold]${pane_target} " ;;
+        2) output="$output #[fg=#e0af68,bold]${pane_target} " ;;
+        3) output="$output #[fg=#9ece6a]${pane_target} " ;;
+        *) output="$output #[fg=#565f89]${pane_target} " ;;
+      esac
+    elif [ "$rank" -eq 1 ] &&
+      ! printf '%s\n' "$attention_sessions" | grep -Fxq "$row_session"; then
+      attention_sessions="${attention_sessions}${attention_sessions:+
+}$row_session"
+    fi
+  done < <(
+    list_rows |
+      awk -F '\t' '
+        BEGIN { OFS = "\t" }
+        {
+          position = $4
+          sub(/^.*:/, "", position)
+          split(position, parts, ".")
+          print parts[1] + 0, parts[2] + 0, $0
+        }
+      ' |
+      sort -t $'\t' -k1,1n -k2,2n |
+      cut -f3-
+  )
+
+  if [ -n "$attention_sessions" ]; then
+    while IFS= read -r row_session; do
+      session_position=$(
+        printf '%s\n' "$session_order" |
+          awk -v session="$row_session" '$0 == session { print NR; exit }'
+      )
+      [ -n "$session_position" ] || continue
+      attention_positions="${attention_positions}${attention_positions:+
+}$session_position"
+    done <<<"$attention_sessions"
+    attention=$(printf '%s\n' "$attention_positions" | sort -n | paste -sd, -)
+  fi
+  if [ -n "$attention" ]; then
+    [ -z "$output" ] ||
+      output="$output #[fg=#565f89,nobold]│"
+    output="$output #[fg=#f7768e,bold]! $attention"
+    found=1
+  fi
+
+  [ "$found" -eq 1 ] || return
+  printf '#[fg=#7dcfff,bg=#24283b,bold]  %s #[bg=#050505] #[default]' "$output"
 }
 
 format_display_row() {
@@ -253,6 +315,13 @@ case "${1:-}" in
     ;;
   --live-status)
     live_status "$(cat)"
+    exit 0
+    ;;
+  --tmux-status)
+    [ $# -eq 2 ] || die "--tmux-status requires a session name"
+    require_command "$TMUX_BIN"
+    require_command jq
+    tmux_status "$2"
     exit 0
     ;;
 esac

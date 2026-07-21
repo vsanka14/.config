@@ -131,6 +131,9 @@ case "$1" in
   list-panes)
     cat "$FIXTURE_DIR/panes"
     ;;
+  list-sessions)
+    printf '100\talpha\n200\tbeta\n300\tgamma\n400\tdelta\n'
+    ;;
   capture-pane)
     pane=
     while [ $# -gt 0 ]; do
@@ -191,6 +194,54 @@ assert_eq 'working     alpha:1.1                   Awaiting Hook' \
   "$(printf '%s\n' "$rows" | sed -n '2p' | cut -f7)" "aligned display row"
 [ ! -e "$state_dir/99.json" ] || fail "dead pane state was not pruned"
 
+cat >>"$fixture_dir/panes" <<'EOF'
+%6	beta	1	3	600	Idle Partner - GitHub Copilot
+EOF
+cat >>"$fixture_dir/processes" <<'EOF'
+600 1 bash
+601 600 copilot
+EOF
+cat >"$fixture_dir/capture_6" <<'EOF'
+/ commands · ? help
+EOF
+write_state 6 idle 2000000000
+
+cat >>"$fixture_dir/panes" <<'EOF'
+%7	beta	1	10	700	Tenth Pane - GitHub Copilot
+EOF
+cat >>"$fixture_dir/processes" <<'EOF'
+700 1 bash
+701 700 copilot
+EOF
+cat >"$fixture_dir/capture_7" <<'EOF'
+/ commands · ? help
+EOF
+write_state 7 idle 2000000000
+
+tmux_status=$(
+  FIXTURE_DIR="$fixture_dir" \
+    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
+    TMUX_AGENT_PICKER_NOW=2000000000 \
+    NO_COLOR=1 \
+    "$picker" --tmux-status beta
+)
+assert_eq '#[fg=#7dcfff,bg=#24283b,bold]   #[fg=#f7768e,bold]1.2  #[fg=#9ece6a]1.3  #[fg=#9ece6a]1.10  #[bg=#050505] #[default]' \
+  "$tmux_status" "tmux status rendering"
+
+cross_session_status=$(
+  FIXTURE_DIR="$fixture_dir" \
+    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
+    TMUX_AGENT_PICKER_NOW=2000000000 \
+    NO_COLOR=1 \
+    "$picker" --tmux-status alpha
+)
+assert_eq '#[fg=#7dcfff,bg=#24283b,bold]   #[fg=#e0af68,bold]1.1  #[fg=#565f89,nobold]│ #[fg=#f7768e,bold]! 2 #[bg=#050505] #[default]' \
+  "$cross_session_status" "cross-session attention rendering"
+
 ask_user_status=$(
   printf '%s\n' \
     'Should I commit the tmux agent picker implementation now?' \
@@ -200,6 +251,17 @@ ask_user_status=$(
     "$picker" --live-status
 )
 assert_eq awaiting "$ask_user_status" "ask_user choice prompt classification"
+
+freeform_ask_user_status=$(
+  printf '%s\n' \
+    '○ Asking user What should I wait for before continuing?' \
+    'Question' \
+    'What should I wait for before continuing?' \
+    '❯ Type your answer...' \
+    'enter to submit · esc to cancel' |
+    "$picker" --live-status
+)
+assert_eq awaiting "$freeform_ask_user_status" "ask_user freeform prompt classification"
 
 cat >"$fixture_dir/fzf" <<'EOF'
 #!/usr/bin/env bash

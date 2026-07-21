@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+source_font=$repo_dir/kitty/fonts/CopilotStatus.ttf
+installed_font=$HOME/Library/Fonts/CopilotStatus.ttf
+
+[ -f "$source_font" ] || {
+  printf 'install-copilot-status-font: missing %s\n' "$source_font" >&2
+  exit 1
+}
+
+mkdir -p -- "$(dirname -- "$installed_font")"
+if [ ! -f "$installed_font" ] || ! cmp -s "$source_font" "$installed_font"; then
+  install -m 644 "$source_font" "$installed_font"
+fi
+
+registration_refreshed=0
+if command -v swift >/dev/null 2>&1 &&
+  swift - "$installed_font" <<'SWIFT'
+import CoreText
+import Foundation
+
+let fontURL = URL(fileURLWithPath: CommandLine.arguments[1]) as CFURL
+var error: Unmanaged<CFError>?
+_ = CTFontManagerUnregisterFontsForURL(fontURL, .user, &error)
+error = nil
+if !CTFontManagerRegisterFontsForURL(fontURL, .user, &error) {
+    let reason = error?.takeRetainedValue().localizedDescription ??
+        "unknown CoreText registration error"
+    FileHandle.standardError.write(Data("\(reason)\n".utf8))
+    exit(1)
+}
+SWIFT
+then
+  registration_refreshed=1
+fi
+
+if [ "$registration_refreshed" -eq 1 ] &&
+  command -v kitty >/dev/null 2>&1 &&
+  kitty @ load-config >/dev/null 2>&1; then
+  printf 'Installed Copilot Status font and reloaded Kitty.\n'
+else
+  printf 'Installed Copilot Status font. Restart Kitty to load it.\n'
+fi
