@@ -17,10 +17,19 @@ refresh_enabled() {
   command -v "$TMUX_BIN" >/dev/null 2>&1
 }
 
+# Drop the picker's shared render cache so the very next status-right expansion
+# rebuilds with this transition instead of serving stale state for the cache
+# TTL. Keeps idle redraws coalesced while making real transitions instant.
+invalidate_status_cache() {
+  local dir=${COPILOT_HOME:-${HOME:-}/.copilot}/agent-status
+  rm -f "$dir/.tmux-status.cache" 2>/dev/null || true
+}
+
 # Instant, status-only redraw so a transition shows without waiting for the
 # next status-interval tick.
 emit_refresh() {
   refresh_enabled || return 0
+  invalidate_status_cache
   "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 || true
 }
 
@@ -29,7 +38,7 @@ emit_refresh() {
 schedule_refresh() {
   refresh_enabled || return 0
   [ "${TMUX_AGENT_STATUS_SCHEDULE_REFRESH:-1}" != 0 ] || return 0
-  ( sleep "$DONE_FLASH_TTL"; "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 ) >/dev/null 2>&1 &
+  ( sleep "$DONE_FLASH_TTL"; invalidate_status_cache; "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 ) >/dev/null 2>&1 &
   disown 2>/dev/null || true
 }
 

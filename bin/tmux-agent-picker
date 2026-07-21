@@ -7,8 +7,18 @@ set -euo pipefail
 
 STALE_SECONDS=${TMUX_AGENT_PICKER_STALE_SECONDS:-1800}
 STATE_DIR=${TMUX_AGENT_PICKER_STATE_DIR:-${COPILOT_HOME:-$HOME/.copilot}/agent-status}
+# Deterministic runs (tests) pin NOW; treat that as a signal to bypass the
+# time-based render cache so fixtures stay hermetic.
+if [ -n "${TMUX_AGENT_PICKER_NOW:-}" ]; then NOW_OVERRIDDEN=1; else NOW_OVERRIDDEN=0; fi
 NOW=${TMUX_AGENT_PICKER_NOW:-$(date '+%s')}
 TMUX_BIN=${TMUX_AGENT_PICKER_TMUX_BIN:-tmux}
+# Shared render cache: the status-right #() is expanded once per attached
+# client every status-interval, and each expansion recomputes identical global
+# agent state. Cache the heavy per-pane scan briefly so N clients cost one scan
+# per window instead of N. Set TTL to 0 to disable.
+CACHE_TTL=${TMUX_AGENT_PICKER_CACHE_TTL:-2}
+CACHE_FILE=${TMUX_AGENT_PICKER_CACHE_FILE:-$STATE_DIR/.tmux-status.cache}
+CACHE_LOCK_STALE=${TMUX_AGENT_PICKER_CACHE_LOCK_STALE:-30}
 
 die() {
   printf 'tmux-agent-picker: %s\n' "$*" >&2
@@ -92,16 +102,6 @@ filter_copilot_panes() {
   ' "$panes_file" "$process_file" >"$destination"
 }
 
-status_rank() {
-  case "$1" in
-    awaiting) printf '1\n' ;;
-    working) printf '2\n' ;;
-    done) printf '3\n' ;;
-    idle) printf '4\n' ;;
-    *) printf '5\n' ;;
-  esac
-}
-
 status_label() {
   local status=$1
   if [ "${NO_COLOR:-0}" = 1 ]; then
@@ -156,6 +156,56 @@ dot_color() {
   esac
 }
 
+# Serve the lean status rows from a short-lived shared cache so concurrent
+# status-right expansions (one per attached client, every status-interval)
+# collapse to a single heavy scan per cache window. A single refresher holds a
+# lock and writes atomically; everyone else serves the (possibly stale) cache,
+# falling back to a direct scan only when there's nothing cached yet.
+cached_lean_rows() {
+  if [ "${NOW_OVERRIDDEN:-0}" = 1 ] || [ "${CACHE_TTL:-0}" -le 0 ]; then
+    list_rows lean
+    return
+  fi
+
+  local mtime age lock=$CACHE_FILE.lock
+  if [ -f "$CACHE_FILE" ]; then
+    mtime=$(stat -f %m "$CACHE_FILE" 2>/dev/null || printf '0')
+    age=$((NOW - mtime))
+    if [ "$age" -ge 0 ] && [ "$age" -le "$CACHE_TTL" ]; then
+      cat "$CACHE_FILE"
+      return
+    fi
+  fi
+
+  mkdir -p "$STATE_DIR" 2>/dev/null || { list_rows lean; return; }
+  chmod 700 "$STATE_DIR" 2>/dev/null || true
+
+  # Reap an abandoned lock so a crashed refresher can't freeze the cache.
+  if [ -d "$lock" ]; then
+    mtime=$(stat -f %m "$lock" 2>/dev/null || printf '0')
+    [ $((NOW - mtime)) -le "$CACHE_LOCK_STALE" ] || rmdir "$lock" 2>/dev/null || true
+  fi
+
+  if mkdir "$lock" 2>/dev/null; then
+    local tmp
+    if tmp=$(mktemp "$CACHE_FILE.XXXXXX" 2>/dev/null); then
+      if list_rows lean >"$tmp" 2>/dev/null; then
+        chmod 600 "$tmp" 2>/dev/null || true
+        mv -f "$tmp" "$CACHE_FILE" 2>/dev/null || rm -f "$tmp"
+      else
+        rm -f "$tmp"
+      fi
+    fi
+    rmdir "$lock" 2>/dev/null || true
+  fi
+
+  if [ -f "$CACHE_FILE" ]; then
+    cat "$CACHE_FILE"
+  else
+    list_rows lean
+  fi
+}
+
 # Renders the status-right: current-session pill (glyph coloured by the global
 # most-urgent status) followed by a cross-session radar (one dot per session,
 # coloured by that session's most-urgent agent).
@@ -171,7 +221,7 @@ tmux_status() {
 
   local rows
   rows=$(
-    list_rows |
+    cached_lean_rows |
       awk -F '\t' '
         BEGIN { OFS = "\t" }
         {
@@ -202,8 +252,8 @@ tmux_status() {
   [ -n "$global_priority" ] || global_priority=9
 
   # Pill cells for the current session, in pane order.
-  local pill= rank pane_id row_session target label title display pane_target
-  while IFS=$'\t' read -r rank pane_id row_session target label title display; do
+  local pill= rank pane_id row_session target pane_target
+  while IFS=$'\t' read -r rank pane_id row_session target; do
     [ -n "${rank:-}" ] || continue
     case "$rank" in *[!0-9]*) continue ;; esac
     [ "$row_session" = "$session" ] || continue
@@ -296,7 +346,7 @@ write_process_snapshot() {
 
 list_rows() {
   require_command jq
-
+  local mode=${1:-full}
   local temp_dir process_file panes_file copilot_panes_file live_panes_file rows_file
   temp_dir=$(mktemp -d)
   process_file=$temp_dir/processes
@@ -326,23 +376,33 @@ list_rows() {
     esac
     printf '%s\n' "$pane_id" >>"$live_panes_file"
 
-    footer=$(capture_footer "$pane_id" || true)
-    fallback=$(live_status "$footer")
     state_file=$STATE_DIR/${pane_id#%}.json
     status=unknown
+    hook_status=; updated_epoch=; age=; flash_kind=; flash_until=0
 
     if state_data=$(state_status "$state_file" "$pane_id"); then
       IFS=$'\t' read -r hook_status updated_epoch flash_kind flash_until <<<"$state_data"
       age=$((NOW - updated_epoch))
-      if [ "$age" -le "$STALE_SECONDS" ]; then
-        status=$hook_status
-        if [ "$status" = working ] && [ "$fallback" = awaiting ]; then
-          status=awaiting
-        elif [ "$status" = awaiting ] && [ "$fallback" = working ]; then
-          status=working
-        fi
-      else
-        status=$fallback
+    fi
+
+    # capture-pane + live_status is the most expensive per-pane work. Only pay
+    # for it when the hook state can't settle the status on its own: missing or
+    # stale state (needs a footer fallback) or a working/awaiting pane that the
+    # footer may need to disambiguate. Fresh idle / done-flash panes — the
+    # common idle case — skip the capture entirely.
+    fallback=
+    if [ -z "$hook_status" ] || [ "$age" -gt "$STALE_SECONDS" ] ||
+       [ "$hook_status" = working ] || [ "$hook_status" = awaiting ]; then
+      footer=$(capture_footer "$pane_id" || true)
+      fallback=$(live_status "$footer")
+    fi
+
+    if [ -n "$hook_status" ] && [ "$age" -le "$STALE_SECONDS" ]; then
+      status=$hook_status
+      if [ "$status" = working ] && [ "$fallback" = awaiting ]; then
+        status=awaiting
+      elif [ "$status" = awaiting ] && [ "$fallback" = working ]; then
+        status=working
       fi
       if [ "$status" = idle ] && [ "$flash_kind" = done ] && [ "${flash_until:-0}" -gt "$NOW" ]; then
         status=done
@@ -351,14 +411,26 @@ list_rows() {
       status=$fallback
     fi
 
-    rank=$(status_rank "$status")
-    label=$(status_label "$status")
+    case "$status" in
+      awaiting) rank=1 ;;
+      working) rank=2 ;;
+      done) rank=3 ;;
+      idle) rank=4 ;;
+      *) rank=5 ;;
+    esac
     session=$(clean_field "$session")
     target=$session:$window.$pane_index
-    title=$(clean_title "$title")
-    display=$(format_display_row "$status" "$target" "$title")
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$rank" "$pane_id" "$session" "$target" "$label" "$title" "$display" >>"$rows_file"
+    if [ "$mode" = lean ]; then
+      # The status-right pill/radar only needs rank, pane, session, target;
+      # skip the label/title/display formatting that only the fzf list uses.
+      printf '%s\t%s\t%s\t%s\n' "$rank" "$pane_id" "$session" "$target" >>"$rows_file"
+    else
+      label=$(status_label "$status")
+      title=$(clean_title "$title")
+      display=$(format_display_row "$status" "$target" "$title")
+      printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$rank" "$pane_id" "$session" "$target" "$label" "$title" "$display" >>"$rows_file"
+    fi
   done <"$copilot_panes_file"
 
   if [ -d "$STATE_DIR" ] && [ ! -L "$STATE_DIR" ]; then

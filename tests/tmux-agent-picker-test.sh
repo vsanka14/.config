@@ -316,6 +316,30 @@ assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.2 #[fg=#9ece6a
   "$flash_status" "completion flash renders green in the pill"
 rm -f "$state_dir/8.json"
 
+# Shared render cache: an enabled run (real clock) writes the cache so
+# concurrent status-right expansions can reuse one scan; a pinned-NOW run — as
+# the rest of this suite uses — must bypass the cache entirely for determinism.
+cache_state_dir=$temp_dir/cache-state
+mkdir -p "$cache_state_dir"
+FIXTURE_DIR="$fixture_dir" \
+  TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
+  TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
+  TMUX_AGENT_PICKER_STATE_DIR="$cache_state_dir" \
+  TMUX_AGENT_PICKER_CACHE_TTL=3600 \
+  NO_COLOR=1 \
+  "$picker" --tmux-status beta >/dev/null
+[ -f "$cache_state_dir/.tmux-status.cache" ] || fail "enabled cache run did not write cache"
+
+rm -f "$cache_state_dir/.tmux-status.cache"
+FIXTURE_DIR="$fixture_dir" \
+  TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
+  TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
+  TMUX_AGENT_PICKER_STATE_DIR="$cache_state_dir" \
+  TMUX_AGENT_PICKER_NOW=2000000000 \
+  NO_COLOR=1 \
+  "$picker" --tmux-status beta >/dev/null
+[ ! -e "$cache_state_dir/.tmux-status.cache" ] || fail "pinned-NOW run must not use the cache"
+
 ask_user_status=$(
   printf '%s\n' \
     'Should I commit the tmux agent picker implementation now?' \
