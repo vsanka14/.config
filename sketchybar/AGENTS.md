@@ -13,7 +13,41 @@ unless a task explicitly requests a visual redesign.
 - `plugins/aerospace.sh` renders workspace state and owns the workspace bounce.
 - `../aerospace/aerospace.toml` emits `aerospace_workspace_change` with
   `FOCUSED_WORKSPACE`.
+- `plugins/agent.sh` owns the `agent` item, surfacing Copilot agent status as an
+  inline menu-bar label (see "Agent Notifications" below).
 - Other files in `plugins/` update one independent item each.
+
+## Agent Notifications
+
+The `agent` item propagates Copilot agent status from tmux to the menu bar as an
+inline label next to the agent icon (no popup). It is intentionally a thin
+consumer:
+
+- **Producer**: `../bin/tmux-agent-status` (a Copilot hook) fires
+  `sketchybar --trigger agent_notify` on every real status transition, plus once
+  more when a completion "done" flash expires. All SketchyBar calls there are
+  guarded by `command -v sketchybar`, so machines without SketchyBar are
+  unaffected.
+- **Source of truth**: `plugins/agent.sh` re-derives the icon colour and the
+  notable session list from `../bin/tmux-agent-picker --notify-lines` (which
+  reuses the tmux pill/radar scan and priority folding). Do **not** reimplement
+  the pane scan in the plugin — extend `--notify-lines` instead so the bar and
+  tmux stay in lockstep.
+- **Item contract**: `agent` is hidden (`drawing=off`) unless ≥1 agent is
+  tracked. `plugins/agent.sh` is its single owner.
+- **Transient vs blocking** is derived from state, not a trigger flag:
+  - a completion ("done") shows a **transient** green label; it clears itself
+    because the underlying `flash.kind=done` expires after `DONE_FLASH_TTL` in
+    `../bin/tmux-agent-status`, which also re-fires `agent_notify` so the label
+    drops promptly;
+  - an awaiting-permission agent shows a **blocking** red label with a red-tinted
+    item background, and it persists until the agent leaves the awaiting state.
+- **Colours** mirror the tmux mapping: awaiting `#f7768e`, done `#3fb950`,
+  other `#7dcfff`. Awaiting outranks done for the icon colour, label colour, and
+  background tint. Idle/working-only agents show the icon with no label.
+
+If the `agent_notify` contract changes, update all three:
+`../bin/tmux-agent-status`, `../bin/tmux-agent-picker`, and `plugins/agent.sh`.
 
 ## Event and Animation Architecture
 
@@ -116,3 +150,14 @@ sketchybar --query "space.$focused"
 
 The observer should be subscribed with `drawing=off`, the focused background
 should be on, and the focused icon should settle at `y_offset=0`.
+
+For the agent notification feature:
+
+```bash
+bash -n bin/tmux-agent-status bin/tmux-agent-picker sketchybar/plugins/agent.sh
+bash tests/tmux-agent-picker-test.sh          # covers --notify-lines
+bin/tmux-agent-picker --notify-lines          # COLOR + LINE rows, or empty
+sketchybar --reload
+sketchybar --trigger agent_notify
+sketchybar --query agent                      # drawing reflects tracked agents
+```

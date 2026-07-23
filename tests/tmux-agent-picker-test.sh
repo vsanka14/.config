@@ -441,4 +441,96 @@ preview_output=$(
 grep -Fxq -- '-e' "$preview_args" || fail "tmux preview did not preserve ANSI colors"
 assert_eq $'\033[31mred\033[0m' "$preview_output" "preview ANSI output"
 
+# --notify-lines feeds the SketchyBar agent item/popup. It reuses the lean scan
+# and the same awaiting>done>other priority folding, emitting a global COLOR and
+# one LINE per notable (awaiting|done) session in creation order.
+nfix=$temp_dir/notify-fixtures
+nstate=$temp_dir/notify-state
+mkdir -p "$nfix" "$nstate"
+
+cat >"$nfix/panes" <<'EOF'
+%30	solo	1	1	3000	Solo Agent - GitHub Copilot
+%31	duo	1	1	3100	Duo Agent - GitHub Copilot
+%32	nope	1	1	3200	Not Copilot
+EOF
+cat >"$nfix/processes" <<'EOF'
+3000 1 bash
+3001 3000 copilot
+3100 1 bash
+3101 3100 copilot
+3200 1 bash
+EOF
+for p in 30 31 32; do
+  printf '/ commands · ? help\n' >"$nfix/capture_$p"
+done
+cat >"$nfix/fake-tmux" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1" in
+  list-panes) cat "$FIXTURE_DIR/panes" ;;
+  list-sessions)
+    fmt=
+    while [ $# -gt 0 ]; do
+      if [ "$1" = -F ]; then fmt=$2; break; fi
+      shift
+    done
+    case "$fmt" in
+      *session_created*) printf '3000\tsolo\n3100\tduo\n' ;;
+      *) printf 'solo\nduo\n' ;;
+    esac
+    ;;
+  capture-pane)
+    pane=
+    while [ $# -gt 0 ]; do
+      if [ "$1" = -t ]; then pane=$2; break; fi
+      shift
+    done
+    cat "$FIXTURE_DIR/capture_${pane#%}"
+    ;;
+  switch-client|select-pane|run-shell|refresh-client) exit 0 ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "$nfix/fake-tmux"
+
+nwrite_state() {
+  local pane=$1 status=$2 epoch=$3
+  jq -n --arg pane "%$pane" --arg status "$status" --argjson epoch "$epoch" \
+    '{pane_id:$pane, session_id:"test", status:$status, event:"test", updated_at:"test", updated_epoch:$epoch}' \
+    >"$nstate/$pane.json"
+}
+
+notify_run() {
+  local now=$1
+  FIXTURE_DIR="$nfix" \
+    TMUX_AGENT_PICKER_TMUX_BIN="$nfix/fake-tmux" \
+    TMUX_AGENT_PICKER_PS_FILE="$nfix/processes" \
+    TMUX_AGENT_PICKER_STATE_DIR="$nstate" \
+    TMUX_AGENT_PICKER_NOW="$now" \
+    NO_COLOR=1 \
+    "$picker" --notify-lines
+}
+
+# Awaiting (solo) + active done flash (duo): awaiting outranks done for the icon
+# colour, and each notable session gets a line in creation order.
+nwrite_state 30 awaiting 3000000000
+jq -n '{pane_id:"%31", session_id:"test", status:"idle", event:"agentStop",
+        updated_at:"test", updated_epoch:3000000000,
+        flash:{kind:"done", until_epoch:3000000005}}' >"$nstate/31.json"
+assert_eq $'COLOR\t#f7768e\nLINE\tsolo\tawaiting\nLINE\tduo\tdone' \
+  "$(notify_run 3000000000)" "notify-lines emits awaiting+done in creation order"
+
+# Both idle (done flash expired): icon still shows (agents tracked) but no
+# notable lines, so the popup would be empty.
+nwrite_state 30 idle 3000000000
+assert_eq $'COLOR\t#7dcfff' \
+  "$(notify_run 3000000100)" "notify-lines shows colour-only when nothing notable"
+
+# No Copilot panes tracked: no output at all, so the bar icon hides.
+cat >"$nfix/panes" <<'EOF'
+%32	nope	1	1	3200	Not Copilot
+EOF
+rm -f "$nstate"/*.json
+assert_eq '' "$(notify_run 3000000000)" "notify-lines emits nothing when no agents are tracked"
+
 printf 'ok - tmux agent picker fixtures\n'

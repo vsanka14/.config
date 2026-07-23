@@ -18,6 +18,25 @@ refresh_enabled() {
   command -v "$TMUX_BIN" >/dev/null 2>&1
 }
 
+# SketchyBar notifications ride the same enable switch as the tmux redraw so
+# tests (which pin TMUX_AGENT_STATUS_REFRESH=0) stay hermetic. Guarded by the
+# binary so machines without SketchyBar are unaffected.
+sketchybar_enabled() {
+  [ "${TMUX_AGENT_STATUS_SKETCHYBAR:-1}" != 0 ] || return 1
+  [ "${TMUX_AGENT_STATUS_REFRESH:-1}" != 0 ] || return 1
+  command -v sketchybar >/dev/null 2>&1
+}
+
+# Push a transient agent notification to the menu bar on a real transition. The
+# SketchyBar plugin re-derives the full notable set (and whether it is a blocking
+# awaiting or a transient done) via tmux-agent-picker, so no per-pane payload is
+# needed here. Fire-and-forget; never blocks the hook.
+emit_sketchybar_notify() {
+  sketchybar_enabled || return 0
+  ( sketchybar --trigger agent_notify >/dev/null 2>&1 ) &
+  disown 2>/dev/null || true
+}
+
 # Drop the picker's shared render cache so the very next status-right expansion
 # rebuilds with this transition instead of serving stale state for the cache
 # TTL. Keeps idle redraws coalesced while making real transitions instant.
@@ -50,6 +69,8 @@ schedule_refresh() {
     else
       "$TMUX_BIN" refresh-client -S >/dev/null 2>&1
     fi
+    command -v sketchybar >/dev/null 2>&1 &&
+      sketchybar --trigger agent_notify >/dev/null 2>&1
   ) >/dev/null 2>&1 &
   disown 2>/dev/null || true
 }
@@ -172,6 +193,7 @@ fi
 if [ "$status" = removed ]; then
   rm -f -- "$state_file" 2>/dev/null
   emit_refresh
+  emit_sketchybar_notify
   exit 0
 fi
 
@@ -242,6 +264,7 @@ mv -f -- "$temp_file" "$state_file" 2>/dev/null || exit 0
 
 if [ "$prev_status" != "$status" ] || [ -n "$flash_kind" ]; then
   emit_refresh
+  emit_sketchybar_notify
 fi
 [ "$flash_kind" = done ] && schedule_refresh
 exit 0

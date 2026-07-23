@@ -79,6 +79,9 @@ sketchybar --default \
 sketchybar --add event aerospace_workspace_change
 sketchybar --add event aerospace_mode_change
 
+# Copilot agent notifications (raised by bin/tmux-agent-status).
+sketchybar --add event agent_notify
+
 # Workspace icons (Nerd Font). Keep this indexed for macOS Bash 3.2.
 SPACE_ICONS=(
     [1]="󰖟"   # browser
@@ -204,6 +207,33 @@ sketchybar --add bracket clock_container calendar clock \
         background.corner_radius=6 \
         background.height=24 \
         background.drawing=on
+
+# Copilot agent status (right side, left of the clock cluster). Persistent only
+# while at least one agent is tracked. A completion shows a transient green label
+# next to the icon; an awaiting-permission agent shows a blocking red label with
+# a red-tinted background. The plugin owns visibility, colour, and label text.
+# The Copilot glyph reads a touch heavy, so render it ~2pt below ICON_SIZE.
+AGENT_ICON_SIZE=$(awk -v s="$ICON_SIZE" 'BEGIN { printf "%.1f", s - 2 }')
+sketchybar --add item agent right \
+    --set agent \
+        drawing=off \
+        icon="" \
+        icon.font="$FONT:Bold:$AGENT_ICON_SIZE" \
+        icon.color=$ACCENT_CYAN \
+        icon.padding_left=8 \
+        icon.padding_right=6 \
+        label.drawing=off \
+        label.font="$FONT:Medium:$LABEL_SIZE" \
+        label.max_chars=42 \
+        label.padding_left=2 \
+        label.padding_right=10 \
+        background.color=$CONTAINER_BG_COLOR \
+        background.corner_radius=6 \
+        background.height=24 \
+        background.drawing=on \
+        update_freq=30 \
+        script="$CONFIG_DIR/plugins/agent.sh" \
+    --subscribe agent agent_notify
 
 # Reload when the external display is connected or disconnected.
 sketchybar --add item display_watcher left \
