@@ -555,6 +555,12 @@ list_rows() {
         status=awaiting
       elif [ "$status" = awaiting ] && [ "$fallback" = working ]; then
         status=working
+      elif [ "$status" = awaiting ] && [ "$fallback" = idle ]; then
+        # A stale permissionRequest awaiting state that was never cleared (e.g.
+        # the prompt was cancelled without a follow-up hook event) would linger
+        # red for up to STALE_SECONDS. A confirmed idle footer means the prompt
+        # is gone, so let it recover instead of waiting out the staleness window.
+        status=idle
       fi
       if [ "$status" = idle ] && [ "$flash_kind" = done ] && [ "${flash_until:-0}" -gt "$NOW" ]; then
         status=done
