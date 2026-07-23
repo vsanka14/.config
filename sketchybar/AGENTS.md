@@ -33,8 +33,10 @@ consumer:
   reuses the tmux pill/radar scan and priority folding). Do **not** reimplement
   the pane scan in the plugin — extend `--notify-lines` instead so the bar and
   tmux stay in lockstep.
-- **Item contract**: `agent` is hidden (`drawing=off`) unless ≥1 agent is
-  tracked. `plugins/agent.sh` is its single owner.
+- **Item contract**: `agent` is hidden (`drawing=off`) unless there is a
+  **notable** agent (awaiting or done). Idle/working-only agents draw nothing, so
+  the icon only appears when it needs attention. `plugins/agent.sh` is its single
+  owner.
 - **Transient vs blocking** is derived from state, not a trigger flag:
   - a completion ("done") shows a **transient** green label; it clears itself
     because the underlying `flash.kind=done` expires after `DONE_FLASH_TTL` in
@@ -44,7 +46,8 @@ consumer:
     item background, and it persists until the agent leaves the awaiting state.
 - **Colours** mirror the tmux mapping: awaiting `#f7768e`, done `#3fb950`,
   other `#7dcfff`. Awaiting outranks done for the icon colour, label colour, and
-  background tint. Idle/working-only agents show the icon with no label.
+  background tint. Idle/working-only agents are not notable, so the item is
+  hidden for them.
 
 If the `agent_notify` contract changes, update all three:
 `../bin/tmux-agent-status`, `../bin/tmux-agent-picker`, and `plugins/agent.sh`.

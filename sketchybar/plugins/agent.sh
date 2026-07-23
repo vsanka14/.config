@@ -6,6 +6,9 @@
 #     the underlying flash expires (~DONE_FLASH_TTL in bin/tmux-agent-status);
 #   - an awaiting-permission agent shows a blocking red label (with a red-tinted
 #     item background) that persists until the agent moves on.
+# The item is hidden entirely unless there is a notable agent (awaiting or done);
+# idle/working-only agents draw nothing, so the icon only appears when it needs
+# attention.
 # The `bin/tmux-agent-status` hook raises `sketchybar --trigger agent_notify` on
 # every real transition, and the notable set + colour are re-derived from
 # `bin/tmux-agent-picker --notify-lines`, so this plugin never duplicates the
@@ -83,14 +86,12 @@ elif [ "$done_count" -gt 0 ]; then
 fi
 
 # Compose a compact label from the notable entries, capped with a "+N" tail so
-# the bar never overflows. No notable entries => icon only.
+# the bar never overflows. No notable entries (idle/working-only agents) => hide
+# the item entirely so the icon only appears when it needs attention (an
+# awaiting-permission or freshly-completed agent).
 total=${#entries[@]}
 if [ "$total" -eq 0 ]; then
-  sketchybar --set "$ITEM" \
-    drawing=on \
-    "icon.color=$icon_color" \
-    "background.color=$BG_NEUTRAL" \
-    label.drawing=off >/dev/null 2>&1
+  hide_item
   exit 0
 fi
 
