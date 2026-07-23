@@ -11,6 +11,7 @@ command -v jq >/dev/null 2>&1 || exit 0
 
 TMUX_BIN=${TMUX_AGENT_STATUS_TMUX_BIN:-tmux}
 DONE_FLASH_TTL=${TMUX_AGENT_STATUS_DONE_TTL:-3}
+PICKER_BIN=${TMUX_AGENT_STATUS_PICKER_BIN:-${HOME:-}/.config/bin/tmux-agent-picker}
 
 refresh_enabled() {
   [ "${TMUX_AGENT_STATUS_REFRESH:-1}" != 0 ] || return 1
@@ -25,11 +26,16 @@ invalidate_status_cache() {
   rm -f "$dir/.tmux-status.cache" 2>/dev/null || true
 }
 
-# Instant, status-only redraw so a transition shows without waiting for the
-# next status-interval tick.
+# Redraw so a transition shows without waiting for the next status-interval tick.
+# The picker's status-right render only cats a precomputed string, so regenerate
+# those strings off the render path first (--refresh recomputes and then redraws).
+# Falls back to a plain redraw when the picker isn't present.
 emit_refresh() {
   refresh_enabled || return 0
   invalidate_status_cache
+  if [ -x "$PICKER_BIN" ] && "$TMUX_BIN" run-shell -b "'$PICKER_BIN' --refresh --notify" >/dev/null 2>&1; then
+    return 0
+  fi
   "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 || true
 }
 
@@ -38,7 +44,13 @@ emit_refresh() {
 schedule_refresh() {
   refresh_enabled || return 0
   [ "${TMUX_AGENT_STATUS_SCHEDULE_REFRESH:-1}" != 0 ] || return 0
-  ( sleep "$DONE_FLASH_TTL"; invalidate_status_cache; "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 ) >/dev/null 2>&1 &
+  ( sleep "$DONE_FLASH_TTL"; invalidate_status_cache
+    if [ -x "$PICKER_BIN" ] && "$TMUX_BIN" run-shell -b "'$PICKER_BIN' --refresh --notify" >/dev/null 2>&1; then
+      :
+    else
+      "$TMUX_BIN" refresh-client -S >/dev/null 2>&1
+    fi
+  ) >/dev/null 2>&1 &
   disown 2>/dev/null || true
 }
 

@@ -154,7 +154,15 @@ case "$1" in
     cat "$FIXTURE_DIR/panes"
     ;;
   list-sessions)
-    printf '100\talpha\n200\tbeta\n300\tgamma\n400\tdelta\n'
+    fmt=
+    while [ $# -gt 0 ]; do
+      if [ "$1" = -F ]; then fmt=$2; break; fi
+      shift
+    done
+    case "$fmt" in
+      *session_created*) printf '100\talpha\n200\tbeta\n300\tgamma\n400\tdelta\n' ;;
+      *) printf 'alpha\nbeta\ngamma\ndelta\n' ;;
+    esac
     ;;
   capture-pane)
     pane=
@@ -167,7 +175,7 @@ case "$1" in
     done
     cat "$FIXTURE_DIR/capture_${pane#%}"
     ;;
-  switch-client|select-pane)
+  switch-client|select-pane|run-shell|refresh-client)
     exit 0
     ;;
   *)
@@ -263,6 +271,37 @@ cross_session_status=$(
 )
 assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.1 #[bg=#050505,nobold] #[fg=#9ece6a]◉ #[fg=#f7768e]● #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$cross_session_status" "cross-session radar rendering"
+
+# Precompute (--refresh) writes each session's status-right string to STATUS_DIR,
+# and the render path (--tmux-status-cached) serves it by a bare cat so a session
+# switch never blocks on the agent scan. Compare against the live synchronous
+# render so the two paths are provably identical.
+picker_env=(
+  FIXTURE_DIR="$fixture_dir"
+  TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux"
+  TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes"
+  TMUX_AGENT_PICKER_STATE_DIR="$state_dir"
+  TMUX_AGENT_PICKER_NOW=2000000000
+  NO_COLOR=1
+)
+direct_beta=$(env "${picker_env[@]}" "$picker" --tmux-status beta)
+beta_key=$(printf 'beta' | od -An -v -tx1 | tr -d ' \n')
+
+env "${picker_env[@]}" "$picker" --refresh
+[ -f "$state_dir/.status/$beta_key.txt" ] || fail "--refresh did not write beta status file"
+assert_eq "$direct_beta" "$(cat "$state_dir/.status/$beta_key.txt")" "precomputed beta status content matches direct render"
+assert_eq "$direct_beta" "$(env "${picker_env[@]}" "$picker" --tmux-status-cached beta)" "cached render serves precomputed string"
+
+# The cached render must return the file verbatim, not recompute — a sentinel in
+# the precomputed file proves the scan is off the render path.
+printf 'SENTINEL-CACHED' >"$state_dir/.status/$beta_key.txt"
+assert_eq 'SENTINEL-CACHED' "$(env "${picker_env[@]}" "$picker" --tmux-status-cached beta)" "cached render cats the precomputed file verbatim"
+
+# With no precomputed file, the cached render falls back to a synchronous compute
+# so first paint is never worse than the previous always-synchronous behavior.
+rm -rf "$state_dir/.status"
+assert_eq "$direct_beta" "$(env "${picker_env[@]}" "$picker" --tmux-status-cached beta)" "cached render falls back to sync compute when uncached"
+rm -rf "$state_dir/.status"
 
 # Transient completion (done) flash: an idle pane carrying an unexpired
 # flash.kind=done renders as rank 3 "done", then decays back to idle.

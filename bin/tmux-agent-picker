@@ -19,6 +19,16 @@ TMUX_BIN=${TMUX_AGENT_PICKER_TMUX_BIN:-tmux}
 CACHE_TTL=${TMUX_AGENT_PICKER_CACHE_TTL:-2}
 CACHE_FILE=${TMUX_AGENT_PICKER_CACHE_FILE:-$STATE_DIR/.tmux-status.cache}
 CACHE_LOCK_STALE=${TMUX_AGENT_PICKER_CACHE_LOCK_STALE:-30}
+# Precomputed per-session status-right strings. The render path
+# (--tmux-status-cached) only cats these files, so a session switch never blocks
+# on the heavy agent scan; a background --refresh (driven by the Copilot hook and
+# idle status-interval ticks) keeps them current. STATUS_TTL bounds how stale a
+# cat may be before a render schedules a background refresh.
+STATUS_DIR=${TMUX_AGENT_PICKER_STATUS_DIR:-$STATE_DIR/.status}
+STATUS_STAMP=$STATUS_DIR/.stamp
+STATUS_TTL=${TMUX_AGENT_PICKER_STATUS_TTL:-2}
+STATUS_LOCK=$STATUS_DIR/.refresh.lock
+STATUS_LOCK_STALE=${TMUX_AGENT_PICKER_STATUS_LOCK_STALE:-30}
 
 die() {
   printf 'tmux-agent-picker: %s\n' "$*" >&2
@@ -306,6 +316,94 @@ tmux_status() {
   printf '%s#[default]' "$out"
 }
 
+# Filename-safe, collision-free key for a session name (hex of its raw bytes).
+session_key() {
+  printf '%s' "$1" | od -An -v -tx1 2>/dev/null | tr -d ' \n'
+}
+
+# Seconds since a file was last modified, or a large sentinel when it's absent.
+file_age() {
+  local mtime
+  mtime=$(stat -f %m "$1" 2>/dev/null) || { printf '%s' 999999; return; }
+  printf '%s' "$((NOW - mtime))"
+}
+
+# Precompute every session's status-right string into STATUS_DIR so the render
+# path becomes a bare cat. One heavy scan (served through the shared lean cache)
+# feeds every per-session render. Serialized by a lock that self-heals once it
+# ages past STATUS_LOCK_STALE. Pass 1 to redraw clients when done.
+refresh_all() {
+  local notify=${1:-0}
+  require_command "$TMUX_BIN"
+  require_command jq
+  mkdir -p "$STATUS_DIR" 2>/dev/null || return 1
+  chmod 700 "$STATUS_DIR" 2>/dev/null || true
+
+  if [ -d "$STATUS_LOCK" ]; then
+    local lmtime
+    lmtime=$(stat -f %m "$STATUS_LOCK" 2>/dev/null || printf '0')
+    [ $((NOW - lmtime)) -le "$STATUS_LOCK_STALE" ] || rmdir "$STATUS_LOCK" 2>/dev/null || true
+  fi
+  # A busy lock means another refresher is mid-flight; it will redraw for us.
+  mkdir "$STATUS_LOCK" 2>/dev/null || return 0
+
+  local sessions keep=" " name key out tmp f base
+  sessions=$("$TMUX_BIN" list-sessions -F '#{session_name}' 2>/dev/null) || sessions=
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    key=$(session_key "$name")
+    keep="$keep$key "
+    out=$(tmux_status "$name" || true)
+    if tmp=$(mktemp "$STATUS_DIR/.status.XXXXXX" 2>/dev/null); then
+      printf '%s' "$out" >"$tmp"
+      chmod 600 "$tmp" 2>/dev/null || true
+      mv -f "$tmp" "$STATUS_DIR/$key.txt" 2>/dev/null || rm -f "$tmp"
+    fi
+  done <<<"$sessions"
+
+  # Drop precomputed files for sessions that no longer exist.
+  for f in "$STATUS_DIR"/*.txt; do
+    [ -e "$f" ] || break
+    base=$(basename "$f" .txt)
+    case "$keep" in
+      *" $base "*) : ;;
+      *) rm -f "$f" ;;
+    esac
+  done
+
+  : >"$STATUS_STAMP" 2>/dev/null || true
+  rmdir "$STATUS_LOCK" 2>/dev/null || true
+
+  if [ "$notify" = 1 ]; then
+    "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 || true
+  fi
+}
+
+# Schedule a non-blocking background refresh when the precomputed strings are
+# stale. Rate-limited by STATUS_TTL; work is deduped by refresh_all's lock. No-op
+# under pinned NOW (tests) or without a reachable tmux.
+schedule_refresh() {
+  [ "${NOW_OVERRIDDEN:-0}" = 1 ] && return 0
+  command -v "$TMUX_BIN" >/dev/null 2>&1 || return 0
+  [ "$(file_age "$STATUS_STAMP")" -ge "$STATUS_TTL" ] || return 0
+  "$TMUX_BIN" run-shell -b "'$0' --refresh --notify" >/dev/null 2>&1 || true
+}
+
+# status-right render path: cat the precomputed string (~1ms) so a session
+# switch never waits on the agent scan. Falls back to a synchronous compute only
+# when no precomputed string exists yet (first paint), which is no worse than the
+# previous always-synchronous behavior.
+tmux_status_cached() {
+  local session=$1 file
+  file=$STATUS_DIR/$(session_key "$session").txt
+  if [ -f "$file" ]; then
+    cat "$file"
+  else
+    tmux_status "$session"
+  fi
+  schedule_refresh
+}
+
 format_display_row() {
   local status=$1 target=$2 title=$3 status_cell target_cell
   status_cell=$(printf '%-10s' "$status")
@@ -474,6 +572,17 @@ case "${1:-}" in
     require_command "$TMUX_BIN"
     require_command jq
     tmux_status "$2"
+    exit 0
+    ;;
+  --tmux-status-cached)
+    [ $# -eq 2 ] || die "--tmux-status-cached requires a session name"
+    tmux_status_cached "$2"
+    exit 0
+    ;;
+  --refresh)
+    notify=0
+    if [ "${2:-}" = --notify ]; then notify=1; fi
+    refresh_all "$notify"
     exit 0
     ;;
 esac
