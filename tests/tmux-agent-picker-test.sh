@@ -526,6 +526,19 @@ nwrite_state 30 idle 3000000000
 assert_eq $'COLOR\t#7dcfff' \
   "$(notify_run 3000000100)" "notify-lines shows colour-only when nothing notable"
 
+# A stale awaiting whose prompt was cancelled without a follow-up hook event:
+# once past the grace window, a confirmed-idle footer lets it recover to idle
+# instead of lingering red until STALE_SECONDS.
+nwrite_state 30 awaiting 3000000000
+nwrite_state 31 idle 3000000000
+assert_eq $'COLOR\t#7dcfff' \
+  "$(notify_run 3000000010)" "notify-lines recovers stale awaiting when footer is idle past grace"
+
+# ...but a fresh awaiting (within the grace window) stays authoritative even when
+# the captured footer looks idle, so real permission prompts are never dropped.
+assert_eq $'COLOR\t#f7768e\nLINE\tsolo\tawaiting' \
+  "$(notify_run 3000000003)" "notify-lines keeps fresh awaiting despite idle footer"
+
 # No Copilot panes tracked: no output at all, so the bar icon hides.
 cat >"$nfix/panes" <<'EOF'
 %32	nope	1	1	3200	Not Copilot

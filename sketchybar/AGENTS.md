@@ -25,9 +25,14 @@ consumer:
 
 - **Producer**: `../bin/tmux-agent-status` (a Copilot hook) fires
   `sketchybar --trigger agent_notify` on every real status transition, plus once
-  more when a completion "done" flash expires. All SketchyBar calls there are
-  guarded by `command -v sketchybar`, so machines without SketchyBar are
-  unaffected.
+  more when a completion "done" flash expires. `../bin/tmux-agent-picker` also
+  fires `agent_notify` from its `--refresh --notify` path (the same background
+  refresh that redraws the tmux status-right), so footer-detected states that
+  never reach the Copilot hook — e.g. a blocking permission prompt — surface on
+  the bar at tmux speed instead of waiting out `agent`'s slow `update_freq`. All
+  SketchyBar calls in both are guarded by `command -v sketchybar` (and the
+  `TMUX_AGENT_PICKER_SKETCHYBAR` / `TMUX_AGENT_STATUS_SKETCHYBAR` switches for
+  hermetic tests), so machines without SketchyBar are unaffected.
 - **Source of truth**: `plugins/agent.sh` re-derives the icon colour and the
   notable session list from `../bin/tmux-agent-picker --notify-lines` (which
   reuses the tmux pill/radar scan and priority folding). Do **not** reimplement

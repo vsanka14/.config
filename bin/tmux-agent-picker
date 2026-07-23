@@ -6,6 +6,13 @@
 set -euo pipefail
 
 STALE_SECONDS=${TMUX_AGENT_PICKER_STALE_SECONDS:-1800}
+# How long a hook `awaiting` state is trusted over an idle-looking footer. A real
+# pending prompt keeps its prompt text in the captured footer (so the footer
+# fallback reads `awaiting` and this grace never applies); this window only
+# guards the brief moment right after a permissionRequest transition where the
+# footer capture may lag the hook. Past it, a confirmed-idle footer means a
+# cancelled/abandoned prompt and the stale awaiting is allowed to recover.
+AWAITING_IDLE_GRACE=${TMUX_AGENT_PICKER_AWAITING_IDLE_GRACE:-5}
 STATE_DIR=${TMUX_AGENT_PICKER_STATE_DIR:-${COPILOT_HOME:-$HOME/.copilot}/agent-status}
 # Deterministic runs (tests) pin NOW; treat that as a signal to bypass the
 # time-based render cache so fixtures stay hermetic.
@@ -425,6 +432,18 @@ refresh_all() {
 
   if [ "$notify" = 1 ]; then
     "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 || true
+    # Keep the SketchyBar agent item in lockstep with the tmux redraw. The
+    # Copilot hook only fires agent_notify on real transitions, so footer-detected
+    # states (e.g. a permission/blocking prompt that never reaches the hook) would
+    # otherwise wait out SketchyBar's slow update_freq. Nudging it here lets the
+    # bar track every polling-driven refresh at tmux speed. Guarded + fire-and-
+    # forget so machines without SketchyBar are unaffected and the scan never
+    # blocks on it.
+    if [ "${TMUX_AGENT_PICKER_SKETCHYBAR:-1}" != 0 ] &&
+       command -v sketchybar >/dev/null 2>&1; then
+      ( sketchybar --trigger agent_notify >/dev/null 2>&1 ) &
+      disown 2>/dev/null || true
+    fi
   fi
 }
 
@@ -555,11 +574,14 @@ list_rows() {
         status=awaiting
       elif [ "$status" = awaiting ] && [ "$fallback" = working ]; then
         status=working
-      elif [ "$status" = awaiting ] && [ "$fallback" = idle ]; then
+      elif [ "$status" = awaiting ] && [ "$fallback" = idle ] &&
+           [ "${age:-0}" -gt "$AWAITING_IDLE_GRACE" ]; then
         # A stale permissionRequest awaiting state that was never cleared (e.g.
         # the prompt was cancelled without a follow-up hook event) would linger
-        # red for up to STALE_SECONDS. A confirmed idle footer means the prompt
-        # is gone, so let it recover instead of waiting out the staleness window.
+        # red for up to STALE_SECONDS. Once past the grace window, a confirmed
+        # idle footer means the prompt is gone, so let it recover instead of
+        # waiting out the staleness window. Fresh awaiting transitions (within
+        # the grace window) stay authoritative even if the footer capture lags.
         status=idle
       fi
       if [ "$status" = idle ] && [ "$flash_kind" = done ] && [ "${flash_until:-0}" -gt "$NOW" ]; then
