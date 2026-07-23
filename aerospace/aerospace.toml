@@ -66,9 +66,22 @@ ctrl-comma = 'layout accordion horizontal'       # Stacked/accordion (default)
 ctrl-period = 'layout tiles horizontal vertical' # Side-by-side tiles
 ctrl-shift-space = 'layout floating tiling'      # Toggle floating <-> tiling
 
-# Join controls - tmux style (| horizontal, _ vertical)
-ctrl-shift-backslash = 'join-with right'         # Join horizontally (ctrl+|)
-ctrl-shift-minus = 'join-with down'              # Join vertically (ctrl+_)
+# Join controls - merge the focused window with the neighbor in a direction.
+# Directional scheme, consistent with the rest: focus=ctrl+cmd, move=ctrl+shift,
+# join=ctrl+alt. The hjkl direction = where the neighbor is.
+# NOTE: with opposite-orientation normalization ON, joining two SIDE-BY-SIDE
+# windows nests them into a VERTICAL stack (this is how you build a "2 stacked
+# on the left + 1 on the right" master-stack layout).
+# Recipe: ctrl+.  ->  focus the leftmost window  ->  ctrl+alt+l (join right)
+# Un-join / exit a joined group with ctrl+alt+u (flatten) below.
+ctrl-alt-h = 'join-with left'                    # Merge with the window to the LEFT
+ctrl-alt-j = 'join-with down'                    # Merge with the window BELOW
+ctrl-alt-k = 'join-with up'                      # Merge with the window ABOVE
+ctrl-alt-l = 'join-with right'                   # Merge with the window to the RIGHT
+
+# Un-join: dissolve ALL nesting/groups on the workspace back to a flat layout.
+# This is how you "exit" a join you no longer want.
+ctrl-alt-u = 'flatten-workspace-tree'
 
 # Resize mode
 ctrl-cmd-r = ['mode resize', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=resize']
