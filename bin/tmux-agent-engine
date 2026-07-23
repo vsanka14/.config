@@ -1,44 +1,55 @@
 #!/usr/bin/env bash
 
-# Requires bin/tmux-agent-status and its Copilot registration at
-# ~/.copilot/hooks/tmux-agent-status.json.
+# tmux-agent-engine: the single source of truth for Copilot agent status.
+# Despite the interactive Alt+C popup being its most visible mode, this is the
+# shared engine behind ALL three surfaces — it does the pane scan + status
+# derivation once and every consumer renders from it:
+#   (no args)               -> interactive fzf picker popup (Alt+C)
+#   --tmux-status-cached    -> tmux status-right pill + cross-session radar dots
+#   --notify-lines          -> SketchyBar agent item feed
+#   --refresh [--notify]    -> recompute cached strings; redraw tmux + nudge bar
+# Consumers must NOT re-implement the scan; extend a mode here so every surface
+# stays in lockstep.
+#
+# Requires bin/tmux-agent-status (the Copilot hook that produces the per-pane
+# state) and its registration at ~/.copilot/hooks/tmux-agent-status.json.
 
 set -euo pipefail
 
-STALE_SECONDS=${TMUX_AGENT_PICKER_STALE_SECONDS:-1800}
+STALE_SECONDS=${TMUX_AGENT_ENGINE_STALE_SECONDS:-1800}
 # How long a hook `awaiting` state is trusted over an idle-looking footer. A real
 # pending prompt keeps its prompt text in the captured footer (so the footer
 # fallback reads `awaiting` and this grace never applies); this window only
 # guards the brief moment right after a permissionRequest transition where the
 # footer capture may lag the hook. Past it, a confirmed-idle footer means a
 # cancelled/abandoned prompt and the stale awaiting is allowed to recover.
-AWAITING_IDLE_GRACE=${TMUX_AGENT_PICKER_AWAITING_IDLE_GRACE:-5}
-STATE_DIR=${TMUX_AGENT_PICKER_STATE_DIR:-${COPILOT_HOME:-$HOME/.copilot}/agent-status}
+AWAITING_IDLE_GRACE=${TMUX_AGENT_ENGINE_AWAITING_IDLE_GRACE:-5}
+STATE_DIR=${TMUX_AGENT_ENGINE_STATE_DIR:-${COPILOT_HOME:-$HOME/.copilot}/agent-status}
 # Deterministic runs (tests) pin NOW; treat that as a signal to bypass the
 # time-based render cache so fixtures stay hermetic.
-if [ -n "${TMUX_AGENT_PICKER_NOW:-}" ]; then NOW_OVERRIDDEN=1; else NOW_OVERRIDDEN=0; fi
-NOW=${TMUX_AGENT_PICKER_NOW:-$(date '+%s')}
-TMUX_BIN=${TMUX_AGENT_PICKER_TMUX_BIN:-tmux}
+if [ -n "${TMUX_AGENT_ENGINE_NOW:-}" ]; then NOW_OVERRIDDEN=1; else NOW_OVERRIDDEN=0; fi
+NOW=${TMUX_AGENT_ENGINE_NOW:-$(date '+%s')}
+TMUX_BIN=${TMUX_AGENT_ENGINE_TMUX_BIN:-tmux}
 # Shared render cache: the status-right #() is expanded once per attached
 # client every status-interval, and each expansion recomputes identical global
 # agent state. Cache the heavy per-pane scan briefly so N clients cost one scan
 # per window instead of N. Set TTL to 0 to disable.
-CACHE_TTL=${TMUX_AGENT_PICKER_CACHE_TTL:-2}
-CACHE_FILE=${TMUX_AGENT_PICKER_CACHE_FILE:-$STATE_DIR/.tmux-status.cache}
-CACHE_LOCK_STALE=${TMUX_AGENT_PICKER_CACHE_LOCK_STALE:-30}
+CACHE_TTL=${TMUX_AGENT_ENGINE_CACHE_TTL:-2}
+CACHE_FILE=${TMUX_AGENT_ENGINE_CACHE_FILE:-$STATE_DIR/.tmux-status.cache}
+CACHE_LOCK_STALE=${TMUX_AGENT_ENGINE_CACHE_LOCK_STALE:-30}
 # Precomputed per-session status-right strings. The render path
 # (--tmux-status-cached) only cats these files, so a session switch never blocks
 # on the heavy agent scan; a background --refresh (driven by the Copilot hook and
 # idle status-interval ticks) keeps them current. STATUS_TTL bounds how stale a
 # cat may be before a render schedules a background refresh.
-STATUS_DIR=${TMUX_AGENT_PICKER_STATUS_DIR:-$STATE_DIR/.status}
+STATUS_DIR=${TMUX_AGENT_ENGINE_STATUS_DIR:-$STATE_DIR/.status}
 STATUS_STAMP=$STATUS_DIR/.stamp
-STATUS_TTL=${TMUX_AGENT_PICKER_STATUS_TTL:-2}
+STATUS_TTL=${TMUX_AGENT_ENGINE_STATUS_TTL:-2}
 STATUS_LOCK=$STATUS_DIR/.refresh.lock
-STATUS_LOCK_STALE=${TMUX_AGENT_PICKER_STATUS_LOCK_STALE:-30}
+STATUS_LOCK_STALE=${TMUX_AGENT_ENGINE_STATUS_LOCK_STALE:-30}
 
 die() {
-  printf 'tmux-agent-picker: %s\n' "$*" >&2
+  printf 'tmux-agent-engine: %s\n' "$*" >&2
   exit 1
 }
 
@@ -439,7 +450,7 @@ refresh_all() {
     # bar track every polling-driven refresh at tmux speed. Guarded + fire-and-
     # forget so machines without SketchyBar are unaffected and the scan never
     # blocks on it.
-    if [ "${TMUX_AGENT_PICKER_SKETCHYBAR:-1}" != 0 ] &&
+    if [ "${TMUX_AGENT_ENGINE_SKETCHYBAR:-1}" != 0 ] &&
        command -v sketchybar >/dev/null 2>&1; then
       ( sketchybar --trigger agent_notify >/dev/null 2>&1 ) &
       disown 2>/dev/null || true
@@ -508,8 +519,8 @@ clean_title() {
 
 write_process_snapshot() {
   local destination=$1
-  if [ -n "${TMUX_AGENT_PICKER_PS_FILE:-}" ]; then
-    cp "$TMUX_AGENT_PICKER_PS_FILE" "$destination"
+  if [ -n "${TMUX_AGENT_ENGINE_PS_FILE:-}" ]; then
+    cp "$TMUX_AGENT_ENGINE_PS_FILE" "$destination"
   else
     ps -axo pid=,ppid=,comm= >"$destination"
   fi

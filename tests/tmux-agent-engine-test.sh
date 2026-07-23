@@ -4,7 +4,7 @@ set -euo pipefail
 
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 hook=$repo_dir/bin/tmux-agent-status
-picker=$repo_dir/bin/tmux-agent-picker
+engine=$repo_dir/bin/tmux-agent-engine
 descriptor=${COPILOT_HOOK_DESCRIPTOR:-$HOME/.copilot/hooks/tmux-agent-status.json}
 descriptor_command='$HOME/.config/bin/tmux-agent-status'
 temp_dir=$(mktemp -d)
@@ -108,7 +108,7 @@ jq -e --arg command "$descriptor_command" '
 ' "$descriptor" >/dev/null || fail "invalid Copilot hook descriptor"
 
 fixture_dir=$temp_dir/fixtures
-state_dir=$temp_dir/picker-state
+state_dir=$temp_dir/engine-state
 mkdir -p "$fixture_dir" "$state_dir"
 
 cat >"$fixture_dir/panes" <<'EOF'
@@ -203,12 +203,12 @@ write_state 99 idle 2000000000
 
 rows=$(
   FIXTURE_DIR="$fixture_dir" \
-    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
-    TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
-    TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
-    TMUX_AGENT_PICKER_NOW=2000000000 \
+    TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
+    TMUX_AGENT_ENGINE_NOW=2000000000 \
     NO_COLOR=1 \
-    "$picker" --list
+    "$engine" --list
 )
 
 assert_eq 4 "$(printf '%s\n' "$rows" | wc -l | tr -d ' ')" "eligible pane count"
@@ -250,24 +250,24 @@ write_state 7 idle 2000000000
 
 tmux_status=$(
   FIXTURE_DIR="$fixture_dir" \
-    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
-    TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
-    TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
-    TMUX_AGENT_PICKER_NOW=2000000000 \
+    TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
+    TMUX_AGENT_ENGINE_NOW=2000000000 \
     NO_COLOR=1 \
-    "$picker" --tmux-status beta
+    "$engine" --tmux-status beta
 )
 assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#565f89]● #[fg=#f7768e]◉ #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$tmux_status" "tmux status rendering"
 
 cross_session_status=$(
   FIXTURE_DIR="$fixture_dir" \
-    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
-    TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
-    TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
-    TMUX_AGENT_PICKER_NOW=2000000000 \
+    TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
+    TMUX_AGENT_ENGINE_NOW=2000000000 \
     NO_COLOR=1 \
-    "$picker" --tmux-status alpha
+    "$engine" --tmux-status alpha
 )
 assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.1 #[bg=#050505,nobold] #[fg=#9ece6a]◉ #[fg=#f7768e]● #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$cross_session_status" "cross-session radar rendering"
@@ -276,31 +276,31 @@ assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.1 #[bg=#050505
 # and the render path (--tmux-status-cached) serves it by a bare cat so a session
 # switch never blocks on the agent scan. Compare against the live synchronous
 # render so the two paths are provably identical.
-picker_env=(
+engine_env=(
   FIXTURE_DIR="$fixture_dir"
-  TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux"
-  TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes"
-  TMUX_AGENT_PICKER_STATE_DIR="$state_dir"
-  TMUX_AGENT_PICKER_NOW=2000000000
+  TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux"
+  TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes"
+  TMUX_AGENT_ENGINE_STATE_DIR="$state_dir"
+  TMUX_AGENT_ENGINE_NOW=2000000000
   NO_COLOR=1
 )
-direct_beta=$(env "${picker_env[@]}" "$picker" --tmux-status beta)
+direct_beta=$(env "${engine_env[@]}" "$engine" --tmux-status beta)
 beta_key=$(printf 'beta' | od -An -v -tx1 | tr -d ' \n')
 
-env "${picker_env[@]}" "$picker" --refresh
+env "${engine_env[@]}" "$engine" --refresh
 [ -f "$state_dir/.status/$beta_key.txt" ] || fail "--refresh did not write beta status file"
 assert_eq "$direct_beta" "$(cat "$state_dir/.status/$beta_key.txt")" "precomputed beta status content matches direct render"
-assert_eq "$direct_beta" "$(env "${picker_env[@]}" "$picker" --tmux-status-cached beta)" "cached render serves precomputed string"
+assert_eq "$direct_beta" "$(env "${engine_env[@]}" "$engine" --tmux-status-cached beta)" "cached render serves precomputed string"
 
 # The cached render must return the file verbatim, not recompute — a sentinel in
 # the precomputed file proves the scan is off the render path.
 printf 'SENTINEL-CACHED' >"$state_dir/.status/$beta_key.txt"
-assert_eq 'SENTINEL-CACHED' "$(env "${picker_env[@]}" "$picker" --tmux-status-cached beta)" "cached render cats the precomputed file verbatim"
+assert_eq 'SENTINEL-CACHED' "$(env "${engine_env[@]}" "$engine" --tmux-status-cached beta)" "cached render cats the precomputed file verbatim"
 
 # With no precomputed file, the cached render falls back to a synchronous compute
 # so first paint is never worse than the previous always-synchronous behavior.
 rm -rf "$state_dir/.status"
-assert_eq "$direct_beta" "$(env "${picker_env[@]}" "$picker" --tmux-status-cached beta)" "cached render falls back to sync compute when uncached"
+assert_eq "$direct_beta" "$(env "${engine_env[@]}" "$engine" --tmux-status-cached beta)" "cached render falls back to sync compute when uncached"
 rm -rf "$state_dir/.status"
 
 # Transient completion (done) flash: an idle pane carrying an unexpired
@@ -323,33 +323,33 @@ jq -n \
 
 done_row=$(
   FIXTURE_DIR="$fixture_dir" \
-    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
-    TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
-    TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
-    TMUX_AGENT_PICKER_NOW=2000000000 \
+    TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
+    TMUX_AGENT_ENGINE_NOW=2000000000 \
     NO_COLOR=1 \
-    "$picker" --list | awk -F '\t' '$2 == "%8" { print $1 "\t" $5 }'
+    "$engine" --list | awk -F '\t' '$2 == "%8" { print $1 "\t" $5 }'
 )
 assert_eq $'3\t✓ done' "$done_row" "active done flash renders as done"
 
 decayed_row=$(
   FIXTURE_DIR="$fixture_dir" \
-    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
-    TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
-    TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
-    TMUX_AGENT_PICKER_NOW=2000000100 \
+    TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
+    TMUX_AGENT_ENGINE_NOW=2000000100 \
     NO_COLOR=1 \
-    "$picker" --list | awk -F '\t' '$2 == "%8" { print $1 "\t" $5 }'
+    "$engine" --list | awk -F '\t' '$2 == "%8" { print $1 "\t" $5 }'
 )
 assert_eq $'4\t✓ idle' "$decayed_row" "expired done flash decays to idle"
 flash_status=$(
   FIXTURE_DIR="$fixture_dir" \
-    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
-    TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
-    TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
-    TMUX_AGENT_PICKER_NOW=2000000000 \
+    TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
+    TMUX_AGENT_ENGINE_NOW=2000000000 \
     NO_COLOR=1 \
-    "$picker" --tmux-status beta
+    "$engine" --tmux-status beta
 )
 assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#3fb950,bold]✓1.4 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#565f89]● #[fg=#f7768e]◉ #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$flash_status" "completion flash renders green in the pill"
@@ -361,31 +361,31 @@ rm -f "$state_dir/8.json"
 cache_state_dir=$temp_dir/cache-state
 mkdir -p "$cache_state_dir"
 FIXTURE_DIR="$fixture_dir" \
-  TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
-  TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
-  TMUX_AGENT_PICKER_STATE_DIR="$cache_state_dir" \
-  TMUX_AGENT_PICKER_CACHE_TTL=3600 \
+  TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+  TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+  TMUX_AGENT_ENGINE_STATE_DIR="$cache_state_dir" \
+  TMUX_AGENT_ENGINE_CACHE_TTL=3600 \
   NO_COLOR=1 \
-  "$picker" --tmux-status beta >/dev/null
+  "$engine" --tmux-status beta >/dev/null
 [ -f "$cache_state_dir/.tmux-status.cache" ] || fail "enabled cache run did not write cache"
 
 rm -f "$cache_state_dir/.tmux-status.cache"
 FIXTURE_DIR="$fixture_dir" \
-  TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
-  TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
-  TMUX_AGENT_PICKER_STATE_DIR="$cache_state_dir" \
-  TMUX_AGENT_PICKER_NOW=2000000000 \
+  TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+  TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+  TMUX_AGENT_ENGINE_STATE_DIR="$cache_state_dir" \
+  TMUX_AGENT_ENGINE_NOW=2000000000 \
   NO_COLOR=1 \
-  "$picker" --tmux-status beta >/dev/null
+  "$engine" --tmux-status beta >/dev/null
 [ ! -e "$cache_state_dir/.tmux-status.cache" ] || fail "pinned-NOW run must not use the cache"
 
 ask_user_status=$(
   printf '%s\n' \
-    'Should I commit the tmux agent picker implementation now?' \
+    'Should I commit the tmux agent engine implementation now?' \
     '❯ 1. Yes, commit all implementation files' \
     '  2. No, leave the changes uncommitted' \
     '↑/↓ to select · enter to confirm · esc to cancel' |
-    "$picker" --live-status
+    "$engine" --live-status
 )
 assert_eq awaiting "$ask_user_status" "ask_user choice prompt classification"
 
@@ -396,7 +396,7 @@ freeform_ask_user_status=$(
     'What should I wait for before continuing?' \
     '❯ Type your answer...' \
     'enter to submit · esc to cancel' |
-    "$picker" --live-status
+    "$engine" --live-status
 )
 assert_eq awaiting "$freeform_ask_user_status" "ask_user freeform prompt classification"
 
@@ -410,12 +410,12 @@ fzf_args=$temp_dir/fzf-args
 FIXTURE_DIR="$fixture_dir" \
   FZF_ARGS_FILE="$fzf_args" \
   PATH="$fixture_dir:$PATH" \
-  TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/fake-tmux" \
-  TMUX_AGENT_PICKER_PS_FILE="$fixture_dir/processes" \
-  TMUX_AGENT_PICKER_STATE_DIR="$state_dir" \
-  TMUX_AGENT_PICKER_NOW=2000000000 \
+  TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+  TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+  TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
+  TMUX_AGENT_ENGINE_NOW=2000000000 \
   NO_COLOR=1 \
-  "$picker"
+  "$engine"
 grep -Fxq -- '--track' "$fzf_args" || fail "fzf tracking was not enabled"
 grep -Fxq -- '--with-nth=7' "$fzf_args" || fail "fzf did not use the formatted display field"
 grep -Fxq -- '--border-label=  Agents ' "$fzf_args" ||
@@ -435,8 +435,8 @@ chmod +x "$fixture_dir/preview-tmux"
 preview_args=$temp_dir/preview-args
 preview_output=$(
   PREVIEW_ARGS_FILE="$preview_args" \
-    TMUX_AGENT_PICKER_TMUX_BIN="$fixture_dir/preview-tmux" \
-    "$picker" preview %1
+    TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/preview-tmux" \
+    "$engine" preview %1
 )
 grep -Fxq -- '-e' "$preview_args" || fail "tmux preview did not preserve ANSI colors"
 assert_eq $'\033[31mred\033[0m' "$preview_output" "preview ANSI output"
@@ -503,12 +503,12 @@ nwrite_state() {
 notify_run() {
   local now=$1
   FIXTURE_DIR="$nfix" \
-    TMUX_AGENT_PICKER_TMUX_BIN="$nfix/fake-tmux" \
-    TMUX_AGENT_PICKER_PS_FILE="$nfix/processes" \
-    TMUX_AGENT_PICKER_STATE_DIR="$nstate" \
-    TMUX_AGENT_PICKER_NOW="$now" \
+    TMUX_AGENT_ENGINE_TMUX_BIN="$nfix/fake-tmux" \
+    TMUX_AGENT_ENGINE_PS_FILE="$nfix/processes" \
+    TMUX_AGENT_ENGINE_STATE_DIR="$nstate" \
+    TMUX_AGENT_ENGINE_NOW="$now" \
     NO_COLOR=1 \
-    "$picker" --notify-lines
+    "$engine" --notify-lines
 }
 
 # Awaiting (solo) + active done flash (duo): awaiting outranks done for the icon
@@ -546,4 +546,4 @@ EOF
 rm -f "$nstate"/*.json
 assert_eq '' "$(notify_run 3000000000)" "notify-lines emits nothing when no agents are tracked"
 
-printf 'ok - tmux agent picker fixtures\n'
+printf 'ok - tmux agent engine fixtures\n'

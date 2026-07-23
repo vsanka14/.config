@@ -25,16 +25,16 @@ consumer:
 
 - **Producer**: `../bin/tmux-agent-status` (a Copilot hook) fires
   `sketchybar --trigger agent_notify` on every real status transition, plus once
-  more when a completion "done" flash expires. `../bin/tmux-agent-picker` also
+  more when a completion "done" flash expires. `../bin/tmux-agent-engine` also
   fires `agent_notify` from its `--refresh --notify` path (the same background
   refresh that redraws the tmux status-right), so footer-detected states that
   never reach the Copilot hook — e.g. a blocking permission prompt — surface on
   the bar at tmux speed instead of waiting out `agent`'s slow `update_freq`. All
   SketchyBar calls in both are guarded by `command -v sketchybar` (and the
-  `TMUX_AGENT_PICKER_SKETCHYBAR` / `TMUX_AGENT_STATUS_SKETCHYBAR` switches for
+  `TMUX_AGENT_ENGINE_SKETCHYBAR` / `TMUX_AGENT_STATUS_SKETCHYBAR` switches for
   hermetic tests), so machines without SketchyBar are unaffected.
 - **Source of truth**: `plugins/agent.sh` re-derives the icon colour and the
-  notable session list from `../bin/tmux-agent-picker --notify-lines` (which
+  notable session list from `../bin/tmux-agent-engine --notify-lines` (which
   reuses the tmux pill/radar scan and priority folding). Do **not** reimplement
   the pane scan in the plugin — extend `--notify-lines` instead so the bar and
   tmux stay in lockstep.
@@ -55,7 +55,7 @@ consumer:
   hidden for them.
 
 If the `agent_notify` contract changes, update all three:
-`../bin/tmux-agent-status`, `../bin/tmux-agent-picker`, and `plugins/agent.sh`.
+`../bin/tmux-agent-status`, `../bin/tmux-agent-engine`, and `plugins/agent.sh`.
 
 ## Event and Animation Architecture
 
@@ -162,9 +162,9 @@ should be on, and the focused icon should settle at `y_offset=0`.
 For the agent notification feature:
 
 ```bash
-bash -n bin/tmux-agent-status bin/tmux-agent-picker sketchybar/plugins/agent.sh
-bash tests/tmux-agent-picker-test.sh          # covers --notify-lines
-bin/tmux-agent-picker --notify-lines          # COLOR + LINE rows, or empty
+bash -n bin/tmux-agent-status bin/tmux-agent-engine sketchybar/plugins/agent.sh
+bash tests/tmux-agent-engine-test.sh          # covers --notify-lines
+bin/tmux-agent-engine --notify-lines          # COLOR + LINE rows, or empty
 sketchybar --reload
 sketchybar --trigger agent_notify
 sketchybar --query agent                      # drawing reflects tracked agents

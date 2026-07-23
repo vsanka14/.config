@@ -11,13 +11,13 @@
 # attention.
 # The `bin/tmux-agent-status` hook raises `sketchybar --trigger agent_notify` on
 # every real transition, and the notable set + colour are re-derived from
-# `bin/tmux-agent-picker --notify-lines`, so this plugin never duplicates the
+# `bin/tmux-agent-engine --notify-lines`, so this plugin never duplicates the
 # pane-scan logic and stays in lockstep with the tmux status-right.
 #
 # Bash 3.2 (macOS) safe: indexed arrays only, no associative arrays / mapfile.
 
 ITEM=${NAME:-agent}
-PICKER=${AGENT_PICKER_BIN:-$HOME/.config/bin/tmux-agent-picker}
+ENGINE=${AGENT_ENGINE_BIN:-$HOME/.config/bin/tmux-agent-engine}
 MAX_ENTRIES=3
 
 # Tokyo Night Moon accents, aligned with the tmux pill/radar colours.
@@ -29,7 +29,7 @@ COLOR_MUTED=0xff636da6
 BG_NEUTRAL=0x991e2030
 BG_BLOCKING=0x66f7768e
 
-# `#rrggbb` (picker output) -> `0xffrrggbb` (SketchyBar).
+# `#rrggbb` (engine output) -> `0xffrrggbb` (SketchyBar).
 hex_to_color() {
   local h=${1#\#}
   case "$h" in
@@ -42,9 +42,9 @@ hide_item() {
   sketchybar --set "$ITEM" drawing=off label.drawing=off >/dev/null 2>&1
 }
 
-[ -x "$PICKER" ] || { hide_item; exit 0; }
+[ -x "$ENGINE" ] || { hide_item; exit 0; }
 
-out=$("$PICKER" --notify-lines 2>/dev/null)
+out=$("$ENGINE" --notify-lines 2>/dev/null)
 if [ -z "$out" ]; then
   hide_item
   exit 0

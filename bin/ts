@@ -42,7 +42,7 @@ case "$1" in
         ;;
     status)
         # Retired: cross-session status dots are now rendered by
-        # bin/tmux-agent-picker --tmux-status (agent-aware radar). Kept as a
+        # bin/tmux-agent-engine --tmux-status (agent-aware radar). Kept as a
         # no-op so any stale status-right reference degrades gracefully.
         exit 0
         ;;

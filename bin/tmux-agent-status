@@ -11,7 +11,7 @@ command -v jq >/dev/null 2>&1 || exit 0
 
 TMUX_BIN=${TMUX_AGENT_STATUS_TMUX_BIN:-tmux}
 DONE_FLASH_TTL=${TMUX_AGENT_STATUS_DONE_TTL:-3}
-PICKER_BIN=${TMUX_AGENT_STATUS_PICKER_BIN:-${HOME:-}/.config/bin/tmux-agent-picker}
+ENGINE_BIN=${TMUX_AGENT_STATUS_ENGINE_BIN:-${HOME:-}/.config/bin/tmux-agent-engine}
 
 refresh_enabled() {
   [ "${TMUX_AGENT_STATUS_REFRESH:-1}" != 0 ] || return 1
@@ -29,7 +29,7 @@ sketchybar_enabled() {
 
 # Push a transient agent notification to the menu bar on a real transition. The
 # SketchyBar plugin re-derives the full notable set (and whether it is a blocking
-# awaiting or a transient done) via tmux-agent-picker, so no per-pane payload is
+# awaiting or a transient done) via tmux-agent-engine, so no per-pane payload is
 # needed here. Fire-and-forget; never blocks the hook.
 emit_sketchybar_notify() {
   sketchybar_enabled || return 0
@@ -37,7 +37,7 @@ emit_sketchybar_notify() {
   disown 2>/dev/null || true
 }
 
-# Drop the picker's shared render cache so the very next status-right expansion
+# Drop the engine's shared render cache so the very next status-right expansion
 # rebuilds with this transition instead of serving stale state for the cache
 # TTL. Keeps idle redraws coalesced while making real transitions instant.
 invalidate_status_cache() {
@@ -46,13 +46,13 @@ invalidate_status_cache() {
 }
 
 # Redraw so a transition shows without waiting for the next status-interval tick.
-# The picker's status-right render only cats a precomputed string, so regenerate
+# The engine's status-right render only cats a precomputed string, so regenerate
 # those strings off the render path first (--refresh recomputes and then redraws).
-# Falls back to a plain redraw when the picker isn't present.
+# Falls back to a plain redraw when the engine isn't present.
 emit_refresh() {
   refresh_enabled || return 0
   invalidate_status_cache
-  if [ -x "$PICKER_BIN" ] && "$TMUX_BIN" run-shell -b "'$PICKER_BIN' --refresh --notify" >/dev/null 2>&1; then
+  if [ -x "$ENGINE_BIN" ] && "$TMUX_BIN" run-shell -b "'$ENGINE_BIN' --refresh --notify" >/dev/null 2>&1; then
     return 0
   fi
   "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 || true
@@ -64,7 +64,7 @@ schedule_refresh() {
   refresh_enabled || return 0
   [ "${TMUX_AGENT_STATUS_SCHEDULE_REFRESH:-1}" != 0 ] || return 0
   ( sleep "$DONE_FLASH_TTL"; invalidate_status_cache
-    if [ -x "$PICKER_BIN" ] && "$TMUX_BIN" run-shell -b "'$PICKER_BIN' --refresh --notify" >/dev/null 2>&1; then
+    if [ -x "$ENGINE_BIN" ] && "$TMUX_BIN" run-shell -b "'$ENGINE_BIN' --refresh --notify" >/dev/null 2>&1; then
       :
     else
       "$TMUX_BIN" refresh-client -S >/dev/null 2>&1
