@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Colors (Tokyo Night Moon)
-export BAR_COLOR=0xcc0d0f18           # ~0.80 opacity, matching wezterm
 export ITEM_BG_COLOR=0xee2a2f45       # Moon darker, enhanced visibility
 export CONTAINER_BG_COLOR=0x991e2030   # Moon bg_dark, ~0.60 opacity
 export ACCENT_BLUE=0xff82aaff         # Blue
@@ -17,18 +16,53 @@ export FG_MUTED=0xff636da6            # Moon muted
 # Font
 FONT="JetBrainsMono Nerd Font"
 
-# Font sizes: uncomment one pair based on display
-ICON_SIZE=16.0;  LABEL_SIZE=12.0    # laptop
-# ICON_SIZE=19.0;  LABEL_SIZE=15.0  # external monitor
+# Select sizing based on whether the large external display is connected.
+DISPLAY_PROFILE=$("$CONFIG_DIR/plugins/display.sh" --profile)
+if [ "$DISPLAY_PROFILE" = "external" ]; then
+    BAR_COLOR=0x1a000000
+    ICON_SIZE=24.0
+    LABEL_SIZE=15.0
+    CLOCK_LABEL_SIZE=14.0
+    STATUS_ICON_WIDTH=30
+    STATUS_ICON_SCALE=0.38
+    BAR_HEIGHT=80
+    BLUR_RADIUS=50
+    BAR_PADDING=120
+    DEFAULT_PADDING=12
+    SPACE_ICON_PADDING=14
+    SPACE_BG_CORNER_RADIUS=10
+    SPACE_BG_HEIGHT=48
+    SHOW_BATTERY=false
+    SHOW_FRONT_APP=true
+else
+    DISPLAY_PROFILE=laptop
+    BAR_COLOR=0xcc0d0f18
+    ICON_SIZE=16.0
+    LABEL_SIZE=12.0
+    CLOCK_LABEL_SIZE=12.0
+    STATUS_ICON_WIDTH=20
+    STATUS_ICON_SCALE=0.25
+    BAR_HEIGHT=32
+    BLUR_RADIUS=30
+    BAR_PADDING=8
+    DEFAULT_PADDING=4
+    SPACE_ICON_PADDING=8
+    SPACE_BG_CORNER_RADIUS=4
+    SPACE_BG_HEIGHT=20
+    SHOW_BATTERY=true
+    SHOW_FRONT_APP=false
+fi
+export BAR_COLOR
+printf '%s\n' "$DISPLAY_PROFILE" > "/tmp/sketchybar-display-profile-${UID}"
 
 # Bar appearance
 sketchybar --bar \
-    height=32 \
-    blur_radius=30 \
+    height=$BAR_HEIGHT \
+    blur_radius=$BLUR_RADIUS \
     position=top \
     sticky=on \
-    padding_left=8 \
-    padding_right=8 \
+    padding_left=$BAR_PADDING \
+    padding_right=$BAR_PADDING \
     color=$BAR_COLOR \
     shadow=off
 
@@ -38,15 +72,18 @@ sketchybar --default \
     icon.color=$FG_COLOR \
     label.font="$FONT:Medium:$LABEL_SIZE" \
     label.color=$FG_COLOR \
-    padding_left=4 \
-    padding_right=4
+    padding_left=$DEFAULT_PADDING \
+    padding_right=$DEFAULT_PADDING
 
 # Aerospace events
 sketchybar --add event aerospace_workspace_change
 sketchybar --add event aerospace_mode_change
 
-# Workspace icons (Nerd Font)
-declare -A SPACE_ICONS=(
+# Copilot agent notifications (raised by bin/tmux-agent-status).
+sketchybar --add event agent_notify
+
+# Workspace icons (Nerd Font). Keep this indexed for macOS Bash 3.2.
+SPACE_ICONS=(
     [1]="󰖟"   # browser
     [2]="󰆍"   # terminal/dev
     [3]="󰒱"   # slack
@@ -59,16 +96,46 @@ for sid in 1 2 3 4 5; do
     sketchybar --add item space.$sid left \
         --set space.$sid \
             icon="${SPACE_ICONS[$sid]}" \
-            icon.padding_left=8 \
-            icon.padding_right=8 \
+            icon.padding_left=$SPACE_ICON_PADDING \
+            icon.padding_right=$SPACE_ICON_PADDING \
             background.color=$ITEM_BG_COLOR \
-            background.corner_radius=4 \
-            background.height=20 \
+            background.corner_radius=$SPACE_BG_CORNER_RADIUS \
+            background.height=$SPACE_BG_HEIGHT \
             background.drawing=off \
-            label.drawing=off \
-            script="$CONFIG_DIR/plugins/aerospace.sh" \
-        --subscribe space.$sid aerospace_workspace_change
+            label.drawing=off
 done
+
+# Keep one event owner: subscribing every space would run the all-space update
+# five times and repeatedly cancel/restart the same animation queue.
+sketchybar --add item workspace_observer left \
+    --set workspace_observer \
+        drawing=off \
+        script="$CONFIG_DIR/plugins/aerospace.sh" \
+    --subscribe workspace_observer aerospace_workspace_change
+
+if [ "$SHOW_FRONT_APP" = true ]; then
+    # Focused application (center)
+    sketchybar --add item front_app center \
+        --set front_app \
+            icon=" " \
+            icon.width=24 \
+            icon.padding_left=10 \
+            icon.padding_right=6 \
+            icon.background.drawing=on \
+            icon.background.height=20 \
+            icon.background.corner_radius=4 \
+            icon.background.image.scale=0.8 \
+            label.font="$FONT:Medium:13.0" \
+            label.max_chars=32 \
+            label.padding_left=4 \
+            label.padding_right=12 \
+            background.color=$CONTAINER_BG_COLOR \
+            background.corner_radius=12 \
+            background.height=40 \
+            background.drawing=on \
+            script="$CONFIG_DIR/plugins/front_app.sh" \
+        --subscribe front_app front_app_switched aerospace_workspace_change
+fi
 
 # Mode indicator (right side)
 sketchybar --add item mode_indicator right \
@@ -82,46 +149,99 @@ sketchybar --add item mode_indicator right \
         script="$CONFIG_DIR/plugins/mode.sh" \
     --subscribe mode_indicator aerospace_mode_change
 
-# Battery (right side)
-sketchybar --add item battery right \
-    --set battery \
-        update_freq=120 \
-        icon.padding_right=6 \
-        icon.color=$ACCENT_ORANGE \
-        script="$CONFIG_DIR/plugins/battery.sh" \
-    --subscribe battery system_woke power_source_change
+if [ "$SHOW_BATTERY" = true ]; then
+    # Battery (right side)
+    sketchybar --add item battery right \
+        --set battery \
+            update_freq=120 \
+            icon.padding_right=6 \
+            icon.color=$ACCENT_ORANGE \
+            script="$CONFIG_DIR/plugins/battery.sh" \
+        --subscribe battery system_woke power_source_change
 
-# Battery container
-sketchybar --add bracket battery_container battery \
-    --set battery_container \
-        background.color=$CONTAINER_BG_COLOR \
-        background.corner_radius=6 \
-        background.height=24 \
-        background.drawing=on
+    # Battery container
+    sketchybar --add bracket battery_container battery \
+        --set battery_container \
+            background.color=$CONTAINER_BG_COLOR \
+            background.corner_radius=6 \
+            background.height=24 \
+            background.drawing=on
 
-# Spacer between containers
-sketchybar --add item spacer right \
-    --set spacer \
-        width=8 \
-        background.drawing=off \
-        icon.drawing=off \
-        label.drawing=off
+    # Spacer between containers
+    sketchybar --add item spacer right \
+        --set spacer \
+            width=8 \
+            background.drawing=off \
+            icon.drawing=off \
+            label.drawing=off
+fi
 
-# Clock (right side)
+# Date and time (right side)
 sketchybar --add item clock right \
     --set clock \
         update_freq=10 \
-        icon.padding_right=6 \
-        icon.color=$ACCENT_PURPLE \
+        icon=" " \
+        icon.width=$STATUS_ICON_WIDTH \
+        icon.padding_right=4 \
+        icon.background.drawing=on \
+        icon.background.image="$CONFIG_DIR/icons/clock.png" \
+        icon.background.image.scale=$STATUS_ICON_SCALE \
+        label.font="$FONT:Medium:$CLOCK_LABEL_SIZE" \
         script="$CONFIG_DIR/plugins/clock.sh"
 
-# Clock container
-sketchybar --add bracket clock_container clock \
+sketchybar --add item calendar right \
+    --set calendar \
+        icon=" " \
+        icon.width=$STATUS_ICON_WIDTH \
+        icon.padding_right=4 \
+        icon.background.drawing=on \
+        icon.background.image="$CONFIG_DIR/icons/calendar.png" \
+        icon.background.image.scale=$STATUS_ICON_SCALE \
+        label.font="$FONT:Medium:$CLOCK_LABEL_SIZE" \
+        label.padding_right=8
+
+# Date and time container
+sketchybar --add bracket clock_container calendar clock \
     --set clock_container \
         background.color=$CONTAINER_BG_COLOR \
         background.corner_radius=6 \
         background.height=24 \
         background.drawing=on
+
+# Copilot agent status (right side, left of the clock cluster). Persistent only
+# while at least one agent is tracked. A completion shows a transient green label
+# next to the icon; an awaiting-permission agent shows a blocking red label with
+# a red-tinted background. The plugin owns visibility, colour, and label text.
+# The Copilot glyph reads a touch heavy, so render it ~2pt below ICON_SIZE.
+AGENT_ICON_SIZE=$(awk -v s="$ICON_SIZE" 'BEGIN { printf "%.1f", s - 2 }')
+sketchybar --add item agent right \
+    --set agent \
+        drawing=off \
+        icon="" \
+        icon.font="$FONT:Bold:$AGENT_ICON_SIZE" \
+        icon.color=$ACCENT_CYAN \
+        icon.padding_left=8 \
+        icon.padding_right=6 \
+        label.drawing=off \
+        label.font="$FONT:Medium:$LABEL_SIZE" \
+        label.max_chars=42 \
+        label.padding_left=2 \
+        label.padding_right=10 \
+        background.color=$CONTAINER_BG_COLOR \
+        background.corner_radius=6 \
+        background.height=24 \
+        background.drawing=on \
+        update_freq=30 \
+        script="$CONFIG_DIR/plugins/agent.sh" \
+    --subscribe agent agent_notify
+
+# Reload when the external display is connected or disconnected.
+sketchybar --add item display_watcher left \
+    --set display_watcher \
+        drawing=off \
+        update_freq=5 \
+        script="$CONFIG_DIR/plugins/display.sh" \
+    --subscribe display_watcher display_change system_woke
 
 # Force initial update
 sketchybar --update

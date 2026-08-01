@@ -1,0 +1,16 @@
+Copilot Status font attribution
+
+This font contains a modified copy of the "copilot-large" glyph (U+EC3A)
+from Microsoft Visual Studio Code Codicons:
+
+https://github.com/microsoft/vscode-codicons
+
+Creator: Microsoft Corporation
+Source font SHA-256:
+cc2472e239e17062e7760af87f8f5997720cc0d94aa014a615c418baaf6333a8
+License: Creative Commons Attribution 4.0 International
+License URL: https://creativecommons.org/licenses/by/4.0/
+
+The glyph was extracted, enlarged within a single terminal cell,
+repositioned for JetBrains Mono, and placed in the "Copilot Status" font
+family. No Microsoft endorsement is implied.

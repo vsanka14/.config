@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="calendar-gradient" x1="12" y1="12" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#c099ff"/>
+      <stop offset="1" stop-color="#fca7ea"/>
+    </linearGradient>
+    <filter id="calendar-glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="2.2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke="url(#calendar-gradient)" stroke-width="3.5" filter="url(#calendar-glow)">
+      <path d="M24 12v8M40 12v8"/>
+      <rect x="14" y="16" width="36" height="36" rx="7" fill="#1e2030" fill-opacity=".92"/>
+      <path d="M14 27h36"/>
+    </g>
+    <g fill="#82aaff">
+      <circle cx="23" cy="35" r="2.2"/>
+      <circle cx="32" cy="35" r="2.2"/>
+      <circle cx="41" cy="35" r="2.2"/>
+      <circle cx="23" cy="44" r="2.2"/>
+      <circle cx="32" cy="44" r="2.2"/>
+      <circle cx="41" cy="44" r="2.2"/>
+    </g>
+  </g>
+</svg>
