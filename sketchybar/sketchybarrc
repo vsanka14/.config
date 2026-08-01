@@ -180,7 +180,7 @@ fi
 sketchybar --add item clock right \
     --set clock \
         update_freq=10 \
-        icon=" " \
+        icon="" \
         icon.width=$STATUS_ICON_WIDTH \
         icon.padding_right=4 \
         icon.background.drawing=on \
