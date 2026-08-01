@@ -1,3 +1,5 @@
 #!/bin/bash
 
-sketchybar --set $NAME icon="󰃭" label="$(date '+%a %b %d  %I:%M %p')"
+sketchybar \
+    --set calendar label="$(date '+%a %b %d')" \
+    --set "$NAME" label="$(date '+%I:%M %p')"

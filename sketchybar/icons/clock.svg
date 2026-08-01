@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="clock-gradient" x1="13" y1="13" x2="51" y2="51" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#86e1fc"/>
+      <stop offset="1" stop-color="#82aaff"/>
+    </linearGradient>
+    <filter id="clock-glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="2.2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="32" cy="32" r="21" fill="#1e2030" fill-opacity=".92" stroke="url(#clock-gradient)" stroke-width="3.5" filter="url(#clock-glow)"/>
+    <path d="M32 20v12h10" stroke="url(#clock-gradient)" stroke-width="4"/>
+    <g fill="#c3e88d">
+      <circle cx="32" cy="15.5" r="1.5"/>
+      <circle cx="48.5" cy="32" r="1.5"/>
+      <circle cx="32" cy="48.5" r="1.5"/>
+      <circle cx="15.5" cy="32" r="1.5"/>
+    </g>
+    <circle cx="32" cy="32" r="2.5" fill="#fca7ea"/>
+  </g>
+</svg>

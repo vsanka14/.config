@@ -1,0 +1,709 @@
+#!/usr/bin/env bash
+
+# tmux-agent-engine: the single source of truth for Copilot agent status.
+# Despite the interactive Alt+C popup being its most visible mode, this is the
+# shared engine behind ALL three surfaces — it does the pane scan + status
+# derivation once and every consumer renders from it:
+#   (no args)               -> interactive fzf picker popup (Alt+C)
+#   --tmux-status-cached    -> tmux status-right pill + cross-session radar dots
+#   --notify-lines          -> SketchyBar agent item feed
+#   --refresh [--notify]    -> recompute cached strings; redraw tmux + nudge bar
+# Consumers must NOT re-implement the scan; extend a mode here so every surface
+# stays in lockstep.
+#
+# Requires bin/tmux-agent-status (the Copilot hook that produces the per-pane
+# state) and its registration at ~/.copilot/hooks/tmux-agent-status.json.
+
+set -euo pipefail
+
+STALE_SECONDS=${TMUX_AGENT_ENGINE_STALE_SECONDS:-1800}
+# How long a hook `awaiting` state is trusted over an idle-looking footer. A real
+# pending prompt keeps its prompt text in the captured footer (so the footer
+# fallback reads `awaiting` and this grace never applies); this window only
+# guards the brief moment right after a permissionRequest transition where the
+# footer capture may lag the hook. Past it, a confirmed-idle footer means a
+# cancelled/abandoned prompt and the stale awaiting is allowed to recover.
+AWAITING_IDLE_GRACE=${TMUX_AGENT_ENGINE_AWAITING_IDLE_GRACE:-5}
+STATE_DIR=${TMUX_AGENT_ENGINE_STATE_DIR:-${COPILOT_HOME:-$HOME/.copilot}/agent-status}
+# Deterministic runs (tests) pin NOW; treat that as a signal to bypass the
+# time-based render cache so fixtures stay hermetic.
+if [ -n "${TMUX_AGENT_ENGINE_NOW:-}" ]; then NOW_OVERRIDDEN=1; else NOW_OVERRIDDEN=0; fi
+NOW=${TMUX_AGENT_ENGINE_NOW:-$(date '+%s')}
+TMUX_BIN=${TMUX_AGENT_ENGINE_TMUX_BIN:-tmux}
+# Shared render cache: the status-right #() is expanded once per attached
+# client every status-interval, and each expansion recomputes identical global
+# agent state. Cache the heavy per-pane scan briefly so N clients cost one scan
+# per window instead of N. Set TTL to 0 to disable.
+CACHE_TTL=${TMUX_AGENT_ENGINE_CACHE_TTL:-2}
+CACHE_FILE=${TMUX_AGENT_ENGINE_CACHE_FILE:-$STATE_DIR/.tmux-status.cache}
+CACHE_LOCK_STALE=${TMUX_AGENT_ENGINE_CACHE_LOCK_STALE:-30}
+# Precomputed per-session status-right strings. The render path
+# (--tmux-status-cached) only cats these files, so a session switch never blocks
+# on the heavy agent scan; a background --refresh (driven by the Copilot hook and
+# idle status-interval ticks) keeps them current. STATUS_TTL bounds how stale a
+# cat may be before a render schedules a background refresh.
+STATUS_DIR=${TMUX_AGENT_ENGINE_STATUS_DIR:-$STATE_DIR/.status}
+STATUS_STAMP=$STATUS_DIR/.stamp
+STATUS_TTL=${TMUX_AGENT_ENGINE_STATUS_TTL:-2}
+STATUS_LOCK=$STATUS_DIR/.refresh.lock
+STATUS_LOCK_STALE=${TMUX_AGENT_ENGINE_STATUS_LOCK_STALE:-30}
+
+die() {
+  printf 'tmux-agent-engine: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "$1 is required"
+}
+
+capture_footer() {
+  "$TMUX_BIN" capture-pane -p -t "$1" 2>/dev/null | tail -n 10
+}
+
+live_status() {
+  local content=$1
+  if printf '%s\n' "$content" | grep -Eiq \
+    'do you want to (allow|run|continue)|allow (once|always)|permission required|approval required|select.*(allow|deny)|yes, and don.t ask|press (enter|y) to (allow|continue)|to select .* enter to confirm .* esc to cancel|asking user|type your answer|enter to submit .* esc to cancel'; then
+    printf 'awaiting\n'
+  elif printf '%s\n' "$content" | grep -Eiq \
+    'esc (interrupt|stop)|ctrl[+]c (cancel|stop)|(^|[[:space:]])◉[[:space:]].*[[:space:]]·'; then
+    printf 'working\n'
+  elif printf '%s\n' "$content" | grep -Eiq \
+    '/ commands .*[\?] help|type your (prompt|message)|ready for (a |your )?(prompt|message)'; then
+    printf 'idle\n'
+  else
+    printf 'unknown\n'
+  fi
+}
+
+state_status() {
+  local state_file=$1 pane_id=$2
+  [ -f "$state_file" ] && [ ! -L "$state_file" ] || return 1
+  jq -er --arg pane "$pane_id" --argjson now "$NOW" '
+    select(.pane_id == $pane)
+    | select(.status == "idle" or .status == "working" or .status == "awaiting")
+    | select((.updated_epoch | type) == "number")
+    | select(.updated_epoch <= ($now + 300))
+    | [.status, .updated_epoch, (.flash.kind // ""), (.flash.until_epoch // 0)] | @tsv
+  ' "$state_file" 2>/dev/null
+}
+
+filter_copilot_panes() {
+  local panes_file=$1 process_file=$2 destination=$3
+  awk '
+    NR == FNR {
+      field_count = split($0, fields, "\t")
+      if (field_count >= 6) {
+        pane_count++
+        pane_line[pane_count] = $0
+        pane_for_pid[fields[5]] = pane_count
+      }
+      next
+    }
+    {
+      pid = $1
+      parent[pid] = $2
+      command[pid] = $3
+    }
+    END {
+      for (pid in command) {
+        count = split(command[pid], parts, "/")
+        if (parts[count] != "copilot") {
+          continue
+        }
+        current = pid
+        for (depth = 0; current != "" && current != "0" && depth < 256; depth++) {
+          if (current in pane_for_pid) {
+            matched[pane_for_pid[current]] = 1
+            break
+          }
+          current = parent[current]
+        }
+      }
+      for (i = 1; i <= pane_count; i++) {
+        if (i in matched) {
+          print pane_line[i]
+        }
+      }
+    }
+  ' "$panes_file" "$process_file" >"$destination"
+}
+
+status_label() {
+  local status=$1
+  if [ "${NO_COLOR:-0}" = 1 ]; then
+    case "$status" in
+      awaiting) printf '⏸ awaiting' ;;
+      working) printf '⚙ working' ;;
+      done) printf '✓ done' ;;
+      idle) printf '✓ idle' ;;
+      *) printf '? unknown' ;;
+    esac
+    return
+  fi
+
+  # Truecolor Tokyo Night hexes, matched exactly to the status-bar pill/radar:
+  # awaiting #f7768e, working #e0af68, done #3fb950, idle #9ece6a, unknown #565f89.
+  case "$status" in
+    awaiting) printf '\033[38;2;247;118;142m⏸ awaiting\033[0m' ;;
+    working) printf '\033[38;2;224;175;104m⚙ working\033[0m' ;;
+    done) printf '\033[38;2;63;185;80m✓ done\033[0m' ;;
+    idle) printf '\033[38;2;158;206;106m✓ idle\033[0m' ;;
+    *) printf '\033[38;2;86;95;137m? unknown\033[0m' ;;
+  esac
+}
+
+# One pane target inside the current-session pill. The pane numbers keep full
+# per-status colours: awaiting=red, working=yellow, completion flash=cyan ✓,
+# idle=green, unknown=neutral.
+pill_cell() {
+  local rank=$1 pane_target=$2
+  case "$rank" in
+    1) printf '#[fg=#f7768e,bold]%s ' "$pane_target" ;;
+    2) printf '#[fg=#e0af68,bold]%s ' "$pane_target" ;;
+    3) printf '#[fg=#3fb950,bold]✓%s ' "$pane_target" ;;
+    4) printf '#[fg=#9ece6a,nobold]%s ' "$pane_target" ;;
+    *) printf '#[fg=#565f89,nobold]%s ' "$pane_target" ;;
+  esac
+}
+
+# Colour of a session's radar dot. Priority: awaiting (red) > completion flash
+# (green) > current session (green) > other agent (neutral) > no agent (dim). The
+# ◉ vs ● glyph — not the colour — marks the current session, so awaiting still
+# reads red even on the session you're in.
+# priority: 0=awaiting, 1=done flash, 2=agent present, empty=no agent.
+dot_color() {
+  local priority=$1 is_current=$2
+  case "$priority" in
+    0) printf '#f7768e'; return ;;
+    1) printf '#3fb950'; return ;;
+  esac
+  if [ "$is_current" = 1 ]; then printf '#9ece6a'; return; fi
+  case "$priority" in
+    2) printf '#565f89' ;;
+    *) printf '#414868' ;;
+  esac
+}
+
+# Serve the lean status rows from a short-lived shared cache so concurrent
+# status-right expansions (one per attached client, every status-interval)
+# collapse to a single heavy scan per cache window. A single refresher holds a
+# lock and writes atomically; everyone else serves the (possibly stale) cache,
+# falling back to a direct scan only when there's nothing cached yet.
+cached_lean_rows() {
+  if [ "${NOW_OVERRIDDEN:-0}" = 1 ] || [ "${CACHE_TTL:-0}" -le 0 ]; then
+    list_rows lean
+    return
+  fi
+
+  local mtime age lock=$CACHE_FILE.lock
+  if [ -f "$CACHE_FILE" ]; then
+    mtime=$(stat -f %m "$CACHE_FILE" 2>/dev/null || printf '0')
+    age=$((NOW - mtime))
+    if [ "$age" -ge 0 ] && [ "$age" -le "$CACHE_TTL" ]; then
+      cat "$CACHE_FILE"
+      return
+    fi
+  fi
+
+  mkdir -p "$STATE_DIR" 2>/dev/null || { list_rows lean; return; }
+  chmod 700 "$STATE_DIR" 2>/dev/null || true
+
+  # Reap an abandoned lock so a crashed refresher can't freeze the cache.
+  if [ -d "$lock" ]; then
+    mtime=$(stat -f %m "$lock" 2>/dev/null || printf '0')
+    [ $((NOW - mtime)) -le "$CACHE_LOCK_STALE" ] || rmdir "$lock" 2>/dev/null || true
+  fi
+
+  if mkdir "$lock" 2>/dev/null; then
+    local tmp
+    if tmp=$(mktemp "$CACHE_FILE.XXXXXX" 2>/dev/null); then
+      if list_rows lean >"$tmp" 2>/dev/null; then
+        chmod 600 "$tmp" 2>/dev/null || true
+        mv -f "$tmp" "$CACHE_FILE" 2>/dev/null || rm -f "$tmp"
+      else
+        rm -f "$tmp"
+      fi
+    fi
+    rmdir "$lock" 2>/dev/null || true
+  fi
+
+  if [ -f "$CACHE_FILE" ]; then
+    cat "$CACHE_FILE"
+  else
+    list_rows lean
+  fi
+}
+
+# Renders the status-right: current-session pill (glyph coloured by the global
+# most-urgent status) followed by a cross-session radar (one dot per session,
+# coloured by that session's most-urgent agent).
+tmux_status() {
+  local session=$1
+  local session_order session_count
+  session_order=$(
+    "$TMUX_BIN" list-sessions -F '#{session_created}	#{session_name}' 2>/dev/null |
+      sort -n |
+      cut -f2-
+  )
+  session_count=$(printf '%s' "$session_order" | grep -c .)
+
+  local rows
+  rows=$(
+    cached_lean_rows |
+      awk -F '\t' '
+        BEGIN { OFS = "\t" }
+        {
+          position = $4
+          sub(/^.*:/, "", position)
+          split(position, parts, ".")
+          print parts[1] + 0, parts[2] + 0, $0
+        }
+      ' |
+      sort -t $'\t' -k1,1n -k2,2n |
+      cut -f3-
+  )
+
+  # Most-urgent priority per session (0=awaiting, 1=done flash, 2=other agent),
+  # computed in awk to stay bash 3.2 safe. done outranks working here so a
+  # completion still flashes green even alongside a working pane.
+  local prioritymap
+  prioritymap=$(printf '%s\n' "$rows" | awk -F '\t' '
+    $1 ~ /^[0-9]+$/ {
+      p = ($1 == 1) ? 0 : ($1 == 3) ? 1 : 2
+      if (!($3 in best) || p < best[$3]) best[$3] = p
+    }
+    END { for (s in best) print s "\t" best[s] }
+  ')
+
+  local global_priority
+  global_priority=$(printf '%s\n' "$prioritymap" | awk -F '\t' 'BEGIN { m = 9 } $2 != "" { if ($2 < m) m = $2 } END { print m }')
+  [ -n "$global_priority" ] || global_priority=9
+
+  # Pill cells for the current session, in pane order.
+  local pill= rank pane_id row_session target pane_target
+  while IFS=$'\t' read -r rank pane_id row_session target; do
+    [ -n "${rank:-}" ] || continue
+    case "$rank" in *[!0-9]*) continue ;; esac
+    [ "$row_session" = "$session" ] || continue
+    pane_target=${target#*:}
+    pill="$pill$(pill_cell "$rank" "$pane_target")"
+  done <<<"$rows"
+
+  # Pill \u2014 only when the current session actually has agent panes.
+  local pill_block=
+  if [ -n "$pill" ]; then
+    local glyph_fg
+    case "$global_priority" in
+      0) glyph_fg="#f7768e" ;;
+      1) glyph_fg="#3fb950" ;;
+      *) glyph_fg="#7dcfff" ;;
+    esac
+    pill_block="#[fg=${glyph_fg},bg=#24283b,bold]   ${pill}#[bg=#050505,nobold]"
+  fi
+
+  # Radar \u2014 one dot per session (creation order); only when >1 session exists.
+  local radar=
+  if [ "${session_count:-0}" -gt 1 ]; then
+    local name glyph color dots= current_flag best
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      if [ "$name" = "$session" ]; then
+        glyph="◉"
+        current_flag=1
+      else
+        glyph="●"
+        current_flag=0
+      fi
+      best=$(printf '%s\n' "$prioritymap" | awk -F '\t' -v s="$name" '$1 == s { print $2; exit }')
+      color=$(dot_color "$best" "$current_flag")
+      dots="$dots#[fg=${color}]${glyph} "
+    done <<<"$session_order"
+    radar="$dots"
+  fi
+
+  [ -n "$pill_block" ] || [ -n "$radar" ] || return
+
+  local out=
+  [ -n "$pill_block" ] && out="$pill_block"
+  if [ -n "$radar" ]; then
+    [ -n "$out" ] && out="$out "
+    out="$out$radar"
+  fi
+  printf '%s#[default]' "$out"
+}
+
+# SketchyBar feed. Reuses the shared lean scan + the same per-session priority
+# folding as the status-right pill (awaiting=0 > done-flash=1 > other=2) so the
+# menu-bar icon and popup stay in lockstep with tmux. Emits:
+#   COLOR<TAB><hex>            global most-urgent icon colour (only when >=1 agent
+#                              is tracked; absent output => hide the bar icon)
+#   LINE<TAB><session><TAB><kind>  one per session whose most-urgent state is
+#                              notable (kind = awaiting|done), in session-creation
+#                              order to match the radar.
+notify_lines() {
+  require_command "$TMUX_BIN"
+  require_command jq
+  local session_order rows
+  session_order=$("$TMUX_BIN" list-sessions -F '#{session_created}	#{session_name}' 2>/dev/null |
+    sort -n | cut -f2-) || session_order=
+  rows=$(cached_lean_rows) || rows=
+  printf '%s\n' "$rows" | ORDERLIST="$session_order" awk -F '\t' '
+    BEGIN {
+      n = split(ENVIRON["ORDERLIST"], arr, "\n")
+      for (i = 1; i <= n; i++) { if (arr[i] != "") pos[arr[i]] = i }
+    }
+    $1 ~ /^[0-9]+$/ {
+      s = $3
+      p = ($1 == 1) ? 0 : ($1 == 3) ? 1 : 2
+      if (!(s in best) || p < best[s]) best[s] = p
+      any = 1
+    }
+    END {
+      if (!any) exit 0
+      gp = 9
+      for (s in best) if (best[s] < gp) gp = best[s]
+      color = (gp == 0) ? "#f7768e" : (gp == 1) ? "#3fb950" : "#7dcfff"
+      print "COLOR\t" color
+      for (i = 1; i <= n; i++) {
+        s = arr[i]
+        if (s == "" || !(s in best) || best[s] > 1) continue
+        kind = (best[s] == 0) ? "awaiting" : "done"
+        print "LINE\t" s "\t" kind
+        emitted[s] = 1
+      }
+      # Notable sessions absent from the creation-order list (rare) still count.
+      for (s in best) {
+        if (best[s] > 1 || (s in emitted)) continue
+        kind = (best[s] == 0) ? "awaiting" : "done"
+        print "LINE\t" s "\t" kind
+      }
+    }
+  '
+}
+
+# Filename-safe, collision-free key for a session name (hex of its raw bytes).
+session_key() {
+  printf '%s' "$1" | od -An -v -tx1 2>/dev/null | tr -d ' \n'
+}
+
+# Seconds since a file was last modified, or a large sentinel when it's absent.
+file_age() {
+  local mtime
+  mtime=$(stat -f %m "$1" 2>/dev/null) || { printf '%s' 999999; return; }
+  printf '%s' "$((NOW - mtime))"
+}
+
+# Precompute every session's status-right string into STATUS_DIR so the render
+# path becomes a bare cat. One heavy scan (served through the shared lean cache)
+# feeds every per-session render. Serialized by a lock that self-heals once it
+# ages past STATUS_LOCK_STALE. Pass 1 to redraw clients when done.
+refresh_all() {
+  local notify=${1:-0}
+  require_command "$TMUX_BIN"
+  require_command jq
+  mkdir -p "$STATUS_DIR" 2>/dev/null || return 1
+  chmod 700 "$STATUS_DIR" 2>/dev/null || true
+
+  if [ -d "$STATUS_LOCK" ]; then
+    local lmtime
+    lmtime=$(stat -f %m "$STATUS_LOCK" 2>/dev/null || printf '0')
+    [ $((NOW - lmtime)) -le "$STATUS_LOCK_STALE" ] || rmdir "$STATUS_LOCK" 2>/dev/null || true
+  fi
+  # A busy lock means another refresher is mid-flight; it will redraw for us.
+  mkdir "$STATUS_LOCK" 2>/dev/null || return 0
+
+  local sessions keep=" " name key out tmp f base
+  sessions=$("$TMUX_BIN" list-sessions -F '#{session_name}' 2>/dev/null) || sessions=
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    key=$(session_key "$name")
+    keep="$keep$key "
+    out=$(tmux_status "$name" || true)
+    if tmp=$(mktemp "$STATUS_DIR/.status.XXXXXX" 2>/dev/null); then
+      printf '%s' "$out" >"$tmp"
+      chmod 600 "$tmp" 2>/dev/null || true
+      mv -f "$tmp" "$STATUS_DIR/$key.txt" 2>/dev/null || rm -f "$tmp"
+    fi
+  done <<<"$sessions"
+
+  # Drop precomputed files for sessions that no longer exist.
+  for f in "$STATUS_DIR"/*.txt; do
+    [ -e "$f" ] || break
+    base=$(basename "$f" .txt)
+    case "$keep" in
+      *" $base "*) : ;;
+      *) rm -f "$f" ;;
+    esac
+  done
+
+  : >"$STATUS_STAMP" 2>/dev/null || true
+  rmdir "$STATUS_LOCK" 2>/dev/null || true
+
+  if [ "$notify" = 1 ]; then
+    "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 || true
+    # Keep the SketchyBar agent item in lockstep with the tmux redraw. The
+    # Copilot hook only fires agent_notify on real transitions, so footer-detected
+    # states (e.g. a permission/blocking prompt that never reaches the hook) would
+    # otherwise wait out SketchyBar's slow update_freq. Nudging it here lets the
+    # bar track every polling-driven refresh at tmux speed. Guarded + fire-and-
+    # forget so machines without SketchyBar are unaffected and the scan never
+    # blocks on it.
+    if [ "${TMUX_AGENT_ENGINE_SKETCHYBAR:-1}" != 0 ] &&
+       command -v sketchybar >/dev/null 2>&1; then
+      ( sketchybar --trigger agent_notify >/dev/null 2>&1 ) &
+      disown 2>/dev/null || true
+    fi
+  fi
+}
+
+# Schedule a non-blocking background refresh when the precomputed strings are
+# stale. Rate-limited by STATUS_TTL; work is deduped by refresh_all's lock. No-op
+# under pinned NOW (tests) or without a reachable tmux.
+schedule_refresh() {
+  [ "${NOW_OVERRIDDEN:-0}" = 1 ] && return 0
+  command -v "$TMUX_BIN" >/dev/null 2>&1 || return 0
+  [ "$(file_age "$STATUS_STAMP")" -ge "$STATUS_TTL" ] || return 0
+  "$TMUX_BIN" run-shell -b "'$0' --refresh --notify" >/dev/null 2>&1 || true
+}
+
+# status-right render path: cat the precomputed string (~1ms) so a session
+# switch never waits on the agent scan. Falls back to a synchronous compute only
+# when no precomputed string exists yet (first paint), which is no worse than the
+# previous always-synchronous behavior.
+tmux_status_cached() {
+  local session=$1 file
+  file=$STATUS_DIR/$(session_key "$session").txt
+  if [ -f "$file" ]; then
+    cat "$file"
+  else
+    tmux_status "$session"
+  fi
+  schedule_refresh
+}
+
+format_display_row() {
+  local status=$1 target=$2 title=$3 status_cell target_cell
+  status_cell=$(printf '%-10s' "$status")
+  target_cell=$(printf '%-26.26s' "$target")
+
+  if [ "${NO_COLOR:-0}" != 1 ]; then
+    # Status column: exact status-bar pill hexes (truecolor).
+    case "$status" in
+      awaiting) status_cell=$(printf '\033[38;2;247;118;142m%s\033[0m' "$status_cell") ;;
+      working) status_cell=$(printf '\033[38;2;224;175;104m%s\033[0m' "$status_cell") ;;
+      done) status_cell=$(printf '\033[38;2;63;185;80m%s\033[0m' "$status_cell") ;;
+      idle) status_cell=$(printf '\033[38;2;158;206;106m%s\033[0m' "$status_cell") ;;
+      *) status_cell=$(printf '\033[38;2;86;95;137m%s\033[0m' "$status_cell") ;;
+    esac
+    # Target column in the blue session accent (#7aa2f7) used by status-left.
+    target_cell=$(printf '\033[38;2;122;162;247m%s\033[0m' "$target_cell")
+  fi
+
+  printf '%s  %s  %s' "$status_cell" "$target_cell" "$title"
+}
+
+clean_field() {
+  printf '%s' "$1" | tr '\t\r\n' '   '
+}
+
+clean_title() {
+  local title
+  title=$(clean_field "$1")
+  title=${title%% - GitHub Copilot*}
+  [ "$title" != "GitHub Copilot" ] || title=
+  [ -n "$title" ] || title=-
+  printf '%s' "$title"
+}
+
+write_process_snapshot() {
+  local destination=$1
+  if [ -n "${TMUX_AGENT_ENGINE_PS_FILE:-}" ]; then
+    cp "$TMUX_AGENT_ENGINE_PS_FILE" "$destination"
+  else
+    ps -axo pid=,ppid=,comm= >"$destination"
+  fi
+}
+
+list_rows() {
+  require_command jq
+  local mode=${1:-full}
+  local temp_dir process_file panes_file copilot_panes_file live_panes_file rows_file
+  temp_dir=$(mktemp -d)
+  process_file=$temp_dir/processes
+  panes_file=$temp_dir/panes
+  copilot_panes_file=$temp_dir/copilot-panes
+  live_panes_file=$temp_dir/live-panes
+  rows_file=$temp_dir/rows
+  trap "rm -rf -- '$temp_dir'" EXIT
+
+  write_process_snapshot "$process_file"
+  "$TMUX_BIN" list-panes -a \
+    -F '#{pane_id}	#{session_name}	#{window_index}	#{pane_index}	#{pane_pid}	#{pane_title}' \
+    >"$panes_file" 2>/dev/null || return 0
+  filter_copilot_panes "$panes_file" "$process_file" "$copilot_panes_file"
+
+  : >"$live_panes_file"
+  : >"$rows_file"
+
+  local pane_id session window pane_index pane_pid title target state_file
+  local state_data hook_status updated_epoch age footer fallback status rank label display
+  while IFS=$'\t' read -r pane_id session window pane_index pane_pid title; do
+    case "$pane_id" in
+      %|%*[!0-9]*|[!%]*|'') continue ;;
+    esac
+    case "$pane_pid" in
+      *[!0-9]*|'') continue ;;
+    esac
+    printf '%s\n' "$pane_id" >>"$live_panes_file"
+
+    state_file=$STATE_DIR/${pane_id#%}.json
+    status=unknown
+    hook_status=; updated_epoch=; age=; flash_kind=; flash_until=0
+
+    if state_data=$(state_status "$state_file" "$pane_id"); then
+      IFS=$'\t' read -r hook_status updated_epoch flash_kind flash_until <<<"$state_data"
+      age=$((NOW - updated_epoch))
+    fi
+
+    # capture-pane + live_status is the most expensive per-pane work. Only pay
+    # for it when the hook state can't settle the status on its own: missing or
+    # stale state (needs a footer fallback) or a working/awaiting pane that the
+    # footer may need to disambiguate. Fresh idle / done-flash panes — the
+    # common idle case — skip the capture entirely.
+    fallback=
+    if [ -z "$hook_status" ] || [ "$age" -gt "$STALE_SECONDS" ] ||
+       [ "$hook_status" = working ] || [ "$hook_status" = awaiting ]; then
+      footer=$(capture_footer "$pane_id" || true)
+      fallback=$(live_status "$footer")
+    fi
+
+    if [ -n "$hook_status" ] && [ "$age" -le "$STALE_SECONDS" ]; then
+      status=$hook_status
+      if [ "$status" = working ] && [ "$fallback" = awaiting ]; then
+        status=awaiting
+      elif [ "$status" = awaiting ] && [ "$fallback" = working ]; then
+        status=working
+      elif [ "$status" = awaiting ] && [ "$fallback" = idle ] &&
+           [ "${age:-0}" -gt "$AWAITING_IDLE_GRACE" ]; then
+        # A stale permissionRequest awaiting state that was never cleared (e.g.
+        # the prompt was cancelled without a follow-up hook event) would linger
+        # red for up to STALE_SECONDS. Once past the grace window, a confirmed
+        # idle footer means the prompt is gone, so let it recover instead of
+        # waiting out the staleness window. Fresh awaiting transitions (within
+        # the grace window) stay authoritative even if the footer capture lags.
+        status=idle
+      fi
+      if [ "$status" = idle ] && [ "$flash_kind" = done ] && [ "${flash_until:-0}" -gt "$NOW" ]; then
+        status=done
+      fi
+    else
+      status=$fallback
+    fi
+
+    case "$status" in
+      awaiting) rank=1 ;;
+      working) rank=2 ;;
+      done) rank=3 ;;
+      idle) rank=4 ;;
+      *) rank=5 ;;
+    esac
+    session=$(clean_field "$session")
+    target=$session:$window.$pane_index
+    if [ "$mode" = lean ]; then
+      # The status-right pill/radar only needs rank, pane, session, target;
+      # skip the label/title/display formatting that only the fzf list uses.
+      printf '%s\t%s\t%s\t%s\n' "$rank" "$pane_id" "$session" "$target" >>"$rows_file"
+    else
+      label=$(status_label "$status")
+      title=$(clean_title "$title")
+      display=$(format_display_row "$status" "$target" "$title")
+      printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$rank" "$pane_id" "$session" "$target" "$label" "$title" "$display" >>"$rows_file"
+    fi
+  done <"$copilot_panes_file"
+
+  if [ -d "$STATE_DIR" ] && [ ! -L "$STATE_DIR" ]; then
+    local candidate candidate_pane
+    for candidate in "$STATE_DIR"/*.json; do
+      [ -e "$candidate" ] || break
+      candidate_pane=%$(basename "$candidate" .json)
+      grep -Fxq "$candidate_pane" "$live_panes_file" || rm -f "$candidate"
+    done
+  fi
+
+  sort -t $'\t' -k1,1n -k3,3 -k4,4 "$rows_file"
+}
+
+switch_to_pane() {
+  local pane_id=$1 session=$2
+  "$TMUX_BIN" switch-client -t "$session"
+  "$TMUX_BIN" select-pane -t "$pane_id"
+}
+
+case "${1:-}" in
+  preview)
+    [ $# -eq 2 ] || die "preview requires a pane ID"
+    exec "$TMUX_BIN" capture-pane -p -e -t "$2" -S -20
+    ;;
+  --list)
+    list_rows
+    exit 0
+    ;;
+  --live-status)
+    live_status "$(cat)"
+    exit 0
+    ;;
+  --tmux-status)
+    [ $# -eq 2 ] || die "--tmux-status requires a session name"
+    require_command "$TMUX_BIN"
+    require_command jq
+    tmux_status "$2"
+    exit 0
+    ;;
+  --tmux-status-cached)
+    [ $# -eq 2 ] || die "--tmux-status-cached requires a session name"
+    tmux_status_cached "$2"
+    exit 0
+    ;;
+  --notify-lines)
+    notify_lines
+    exit 0
+    ;;
+  --refresh)
+    notify=0
+    if [ "${2:-}" = --notify ]; then notify=1; fi
+    refresh_all "$notify"
+    exit 0
+    ;;
+esac
+
+require_command "$TMUX_BIN"
+require_command fzf
+require_command jq
+
+selection=$(
+  list_rows |
+    fzf --ansi \
+      --track \
+      --reverse \
+      --border=rounded \
+      --border-label='  Agents ' \
+      --border-label-pos=3 \
+      --prompt='  ' \
+      --pointer='▶' \
+      --padding=1 \
+      --color='bg:-1,fg+:#c0caf5,bg+:#292e42,hl:#7aa2f7,hl+:#7dcfff,gutter:#3b4261,border:#3b4261,label:#7dcfff,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89,info:#565f89,spinner:#7dcfff' \
+      --delimiter=$'\t' \
+      --with-nth=7 \
+      --header='STATUS      TARGET                      TITLE' \
+      --preview="$0 preview {2}" \
+      --preview-window='right,55%,border-left,follow'
+) || exit 0
+[ -n "$selection" ] || exit 0
+
+pane_id=$(printf '%s\n' "$selection" | cut -f2)
+session=$(printf '%s\n' "$selection" | cut -f3)
+[ -n "$pane_id" ] && [ -n "$session" ] || die "invalid selection"
+switch_to_pane "$pane_id" "$session"

@@ -8,6 +8,7 @@
 -- Read ~/documents/notes/jdlts-setup.md for more info.
 return {
 	"mfussenegger/nvim-jdtls",
+	enabled = false,
 	ft = "java",
 	dependencies = { "mfussenegger/nvim-dap" },
 	config = function()

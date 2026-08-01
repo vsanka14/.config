@@ -9,6 +9,72 @@ trap 'exit 0' ERR HUP INT TERM
 
 command -v jq >/dev/null 2>&1 || exit 0
 
+TMUX_BIN=${TMUX_AGENT_STATUS_TMUX_BIN:-tmux}
+DONE_FLASH_TTL=${TMUX_AGENT_STATUS_DONE_TTL:-3}
+ENGINE_BIN=${TMUX_AGENT_STATUS_ENGINE_BIN:-${HOME:-}/.config/bin/tmux-agent-engine}
+
+refresh_enabled() {
+  [ "${TMUX_AGENT_STATUS_REFRESH:-1}" != 0 ] || return 1
+  command -v "$TMUX_BIN" >/dev/null 2>&1
+}
+
+# SketchyBar notifications ride the same enable switch as the tmux redraw so
+# tests (which pin TMUX_AGENT_STATUS_REFRESH=0) stay hermetic. Guarded by the
+# binary so machines without SketchyBar are unaffected.
+sketchybar_enabled() {
+  [ "${TMUX_AGENT_STATUS_SKETCHYBAR:-1}" != 0 ] || return 1
+  [ "${TMUX_AGENT_STATUS_REFRESH:-1}" != 0 ] || return 1
+  command -v sketchybar >/dev/null 2>&1
+}
+
+# Push a transient agent notification to the menu bar on a real transition. The
+# SketchyBar plugin re-derives the full notable set (and whether it is a blocking
+# awaiting or a transient done) via tmux-agent-engine, so no per-pane payload is
+# needed here. Fire-and-forget; never blocks the hook.
+emit_sketchybar_notify() {
+  sketchybar_enabled || return 0
+  ( sketchybar --trigger agent_notify >/dev/null 2>&1 ) &
+  disown 2>/dev/null || true
+}
+
+# Drop the engine's shared render cache so the very next status-right expansion
+# rebuilds with this transition instead of serving stale state for the cache
+# TTL. Keeps idle redraws coalesced while making real transitions instant.
+invalidate_status_cache() {
+  local dir=${COPILOT_HOME:-${HOME:-}/.copilot}/agent-status
+  rm -f "$dir/.tmux-status.cache" 2>/dev/null || true
+}
+
+# Redraw so a transition shows without waiting for the next status-interval tick.
+# The engine's status-right render only cats a precomputed string, so regenerate
+# those strings off the render path first (--refresh recomputes and then redraws).
+# Falls back to a plain redraw when the engine isn't present.
+emit_refresh() {
+  refresh_enabled || return 0
+  invalidate_status_cache
+  if [ -x "$ENGINE_BIN" ] && "$TMUX_BIN" run-shell -b "'$ENGINE_BIN' --refresh --notify" >/dev/null 2>&1; then
+    return 0
+  fi
+  "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 || true
+}
+
+# One-shot delayed redraw so a transient "done" flash decays crisply at expiry
+# instead of lingering until the next poll.
+schedule_refresh() {
+  refresh_enabled || return 0
+  [ "${TMUX_AGENT_STATUS_SCHEDULE_REFRESH:-1}" != 0 ] || return 0
+  ( sleep "$DONE_FLASH_TTL"; invalidate_status_cache
+    if [ -x "$ENGINE_BIN" ] && "$TMUX_BIN" run-shell -b "'$ENGINE_BIN' --refresh --notify" >/dev/null 2>&1; then
+      :
+    else
+      "$TMUX_BIN" refresh-client -S >/dev/null 2>&1
+    fi
+    command -v sketchybar >/dev/null 2>&1 &&
+      sketchybar --trigger agent_notify >/dev/null 2>&1
+  ) >/dev/null 2>&1 &
+  disown 2>/dev/null || true
+}
+
 valid_pane_id() {
   case "$1" in
     %|%*[!0-9]*|[!%]*|'') return 1 ;;
@@ -119,8 +185,15 @@ case "$process_pid" in
   *[!0-9]*|'') process_pid=0 ;;
 esac
 
+prev_status=
+if [ -f "$state_file" ] && [ ! -L "$state_file" ]; then
+  prev_status=$(jq -r '.status // empty' "$state_file" 2>/dev/null) || prev_status=
+fi
+
 if [ "$status" = removed ]; then
   rm -f -- "$state_file" 2>/dev/null
+  emit_refresh
+  emit_sketchybar_notify
   exit 0
 fi
 
@@ -147,6 +220,16 @@ subagent_name=$(printf '%.120s' "$subagent_name")
 updated_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null) || exit 0
 updated_epoch=$(date '+%s' 2>/dev/null) || exit 0
 
+# Edge-triggered transient signal: only a real completion (agentStop after the
+# agent was working) flashes "done". Fresh sessionStart idle and subagentStop
+# must not flash.
+flash_kind=
+flash_until=0
+if [ "$event" = agentStop ] && [ "$prev_status" = working ]; then
+  flash_kind=done
+  flash_until=$((updated_epoch + DONE_FLASH_TTL))
+fi
+
 temp_file=$(mktemp "$state_dir/.tmux-agent-status.XXXXXX" 2>/dev/null) || exit 0
 trap 'rm -f -- "$temp_file" 2>/dev/null; exit 0' ERR HUP INT TERM
 
@@ -158,8 +241,10 @@ jq -n \
   --arg tool_name "$tool_name" \
   --arg subagent_name "$subagent_name" \
   --arg updated_at "$updated_at" \
+  --arg flash_kind "$flash_kind" \
   --argjson process_pid "$process_pid" \
-  --argjson updated_epoch "$updated_epoch" '
+  --argjson updated_epoch "$updated_epoch" \
+  --argjson flash_until "$flash_until" '
   {
     pane_id: $pane_id,
     session_id: $session_id,
@@ -171,8 +256,15 @@ jq -n \
   }
   + (if $tool_name == "" then {} else {tool_name: $tool_name} end)
   + (if $subagent_name == "" then {} else {subagent_name: $subagent_name} end)
+  + (if $flash_kind == "" then {} else {flash: {kind: $flash_kind, until_epoch: $flash_until}} end)
 ' >"$temp_file" 2>/dev/null || exit 0
 
 chmod 600 "$temp_file" 2>/dev/null || exit 0
 mv -f -- "$temp_file" "$state_file" 2>/dev/null || exit 0
+
+if [ "$prev_status" != "$status" ] || [ -n "$flash_kind" ]; then
+  emit_refresh
+  emit_sketchybar_notify
+fi
+[ "$flash_kind" = done ] && schedule_refresh
 exit 0
