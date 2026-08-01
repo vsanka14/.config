@@ -72,7 +72,9 @@ map("n", "<Leader>gl", function()
 		"  editPreset: nvim-remote",
 	}, config_file)
 
-	local cmd = string.format("lazygit --use-config-file=%s", vim.fn.shellescape(config_file))
+	local user_config = vim.fn.expand("~/Library/Application Support/lazygit/config.yml")
+	local config_files = table.concat({ user_config, config_file }, ",")
+	local cmd = string.format("lazygit --use-config-file=%s", vim.fn.shellescape(config_files))
 	require("helpers.float-term").open(cmd, {
 		on_exit = function()
 			vim.fn.delete(config_file)
