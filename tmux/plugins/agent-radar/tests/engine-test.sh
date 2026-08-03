@@ -72,6 +72,10 @@ run_hook errorOccurred ',"recoverable":false,"error":{"message":"must not persis
 assert_eq idle "$(state_value .status)" "nonrecoverable error settles agent idle"
 assert_eq null "$(state_value '.flash.kind // "null"')" "error does not flash successful completion"
 run_hook userPromptSubmitted
+run_hook abort ',"abortReason":"user_initiated"'
+assert_eq idle "$(state_value .status)" "abort settles agent idle"
+assert_eq null "$(state_value '.flash.kind // "null"')" "abort does not flash successful completion"
+run_hook userPromptSubmitted
 run_hook subagentStart ',"agentDisplayName":"test-agent"'
 assert_eq working "$(state_value .status)" "subagent keeps parent working"
 assert_eq test-agent "$(state_value .subagent_name)" "subagent metadata"

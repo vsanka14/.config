@@ -54,9 +54,15 @@ Setup generates the descriptor with the plugin's resolved absolute path,
 migrates valid legacy pane state, and cleans only old Agent Radar state/cache
 artifacts.
 
-Lifecycle hooks are the sole status source. Agent Radar uses tool and
-notification hooks for dialogs that need attention, completion hooks to clear
-them, and session hooks to add or remove panes.
+Copilot lifecycle events are the sole status source. Agent Radar uses public
+tool and notification hooks for dialogs that need attention, completion hooks
+to clear them, and session hooks to add or remove panes.
+
+Copilot does not expose turn cancellation as a public hook. This setup
+intentionally compensates with an untracked user extension at
+`~/.copilot/extensions/agent-radar/extension.mjs`; it subscribes to the
+Extension SDK's session `abort` event and forwards root-turn cancellation to
+`agent-radar-hook abort`.
 
 ## Public commands
 

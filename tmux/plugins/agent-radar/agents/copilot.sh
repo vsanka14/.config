@@ -29,6 +29,7 @@ agent_event_status() {
         printf 'idle'
       fi
       ;;
+    abort) printf 'idle' ;;
     agentStop) printf 'idle' ;;
     sessionEnd) printf 'removed' ;;
     *) return 1 ;;
