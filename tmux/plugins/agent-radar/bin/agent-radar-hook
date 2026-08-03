@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# Copilot hook: maintain privacy-safe status for the current tmux pane.
-# Required registration lives only at ~/.copilot/hooks/tmux-agent-status.json.
+# Copilot adapter hook: maintain privacy-safe status for the current tmux pane.
 
 set -u
 umask 077
@@ -9,39 +8,50 @@ trap 'exit 0' ERR HUP INT TERM
 
 command -v jq >/dev/null 2>&1 || exit 0
 
-TMUX_BIN=${TMUX_AGENT_STATUS_TMUX_BIN:-tmux}
-DONE_FLASH_TTL=${TMUX_AGENT_STATUS_DONE_TTL:-3}
-ENGINE_BIN=${TMUX_AGENT_STATUS_ENGINE_BIN:-${HOME:-}/.config/bin/tmux-agent-engine}
+SCRIPT_PATH=${BASH_SOURCE[0]}
+while [ -L "$SCRIPT_PATH" ]; do
+  LINK_TARGET=$(readlink "$SCRIPT_PATH")
+  case "$LINK_TARGET" in
+    /*) SCRIPT_PATH=$LINK_TARGET ;;
+    *) SCRIPT_PATH=$(dirname -- "$SCRIPT_PATH")/$LINK_TARGET ;;
+  esac
+done
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)
+PLUGIN_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+source "$PLUGIN_ROOT/lib/config.sh"
+AGENT_RADAR_ENGINE_BIN=${AGENT_RADAR_ENGINE_BIN:-$SCRIPT_DIR/agent-radar}
+source "$PLUGIN_ROOT/lib/notify.sh"
+source "$PLUGIN_ROOT/agents/copilot.sh"
+
+TMUX_BIN=${AGENT_RADAR_TMUX_BIN:-${TMUX_AGENT_STATUS_TMUX_BIN:-tmux}}
+DONE_FLASH_TTL=${AGENT_RADAR_DONE_TTL:-${TMUX_AGENT_STATUS_DONE_TTL:-$(agent_radar_tmux_option @agent-radar-done-ttl 3)}}
+LOADER_BIN=$PLUGIN_ROOT/agent-radar.tmux
 
 refresh_enabled() {
   [ "${TMUX_AGENT_STATUS_REFRESH:-1}" != 0 ] || return 1
   command -v "$TMUX_BIN" >/dev/null 2>&1
 }
 
-# SketchyBar notifications ride the same enable switch as the tmux redraw so
-# tests (which pin TMUX_AGENT_STATUS_REFRESH=0) stay hermetic. Guarded by the
-# binary so machines without SketchyBar are unaffected.
-sketchybar_enabled() {
-  [ "${TMUX_AGENT_STATUS_SKETCHYBAR:-1}" != 0 ] || return 1
-  [ "${TMUX_AGENT_STATUS_REFRESH:-1}" != 0 ] || return 1
-  command -v sketchybar >/dev/null 2>&1
+refresh_command() {
+  local command
+  command=$("$TMUX_BIN" show-option -gqv @agent-radar-runtime-command 2>/dev/null) || command=
+  case "$command" in
+    env\ *agent-radar*) printf '%s --refresh --notify' "$command" ;;
+    *) printf "'%s' --refresh" "$LOADER_BIN" ;;
+  esac
 }
 
-# Push a transient agent notification to the menu bar on a real transition. The
-# SketchyBar plugin re-derives the full notable set (and whether it is a blocking
-# awaiting or a transient done) via tmux-agent-engine, so no per-pane payload is
-# needed here. Fire-and-forget; never blocks the hook.
-emit_sketchybar_notify() {
-  sketchybar_enabled || return 0
-  ( sketchybar --trigger agent_notify >/dev/null 2>&1 ) &
-  disown 2>/dev/null || true
+emit_external_notify() {
+  [ "${TMUX_AGENT_STATUS_REFRESH:-1}" != 0 ] || return 0
+  emit_agent_radar_change
 }
 
 # Drop the engine's shared render cache so the very next status-right expansion
 # rebuilds with this transition instead of serving stale state for the cache
 # TTL. Keeps idle redraws coalesced while making real transitions instant.
 invalidate_status_cache() {
-  local dir=${COPILOT_HOME:-${HOME:-}/.copilot}/agent-status
+  local dir
+  dir=$(agent_radar_state_dir)
   rm -f "$dir/.tmux-status.cache" 2>/dev/null || true
 }
 
@@ -50,9 +60,11 @@ invalidate_status_cache() {
 # those strings off the render path first (--refresh recomputes and then redraws).
 # Falls back to a plain redraw when the engine isn't present.
 emit_refresh() {
+  local command
   refresh_enabled || return 0
   invalidate_status_cache
-  if [ -x "$ENGINE_BIN" ] && "$TMUX_BIN" run-shell -b "'$ENGINE_BIN' --refresh --notify" >/dev/null 2>&1; then
+  command=$(refresh_command)
+  if [ -n "$command" ] && "$TMUX_BIN" run-shell -b "$command" >/dev/null 2>&1; then
     return 0
   fi
   "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 || true
@@ -61,16 +73,17 @@ emit_refresh() {
 # One-shot delayed redraw so a transient "done" flash decays crisply at expiry
 # instead of lingering until the next poll.
 schedule_refresh() {
+  local command
   refresh_enabled || return 0
   [ "${TMUX_AGENT_STATUS_SCHEDULE_REFRESH:-1}" != 0 ] || return 0
   ( sleep "$DONE_FLASH_TTL"; invalidate_status_cache
-    if [ -x "$ENGINE_BIN" ] && "$TMUX_BIN" run-shell -b "'$ENGINE_BIN' --refresh --notify" >/dev/null 2>&1; then
+    command=$(refresh_command)
+    if [ -n "$command" ] && "$TMUX_BIN" run-shell -b "$command" >/dev/null 2>&1; then
       :
     else
       "$TMUX_BIN" refresh-client -S >/dev/null 2>&1
     fi
-    command -v sketchybar >/dev/null 2>&1 &&
-      sketchybar --trigger agent_notify >/dev/null 2>&1
+    emit_agent_radar_change
   ) >/dev/null 2>&1 &
   disown 2>/dev/null || true
 }
@@ -95,7 +108,7 @@ resolve_pane_id() {
   if [ -n "${TMUX_AGENT_STATUS_PS_FILE:-}" ]; then
     process_file=$TMUX_AGENT_STATUS_PS_FILE
   else
-    process_file=$(mktemp "${TMPDIR:-/tmp}/tmux-agent-status-ps.XXXXXX") || return 1
+    process_file=$(mktemp "${TMPDIR:-/tmp}/agent-radar-hook-ps.XXXXXX") || return 1
     cleanup_process_file=1
     ps -axo pid=,ppid=,comm= >"$process_file" 2>/dev/null || {
       rm -f "$process_file"
@@ -114,14 +127,14 @@ resolve_pane_id() {
       current = start
       for (depth = 0; current != "" && current != "0" && depth < 256; depth++) {
         count = split(command[current], parts, "/")
-        if (parts[count] == "copilot") {
+        if (parts[count] == agent_process) {
           print current
           exit
         }
         current = parent[current]
       }
     }
-  ' "$process_file")
+  ' agent_process="$AGENT_RADAR_PROCESS_BASENAME" "$process_file")
 
   if [ -z "$copilot_pid" ]; then
     [ "$cleanup_process_file" -eq 0 ] || rm -f "$process_file"
@@ -161,24 +174,40 @@ pane_id=$(resolve_pane_id) || exit 0
 
 event=${1:-}
 input={}
-if [ -z "$event" ]; then
+if [ ! -t 0 ]; then
   input=$(cat 2>/dev/null) || exit 0
-  jq -e 'type == "object"' >/dev/null 2>&1 <<<"$input" || exit 0
+  [ -n "$input" ] || input={}
+fi
+jq -e 'type == "object"' >/dev/null 2>&1 <<<"$input" || exit 0
+if [ -z "$event" ]; then
   event=$(jq -r '.hookEventName // .hookName // .eventName // .event // empty' <<<"$input" 2>/dev/null)
 fi
-case "$event" in
-  sessionStart) status=idle ;;
-  userPromptSubmitted|preToolUse|postToolUse) status=working ;;
-  permissionRequest) status=awaiting ;;
-  agentStop) status=idle ;;
-  sessionEnd) status=removed ;;
-  subagentStart|subagentStop) status=working ;;
-  *) exit 0 ;;
-esac
 
-copilot_home=${COPILOT_HOME:-${HOME:-}/.copilot}
-[ -n "$copilot_home" ] || exit 0
-state_dir=$copilot_home/agent-status
+tool_name=$(jq -r '
+  .toolName // .tool_name //
+  (
+    [.toolCalls[]? | .name // .toolName // .tool_name // empty]
+    | if index("ask_user") then "ask_user" else (.[0] // empty) end
+  )
+' <<<"$input" 2>/dev/null)
+tool_name=$(printf '%.120s' "$tool_name")
+
+event_detail=
+case "$event" in
+  preToolUse)
+    event_detail=$tool_name
+    ;;
+  notification)
+    event_detail=$(jq -r '.notification_type // empty' <<<"$input" 2>/dev/null)
+    ;;
+  errorOccurred)
+    event_detail=$(jq -r 'if .recoverable == true then "true" else "false" end' <<<"$input" 2>/dev/null)
+    ;;
+esac
+status=$(agent_event_status "$event" "$event_detail") || exit 0
+
+state_dir=$(agent_radar_state_dir)
+[ -n "$state_dir" ] || exit 0
 state_file=$state_dir/${pane_id#%}.json
 process_pid=${PPID:-0}
 case "$process_pid" in
@@ -193,7 +222,7 @@ fi
 if [ "$status" = removed ]; then
   rm -f -- "$state_file" 2>/dev/null
   emit_refresh
-  emit_sketchybar_notify
+  emit_external_notify
   exit 0
 fi
 
@@ -213,8 +242,6 @@ session_id=$(jq -r '.sessionId // .session_id // "unknown"' <<<"$input" 2>/dev/n
 session_id=$(printf '%s' "$session_id" | tr -cd '[:alnum:]_-')
 [ -n "$session_id" ] || session_id=unknown
 
-tool_name=$(jq -r '.toolName // .tool_name // empty' <<<"$input" 2>/dev/null)
-tool_name=$(printf '%.120s' "$tool_name")
 subagent_name=$(jq -r '.agentDisplayName // .agentName // .agent_name // empty' <<<"$input" 2>/dev/null)
 subagent_name=$(printf '%.120s' "$subagent_name")
 updated_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null) || exit 0
@@ -230,7 +257,7 @@ if [ "$event" = agentStop ] && [ "$prev_status" = working ]; then
   flash_until=$((updated_epoch + DONE_FLASH_TTL))
 fi
 
-temp_file=$(mktemp "$state_dir/.tmux-agent-status.XXXXXX" 2>/dev/null) || exit 0
+temp_file=$(mktemp "$state_dir/.agent-radar-hook.XXXXXX" 2>/dev/null) || exit 0
 trap 'rm -f -- "$temp_file" 2>/dev/null; exit 0' ERR HUP INT TERM
 
 jq -n \
@@ -264,7 +291,7 @@ mv -f -- "$temp_file" "$state_file" 2>/dev/null || exit 0
 
 if [ "$prev_status" != "$status" ] || [ -n "$flash_kind" ]; then
   emit_refresh
-  emit_sketchybar_notify
+  emit_external_notify
 fi
 [ "$flash_kind" = done ] && schedule_refresh
 exit 0

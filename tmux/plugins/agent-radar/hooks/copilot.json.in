@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "disableAllHooks": false,
+  "hooks": {
+    "sessionStart": [
+      { "type": "command", "command": "__COMMAND__ sessionStart", "timeoutSec": 5 }
+    ],
+    "userPromptSubmitted": [
+      { "type": "command", "command": "__COMMAND__ userPromptSubmitted", "timeoutSec": 5 }
+    ],
+    "permissionRequest": [
+      { "type": "command", "command": "__COMMAND__ permissionRequest", "timeoutSec": 5 }
+    ],
+    "notification": [
+      {
+        "type": "command",
+        "command": "__COMMAND__ notification",
+        "matcher": "permission_prompt|elicitation_dialog",
+        "timeoutSec": 5
+      }
+    ],
+    "preToolUse": [
+      { "type": "command", "command": "__COMMAND__ preToolUse", "timeoutSec": 5 }
+    ],
+    "postToolUse": [
+      { "type": "command", "command": "__COMMAND__ postToolUse", "timeoutSec": 5 }
+    ],
+    "postToolUseFailure": [
+      { "type": "command", "command": "__COMMAND__ postToolUseFailure", "timeoutSec": 5 }
+    ],
+    "errorOccurred": [
+      { "type": "command", "command": "__COMMAND__ errorOccurred", "timeoutSec": 5 }
+    ],
+    "agentStop": [
+      { "type": "command", "command": "__COMMAND__ agentStop", "timeoutSec": 5 }
+    ],
+    "sessionEnd": [
+      { "type": "command", "command": "__COMMAND__ sessionEnd", "timeoutSec": 5 }
+    ],
+    "subagentStart": [
+      { "type": "command", "command": "__COMMAND__ subagentStart", "timeoutSec": 5 }
+    ],
+    "subagentStop": [
+      { "type": "command", "command": "__COMMAND__ subagentStop", "timeoutSec": 5 }
+    ]
+  }
+}

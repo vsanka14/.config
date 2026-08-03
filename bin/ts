@@ -15,13 +15,23 @@
 #
 
 # --- Subcommands: go / status ---
+refresh_tmux_client() {
+    tmux refresh-client -S >/dev/null 2>&1 || true
+}
+
 case "$1" in
     go)
         sessions=$(tmux list-sessions -F '#{session_created}:#S' 2>/dev/null | sort -n | cut -d: -f2-)
         n="$2"
         [[ "$n" =~ ^[0-9]+$ ]] || exit 1
         target=$(echo "$sessions" | sed -n "${n}p")
-        [[ -n "$target" ]] && { tmux switch-client -t "$target" 2>/dev/null || exec tmux attach-session -t "$target"; }
+        if [[ -n "$target" ]]; then
+            if tmux switch-client -t "$target" 2>/dev/null; then
+                refresh_tmux_client
+            else
+                exec tmux attach-session -t "$target"
+            fi
+        fi
         exit 0
         ;;
     prev|next)
@@ -37,12 +47,15 @@ case "$1" in
             target_idx=$(( (idx - 2 + count) % count + 1 ))
         fi
         target=$(echo "$sessions" | sed -n "${target_idx}p")
-        [[ -n "$target" ]] && tmux switch-client -t "$target"
+        if [[ -n "$target" ]]; then
+            tmux switch-client -t "$target"
+            refresh_tmux_client
+        fi
         exit 0
         ;;
     status)
         # Retired: cross-session status dots are now rendered by
-        # bin/tmux-agent-engine --tmux-status (agent-aware radar). Kept as a
+        # tmux/plugins/agent-radar/bin/agent-radar --tmux-status. Kept as a
         # no-op so any stale status-right reference degrades gracefully.
         exit 0
         ;;
@@ -84,7 +97,13 @@ case "$1" in
                     --delimiter='\t' --with-nth=1,2,3 \
               | cut -f4
         )
-        [[ -n "$target" ]] && { tmux switch-client -t "$target" 2>/dev/null || exec tmux attach-session -t "$target"; }
+        if [[ -n "$target" ]]; then
+            if tmux switch-client -t "$target" 2>/dev/null; then
+                refresh_tmux_client
+            else
+                exec tmux attach-session -t "$target"
+            fi
+        fi
         exit 0
         ;;
 esac
@@ -157,4 +176,8 @@ if ! tmux has-session -t="$selected_name" 2>/dev/null; then
     tmux select-pane -t "$selected_name" -R
 fi
 
-tmux switch-client -t "$selected_name" 2>/dev/null || exec tmux attach-session -t "$selected_name"
+if tmux switch-client -t "$selected_name" 2>/dev/null; then
+    refresh_tmux_client
+else
+    exec tmux attach-session -t "$selected_name"
+fi

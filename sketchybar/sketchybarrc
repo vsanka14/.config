@@ -79,7 +79,7 @@ sketchybar --default \
 sketchybar --add event aerospace_workspace_change
 sketchybar --add event aerospace_mode_change
 
-# Copilot agent notifications (raised by bin/tmux-agent-status).
+# Copilot agent notifications (raised through Agent Radar's on-change hook).
 sketchybar --add event agent_notify
 
 # Workspace icons (Nerd Font). Keep this indexed for macOS Bash 3.2.

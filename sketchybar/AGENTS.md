@@ -23,18 +23,13 @@ The `agent` item propagates Copilot agent status from tmux to the menu bar as an
 inline label next to the agent icon (no popup). It is intentionally a thin
 consumer:
 
-- **Producer**: `../bin/tmux-agent-status` (a Copilot hook) fires
-  `sketchybar --trigger agent_notify` on every real status transition, plus once
-  more when a completion "done" flash expires. `../bin/tmux-agent-engine` also
-  fires `agent_notify` from its `--refresh --notify` path (the same background
-  refresh that redraws the tmux status-right), so footer-detected states that
-  never reach the Copilot hook — e.g. a blocking permission prompt — surface on
-  the bar at tmux speed instead of waiting out `agent`'s slow `update_freq`. All
-  SketchyBar calls in both are guarded by `command -v sketchybar` (and the
-  `TMUX_AGENT_ENGINE_SKETCHYBAR` / `TMUX_AGENT_STATUS_SKETCHYBAR` switches for
-  hermetic tests), so machines without SketchyBar are unaffected.
+- **Producer**: `../tmux/plugins/agent-radar/` runs the generic command in
+  `@agent-radar-on-change` on real status transitions and polling-driven changes.
+  This dotfiles config sets it to `sketchybar --trigger agent_notify`; Agent Radar
+  itself does not know about SketchyBar.
 - **Source of truth**: `plugins/agent.sh` re-derives the icon colour and the
-  notable session list from `../bin/tmux-agent-engine --notify-lines` (which
+  notable session list from
+  `../tmux/plugins/agent-radar/bin/agent-radar --notify-lines` (which
   reuses the tmux pill/radar scan and priority folding). Do **not** reimplement
   the pane scan in the plugin — extend `--notify-lines` instead so the bar and
   tmux stay in lockstep.
@@ -44,9 +39,8 @@ consumer:
   owner.
 - **Transient vs blocking** is derived from state, not a trigger flag:
   - a completion ("done") shows a **transient** green label; it clears itself
-    because the underlying `flash.kind=done` expires after `DONE_FLASH_TTL` in
-    `../bin/tmux-agent-status`, which also re-fires `agent_notify` so the label
-    drops promptly;
+    because the underlying `flash.kind=done` expires after Agent Radar's done
+    TTL, which also re-runs the configured on-change command;
   - an awaiting-permission agent shows a **blocking** red label with a red-tinted
     item background, and it persists until the agent leaves the awaiting state.
 - **Colours** mirror the tmux mapping: awaiting `#f7768e`, done `#3fb950`,
@@ -54,8 +48,8 @@ consumer:
   background tint. Idle/working-only agents are not notable, so the item is
   hidden for them.
 
-If the `agent_notify` contract changes, update all three:
-`../bin/tmux-agent-status`, `../bin/tmux-agent-engine`, and `plugins/agent.sh`.
+If the `agent_notify` contract changes, update Agent Radar's `--notify-lines`
+API, the `@agent-radar-on-change` setting, and `plugins/agent.sh`.
 
 ## Event and Animation Architecture
 
@@ -162,9 +156,9 @@ should be on, and the focused icon should settle at `y_offset=0`.
 For the agent notification feature:
 
 ```bash
-bash -n bin/tmux-agent-status bin/tmux-agent-engine sketchybar/plugins/agent.sh
-bash tests/tmux-agent-engine-test.sh          # covers --notify-lines
-bin/tmux-agent-engine --notify-lines          # COLOR + LINE rows, or empty
+bash -n tmux/plugins/agent-radar/bin/* sketchybar/plugins/agent.sh
+bash tmux/plugins/agent-radar/tests/engine-test.sh
+tmux/plugins/agent-radar/bin/agent-radar --notify-lines
 sketchybar --reload
 sketchybar --trigger agent_notify
 sketchybar --query agent                      # drawing reflects tracked agents

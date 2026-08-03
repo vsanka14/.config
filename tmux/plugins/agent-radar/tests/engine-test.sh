@@ -2,13 +2,14 @@
 
 set -euo pipefail
 
-repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-hook=$repo_dir/bin/tmux-agent-status
-engine=$repo_dir/bin/tmux-agent-engine
-descriptor=${COPILOT_HOOK_DESCRIPTOR:-$HOME/.copilot/hooks/tmux-agent-status.json}
-descriptor_command='$HOME/.config/bin/tmux-agent-status'
+plugin_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+hook=$plugin_dir/bin/agent-radar-hook
+engine=$plugin_dir/bin/agent-radar
+setup=$plugin_dir/bin/agent-radar-setup
 temp_dir=$(mktemp -d)
 trap 'rm -rf "$temp_dir"' EXIT
+descriptor=$temp_dir/setup-copilot/hooks/tmux-agent-status.json
+hook_state_dir=$temp_dir/copilot-home/agent-status
 
 fail() {
   printf 'not ok - %s\n' "$*" >&2
@@ -23,7 +24,7 @@ assert_eq() {
 run_hook() {
   local event=$1 payload=${2:-}
   printf '{"hookName":"%s","sessionId":"session-1"%s}' "$event" "$payload" |
-    COPILOT_HOME="$temp_dir/copilot-home" TMUX_PANE='%7' \
+    COPILOT_HOME="$temp_dir/copilot-home" AGENT_RADAR_STATE_DIR="$hook_state_dir" TMUX_PANE='%7' \
       TMUX_AGENT_STATUS_REFRESH=0 "$hook"
 }
 
@@ -36,13 +37,41 @@ assert_eq idle "$(state_value .status)" "sessionStart status"
 run_hook userPromptSubmitted ',"prompt":"must not persist"'
 assert_eq working "$(state_value .status)" "prompt status"
 printf '{}' |
-  COPILOT_HOME="$temp_dir/copilot-home" TMUX_PANE='%7' "$hook" sessionStart
+  COPILOT_HOME="$temp_dir/copilot-home" AGENT_RADAR_STATE_DIR="$hook_state_dir" \
+    TMUX_PANE='%7' "$hook" sessionStart
 assert_eq working "$(state_value .status)" "late sessionStart preserves working"
 run_hook permissionRequest ',"toolInput":{"secret":"must not persist"}'
-assert_eq awaiting "$(state_value .status)" "permission status"
+assert_eq working "$(state_value .status)" "pre-policy permission request stays working"
+run_hook notification ',"notification_type":"permission_prompt"'
+assert_eq awaiting "$(state_value .status)" "visible permission prompt status"
 run_hook preToolUse ',"toolName":"bash","toolInput":{"secret":"must not persist"}'
 assert_eq working "$(state_value .status)" "preToolUse clears awaiting"
 assert_eq bash "$(state_value .tool_name)" "tool metadata"
+run_hook preToolUse \
+  ',"toolCalls":[{"id":"call-1","name":"bash","args":"{\"secret\":\"must not persist\"}"},{"id":"call-2","name":"ask_user","args":"{\"question\":\"must not persist\"}"}]'
+assert_eq awaiting "$(state_value .status)" "batched ask_user waits for user"
+assert_eq ask_user "$(state_value .tool_name)" "batched ask_user metadata"
+run_hook postToolUseFailure ',"toolName":"ask_user","error":"must not persist"'
+assert_eq working "$(state_value .status)" "failed ask_user clears awaiting"
+run_hook preToolUse \
+  ',"toolCalls":[{"id":"call-3","name":"ask_user","args":"{\"question\":\"must not persist\"}"}]'
+assert_eq awaiting "$(state_value .status)" "single batched ask_user waits for user"
+run_hook postToolUse ',"toolName":"ask_user"'
+assert_eq working "$(state_value .status)" "completed ask_user clears awaiting"
+run_hook notification ',"notification_type":"elicitation_dialog"'
+assert_eq awaiting "$(state_value .status)" "elicitation dialog status"
+run_hook postToolUse ',"toolName":"ask_user"'
+assert_eq working "$(state_value .status)" "postToolUse clears elicitation"
+run_hook postToolUseFailure ',"toolName":"bash","error":"must not persist"'
+assert_eq working "$(state_value .status)" "tool failure keeps agent working"
+run_hook notification ',"notification_type":"shell_completed"'
+assert_eq working "$(state_value .status)" "irrelevant notification is ignored"
+run_hook errorOccurred ',"recoverable":true,"error":{"message":"must not persist"}'
+assert_eq working "$(state_value .status)" "recoverable error keeps agent working"
+run_hook errorOccurred ',"recoverable":false,"error":{"message":"must not persist"}'
+assert_eq idle "$(state_value .status)" "nonrecoverable error settles agent idle"
+assert_eq null "$(state_value '.flash.kind // "null"')" "error does not flash successful completion"
+run_hook userPromptSubmitted
 run_hook subagentStart ',"agentDisplayName":"test-agent"'
 assert_eq working "$(state_value .status)" "subagent keeps parent working"
 assert_eq test-agent "$(state_value .subagent_name)" "subagent metadata"
@@ -55,7 +84,8 @@ flash_home="$temp_dir/copilot-home"
 flash_run() {
   local event=$1
   printf '{"hookName":"%s","sessionId":"flash"}' "$event" |
-    COPILOT_HOME="$flash_home" TMUX_PANE='%20' TMUX_AGENT_STATUS_REFRESH=0 "$hook"
+    COPILOT_HOME="$flash_home" AGENT_RADAR_STATE_DIR="$flash_home/agent-status" \
+      TMUX_PANE='%20' TMUX_AGENT_STATUS_REFRESH=0 "$hook"
 }
 flash_val() { jq -r "$1 // \"null\"" "$flash_home/agent-status/20.json"; }
 
@@ -92,6 +122,7 @@ chmod +x "$temp_dir/hook-tmux"
 printf '{"hookName":"sessionStart","sessionId":"resolved-session"}' |
   env -u TMUX_PANE \
     COPILOT_HOME="$temp_dir/copilot-home" \
+    AGENT_RADAR_STATE_DIR="$hook_state_dir" \
     TMUX_AGENT_STATUS_TMUX_BIN="$temp_dir/hook-tmux" \
     TMUX_AGENT_STATUS_PS_FILE="$temp_dir/hook-processes" \
     TMUX_AGENT_STATUS_PROCESS_PID=900 \
@@ -100,12 +131,44 @@ assert_eq resolved-session \
   "$(jq -r .session_id "$temp_dir/copilot-home/agent-status/8.json")" \
   "pane resolution through Copilot ancestry"
 
-[ -f "$descriptor" ] || fail "missing Copilot hook descriptor: $descriptor"
-jq -e --arg command "$descriptor_command" '
+COPILOT_HOME="$temp_dir/setup-copilot" \
+  AGENT_RADAR_STATE_DIR="$temp_dir/setup-state" \
+  "$setup" install >/dev/null
+[ -f "$descriptor" ] || fail "missing generated Copilot hook descriptor: $descriptor"
+jq -e --arg hook "$hook" '
   .version == 1
-  and ([.hooks[][] | .command] | length == 9)
-  and all(.hooks[][]; (.command | startswith($command + " ")))
+  and ([.hooks[][] | .command] | length == 12)
+  and (.hooks.notification[0].matcher == "permission_prompt|elicitation_dialog")
+  and all(.hooks[][]; (.command | contains($hook + " ")))
 ' "$descriptor" >/dev/null || fail "invalid Copilot hook descriptor"
+
+# Exercise the generated command exactly as Copilot invokes it: the event name
+# is an argument while the event-specific fields arrive on stdin.
+configured_command=$(jq -r '.hooks.preToolUse[0].command' "$descriptor")
+printf '%s\n' '{"sessionId":"configured-session","toolName":"bash","toolArgs":{"secret":"must not persist"}}' |
+  TMUX_PANE='%9' TMUX_AGENT_STATUS_REFRESH=0 /bin/sh -c "$configured_command"
+assert_eq configured-session \
+  "$(jq -r .session_id "$temp_dir/setup-state/9.json")" \
+  "configured hook command preserves session ID"
+assert_eq bash \
+  "$(jq -r .tool_name "$temp_dir/setup-state/9.json")" \
+  "configured hook command preserves tool name"
+if grep -Eq 'must not persist|toolArgs' "$temp_dir/setup-state/9.json"; then
+  fail "configured hook persisted sensitive payload data"
+fi
+
+printf '%s\n' \
+  '{"sessionId":"configured-session","toolCalls":[{"id":"call-1","name":"ask_user","args":"{\"question\":\"must not persist\"}"}]}' |
+  TMUX_PANE='%9' TMUX_AGENT_STATUS_REFRESH=0 /bin/sh -c "$configured_command"
+assert_eq awaiting \
+  "$(jq -r .status "$temp_dir/setup-state/9.json")" \
+  "configured hook recognizes batched ask_user"
+assert_eq ask_user \
+  "$(jq -r .tool_name "$temp_dir/setup-state/9.json")" \
+  "configured hook extracts batched ask_user"
+if grep -Eq 'must not persist|toolCalls|question' "$temp_dir/setup-state/9.json"; then
+  fail "configured batched hook persisted sensitive payload data"
+fi
 
 fixture_dir=$temp_dir/fixtures
 state_dir=$temp_dir/engine-state
@@ -132,23 +195,10 @@ cat >"$fixture_dir/processes" <<'EOF'
 500 1 bash
 EOF
 
-cat >"$fixture_dir/capture_1" <<'EOF'
-Working · esc interrupt
-EOF
-cat >"$fixture_dir/capture_2" <<'EOF'
-Do you want to allow this command?
-Allow once
-EOF
-cat >"$fixture_dir/capture_3" <<'EOF'
-/ commands · ? help
-EOF
-cat >"$fixture_dir/capture_4" <<'EOF'
-unrecognized footer
-EOF
-
 cat >"$fixture_dir/fake-tmux" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+[ -z "${TMUX_CALL_LOG:-}" ] || printf '%s\n' "$*" >>"$TMUX_CALL_LOG"
 case "$1" in
   list-panes)
     cat "$FIXTURE_DIR/panes"
@@ -165,15 +215,8 @@ case "$1" in
     esac
     ;;
   capture-pane)
-    pane=
-    while [ $# -gt 0 ]; do
-      if [ "$1" = -t ]; then
-        pane=$2
-        break
-      fi
-      shift
-    done
-    cat "$FIXTURE_DIR/capture_${pane#%}"
+    printf 'status scan unexpectedly captured pane content\n' >&2
+    exit 1
     ;;
   switch-client|select-pane|run-shell|refresh-client)
     exit 0
@@ -203,6 +246,7 @@ write_state 99 idle 2000000000
 
 rows=$(
   FIXTURE_DIR="$fixture_dir" \
+    TMUX_CALL_LOG="$temp_dir/tmux-calls" \
     TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
     TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
     TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
@@ -211,17 +255,23 @@ rows=$(
     "$engine" --list
 )
 
+if grep -q '^show-option' "$temp_dir/tmux-calls"; then
+  fail "engine scan queried tmux options at runtime"
+fi
+if grep -q '^capture-pane' "$temp_dir/tmux-calls"; then
+  fail "engine scan captured pane content"
+fi
 assert_eq 4 "$(printf '%s\n' "$rows" | wc -l | tr -d ' ')" "eligible pane count"
-assert_eq $'1\t%2\tbeta\tbeta:1.2\t⏸ awaiting\tPermission Fallback' \
-  "$(printf '%s\n' "$rows" | sed -n '1p' | cut -f1-6)" "permission fallback precedence"
-assert_eq $'2\t%1\talpha\talpha:1.1\t⚙ working\tAwaiting Hook' \
-  "$(printf '%s\n' "$rows" | sed -n '2p' | cut -f1-6)" "working fallback clears stale awaiting hook"
-assert_eq $'4\t%3\tgamma\tgamma:2.1\t✓ idle\tStale Worker' \
-  "$(printf '%s\n' "$rows" | sed -n '3p' | cut -f1-6)" "stale state fallback"
+assert_eq $'1\t%1\talpha\talpha:1.1\t⏸ awaiting\tAwaiting Hook' \
+  "$(printf '%s\n' "$rows" | sed -n '1p' | cut -f1-6)" "awaiting hook is authoritative"
+assert_eq $'2\t%2\tbeta\tbeta:1.2\t⚙ working\tPermission Fallback' \
+  "$(printf '%s\n' "$rows" | sed -n '2p' | cut -f1-6)" "working hook is authoritative"
+assert_eq $'2\t%3\tgamma\tgamma:2.1\t⚙ working\tStale Worker' \
+  "$(printf '%s\n' "$rows" | sed -n '3p' | cut -f1-6)" "old hook state remains authoritative"
 assert_eq $'5\t%4\tdelta\tdelta:1.1\t? unknown\tUnknown Session' \
   "$(printf '%s\n' "$rows" | sed -n '4p' | cut -f1-6)" "unknown classification"
-assert_eq 'working     alpha:1.1                   Awaiting Hook' \
-  "$(printf '%s\n' "$rows" | sed -n '2p' | cut -f7)" "aligned display row"
+assert_eq 'awaiting    alpha:1.1                   Awaiting Hook' \
+  "$(printf '%s\n' "$rows" | sed -n '1p' | cut -f7)" "aligned display row"
 [ ! -e "$state_dir/99.json" ] || fail "dead pane state was not pruned"
 
 cat >>"$fixture_dir/panes" <<'EOF'
@@ -231,9 +281,6 @@ cat >>"$fixture_dir/processes" <<'EOF'
 600 1 bash
 601 600 copilot
 EOF
-cat >"$fixture_dir/capture_6" <<'EOF'
-/ commands · ? help
-EOF
 write_state 6 idle 2000000000
 
 cat >>"$fixture_dir/panes" <<'EOF'
@@ -242,9 +289,6 @@ EOF
 cat >>"$fixture_dir/processes" <<'EOF'
 700 1 bash
 701 700 copilot
-EOF
-cat >"$fixture_dir/capture_7" <<'EOF'
-/ commands · ? help
 EOF
 write_state 7 idle 2000000000
 
@@ -257,7 +301,7 @@ tmux_status=$(
     NO_COLOR=1 \
     "$engine" --tmux-status beta
 )
-assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#565f89]● #[fg=#f7768e]◉ #[fg=#565f89]● #[fg=#565f89]● #[default]' \
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#f7768e]● #[fg=#9ece6a]◉ #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$tmux_status" "tmux status rendering"
 
 cross_session_status=$(
@@ -269,7 +313,7 @@ cross_session_status=$(
     NO_COLOR=1 \
     "$engine" --tmux-status alpha
 )
-assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.1 #[bg=#050505,nobold] #[fg=#9ece6a]◉ #[fg=#f7768e]● #[fg=#565f89]● #[fg=#565f89]● #[default]' \
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.1 #[bg=#050505,nobold] #[fg=#f7768e]◉ #[fg=#565f89]● #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$cross_session_status" "cross-session radar rendering"
 
 # Precompute (--refresh) writes each session's status-right string to STATUS_DIR,
@@ -292,10 +336,44 @@ env "${engine_env[@]}" "$engine" --refresh
 assert_eq "$direct_beta" "$(cat "$state_dir/.status/$beta_key.txt")" "precomputed beta status content matches direct render"
 assert_eq "$direct_beta" "$(env "${engine_env[@]}" "$engine" --tmux-status-cached beta)" "cached render serves precomputed string"
 
+# A refresh request that loses the lock must leave a pending marker. The next
+# lock owner consumes it before publishing, so transitions are not dropped.
+mkdir "$state_dir/.status/.refresh.lock"
+env "${engine_env[@]}" TMUX_AGENT_ENGINE_STATUS_LOCK_STALE=999999999 \
+  "$engine" --refresh
+[ -f "$state_dir/.status/.pending" ] ||
+  fail "contended refresh did not leave a pending marker"
+rmdir "$state_dir/.status/.refresh.lock"
+env "${engine_env[@]}" "$engine" --refresh
+[ ! -e "$state_dir/.status/.pending" ] ||
+  fail "refresh owner did not consume the pending marker"
+
 # The cached render must return the file verbatim, not recompute — a sentinel in
 # the precomputed file proves the scan is off the render path.
 printf 'SENTINEL-CACHED' >"$state_dir/.status/$beta_key.txt"
 assert_eq 'SENTINEL-CACHED' "$(env "${engine_env[@]}" "$engine" --tmux-status-cached beta)" "cached render cats the precomputed file verbatim"
+cat >"$temp_dir/never-tmux" <<EOF
+#!/usr/bin/env bash
+touch "$temp_dir/unexpected-tmux-call"
+exit 1
+EOF
+chmod +x "$temp_dir/never-tmux"
+assert_eq 'SENTINEL-CACHED' \
+  "$(env "${engine_env[@]}" TMUX_AGENT_ENGINE_TMUX_BIN="$temp_dir/never-tmux" \
+    "$engine" --tmux-status-cached beta)" \
+  "fresh cached render avoids tmux subprocesses"
+[ ! -e "$temp_dir/unexpected-tmux-call" ] ||
+  fail "fresh cached render invoked tmux"
+
+# Cached paints never schedule background work, even without a pinned clock.
+rm -f "$temp_dir/unexpected-tmux-call"
+assert_eq 'SENTINEL-CACHED' \
+  "$(TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
+    TMUX_AGENT_ENGINE_TMUX_BIN="$temp_dir/never-tmux" \
+    "$engine" --tmux-status-cached beta)" \
+  "cached render avoids background reconciliation"
+[ ! -e "$temp_dir/unexpected-tmux-call" ] ||
+  fail "cached render scheduled background work"
 
 # With no precomputed file, the cached render falls back to a synchronous compute
 # so first paint is never worse than the previous always-synchronous behavior.
@@ -311,9 +389,6 @@ EOF
 cat >>"$fixture_dir/processes" <<'EOF'
 800 1 bash
 801 800 copilot
-EOF
-cat >"$fixture_dir/capture_8" <<'EOF'
-/ commands · ? help
 EOF
 jq -n \
   '{pane_id:"%8", session_id:"test", status:"idle", event:"agentStop",
@@ -351,7 +426,7 @@ flash_status=$(
     NO_COLOR=1 \
     "$engine" --tmux-status beta
 )
-assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#3fb950,bold]✓1.4 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#565f89]● #[fg=#f7768e]◉ #[fg=#565f89]● #[fg=#565f89]● #[default]' \
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#3fb950,bold]✓1.4 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#f7768e]● #[fg=#3fb950]◉ #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$flash_status" "completion flash renders green in the pill"
 rm -f "$state_dir/8.json"
 
@@ -379,27 +454,6 @@ FIXTURE_DIR="$fixture_dir" \
   "$engine" --tmux-status beta >/dev/null
 [ ! -e "$cache_state_dir/.tmux-status.cache" ] || fail "pinned-NOW run must not use the cache"
 
-ask_user_status=$(
-  printf '%s\n' \
-    'Should I commit the tmux agent engine implementation now?' \
-    '❯ 1. Yes, commit all implementation files' \
-    '  2. No, leave the changes uncommitted' \
-    '↑/↓ to select · enter to confirm · esc to cancel' |
-    "$engine" --live-status
-)
-assert_eq awaiting "$ask_user_status" "ask_user choice prompt classification"
-
-freeform_ask_user_status=$(
-  printf '%s\n' \
-    '○ Asking user What should I wait for before continuing?' \
-    'Question' \
-    'What should I wait for before continuing?' \
-    '❯ Type your answer...' \
-    'enter to submit · esc to cancel' |
-    "$engine" --live-status
-)
-assert_eq awaiting "$freeform_ask_user_status" "ask_user freeform prompt classification"
-
 cat >"$fixture_dir/fzf" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$@" >"$FZF_ARGS_FILE"
@@ -418,6 +472,8 @@ FIXTURE_DIR="$fixture_dir" \
   "$engine"
 grep -Fxq -- '--track' "$fzf_args" || fail "fzf tracking was not enabled"
 grep -Fxq -- '--with-nth=7' "$fzf_args" || fail "fzf did not use the formatted display field"
+grep -Eq '^--listen-unsafe=.*/fzf[.]sock$' "$fzf_args" ||
+  fail "fzf live refresh socket was not configured"
 grep -Fxq -- '--border-label=  Agents ' "$fzf_args" ||
   fail "fzf border label did not include the tmux icon"
 grep -Fxq -- '--preview-window=right,55%,border-left,follow' "$fzf_args" ||
@@ -441,7 +497,7 @@ preview_output=$(
 grep -Fxq -- '-e' "$preview_args" || fail "tmux preview did not preserve ANSI colors"
 assert_eq $'\033[31mred\033[0m' "$preview_output" "preview ANSI output"
 
-# --notify-lines feeds the SketchyBar agent item/popup. It reuses the lean scan
+# --notify-lines feeds external notification consumers. It reuses the lean scan
 # and the same awaiting>done>other priority folding, emitting a global COLOR and
 # one LINE per notable (awaiting|done) session in creation order.
 nfix=$temp_dir/notify-fixtures
@@ -460,9 +516,6 @@ cat >"$nfix/processes" <<'EOF'
 3101 3100 copilot
 3200 1 bash
 EOF
-for p in 30 31 32; do
-  printf '/ commands · ? help\n' >"$nfix/capture_$p"
-done
 cat >"$nfix/fake-tmux" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -479,14 +532,7 @@ case "$1" in
       *) printf 'solo\nduo\n' ;;
     esac
     ;;
-  capture-pane)
-    pane=
-    while [ $# -gt 0 ]; do
-      if [ "$1" = -t ]; then pane=$2; break; fi
-      shift
-    done
-    cat "$FIXTURE_DIR/capture_${pane#%}"
-    ;;
+  capture-pane) exit 1 ;;
   switch-client|select-pane|run-shell|refresh-client) exit 0 ;;
   *) exit 1 ;;
 esac
@@ -526,18 +572,11 @@ nwrite_state 30 idle 3000000000
 assert_eq $'COLOR\t#7dcfff' \
   "$(notify_run 3000000100)" "notify-lines shows colour-only when nothing notable"
 
-# A stale awaiting whose prompt was cancelled without a follow-up hook event:
-# once past the grace window, a confirmed-idle footer lets it recover to idle
-# instead of lingering red until STALE_SECONDS.
+# Hook state remains authoritative regardless of age.
 nwrite_state 30 awaiting 3000000000
 nwrite_state 31 idle 3000000000
-assert_eq $'COLOR\t#7dcfff' \
-  "$(notify_run 3000000010)" "notify-lines recovers stale awaiting when footer is idle past grace"
-
-# ...but a fresh awaiting (within the grace window) stays authoritative even when
-# the captured footer looks idle, so real permission prompts are never dropped.
 assert_eq $'COLOR\t#f7768e\nLINE\tsolo\tawaiting' \
-  "$(notify_run 3000000003)" "notify-lines keeps fresh awaiting despite idle footer"
+  "$(notify_run 3000000100)" "notify-lines keeps awaiting hook state"
 
 # No Copilot panes tracked: no output at all, so the bar icon hides.
 cat >"$nfix/panes" <<'EOF'

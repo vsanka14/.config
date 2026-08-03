@@ -3,21 +3,20 @@
 # Single owner of the `agent` menu-bar item. Renders Copilot agent status inline
 # as a label next to the agent icon (no popup):
 #   - a completion ("done") shows a transient green label that clears itself when
-#     the underlying flash expires (~DONE_FLASH_TTL in bin/tmux-agent-status);
+#     the underlying Agent Radar done flash expires;
 #   - an awaiting-permission agent shows a blocking red label (with a red-tinted
 #     item background) that persists until the agent moves on.
 # The item is hidden entirely unless there is a notable agent (awaiting or done);
 # idle/working-only agents draw nothing, so the icon only appears when it needs
 # attention.
-# The `bin/tmux-agent-status` hook raises `sketchybar --trigger agent_notify` on
-# every real transition, and the notable set + colour are re-derived from
-# `bin/tmux-agent-engine --notify-lines`, so this plugin never duplicates the
-# pane-scan logic and stays in lockstep with the tmux status-right.
+# Agent Radar invokes the configured `@agent-radar-on-change` command on real
+# transitions. The notable set + colour are re-derived from its `--notify-lines`
+# API, so this plugin never duplicates pane-scan logic.
 #
 # Bash 3.2 (macOS) safe: indexed arrays only, no associative arrays / mapfile.
 
 ITEM=${NAME:-agent}
-ENGINE=${AGENT_ENGINE_BIN:-$HOME/.config/bin/tmux-agent-engine}
+ENGINE=${AGENT_ENGINE_BIN:-$HOME/.config/tmux/plugins/agent-radar/bin/agent-radar}
 MAX_ENTRIES=3
 
 # Tokyo Night Moon accents, aligned with the tmux pill/radar colours.
@@ -44,7 +43,21 @@ hide_item() {
 
 [ -x "$ENGINE" ] || { hide_item; exit 0; }
 
-out=$("$ENGINE" --notify-lines 2>/dev/null)
+runtime_command=
+if [ -z "${AGENT_ENGINE_BIN:-}" ] &&
+   [ -z "${AGENT_RADAR_STATE_DIR:-}" ] &&
+   command -v tmux >/dev/null 2>&1; then
+  runtime_command=$(tmux show-option -gqv @agent-radar-runtime-command 2>/dev/null) ||
+    runtime_command=
+fi
+case "$runtime_command" in
+  env\ */agent-radar)
+    out=$(/bin/sh -c "$runtime_command --notify-lines" 2>/dev/null)
+    ;;
+  *)
+    out=$("$ENGINE" --notify-lines 2>/dev/null)
+    ;;
+esac
 if [ -z "$out" ]; then
   hide_item
   exit 0
