@@ -142,7 +142,7 @@ w = ['exec-and-forget open -a "WhatsApp"', 'mode main', 'exec-and-forget sketchy
 i = ['exec-and-forget open -a "iSTB"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 # Toggle screen recording (start/stop). On stop, prompts for a name and
 # re-encodes with ffmpeg to ~/Documents/screen-recordings/<name>.mov.
-r = ['exec-and-forget $HOME/.config/bin/screen-record-toggle', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+r = ['exec-and-forget $HOME/.config/aerospace/screen-record-toggle.sh', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 esc = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 enter = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 

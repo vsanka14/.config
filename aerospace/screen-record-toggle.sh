@@ -1,5 +1,5 @@
 #!/bin/bash
-# Toggle a macOS screen recording driven by `screencapture -v`.
+# Toggle a macOS screen recording from the AeroSpace open-mode shortcut.
 # First invocation: starts recording to a temp file.
 # Second invocation: stops, prompts for a name, re-encodes with x264 CRF 17
 # at native resolution, and saves to ~/Documents/screen-recordings/.
