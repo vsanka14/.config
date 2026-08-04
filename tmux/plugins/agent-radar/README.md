@@ -38,8 +38,10 @@ set -g @agent-radar-state-dir '/absolute/path/to/agent-radar'
 ```
 
 Colors are configurable through the `@agent-radar-color-*` options defined in
-`agent-radar.tmux`. Re-run setup after changing `@agent-radar-state-dir` so the
-Copilot hook descriptor uses the same directory.
+`agent-radar.tmux`. A current session with no Copilot panes keeps a dim,
+icon-only pill so the status affordance remains stable across session switches.
+Re-run setup after changing `@agent-radar-state-dir` so the Copilot hook
+descriptor uses the same directory.
 
 ## Copilot hook
 

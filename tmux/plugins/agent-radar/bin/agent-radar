@@ -209,7 +209,8 @@ tmux_status() {
     pill="$pill$(pill_cell "$rank" "$pane_target")"
   done <<<"$rows"
 
-  # Pill \u2014 only when the current session actually has agent panes.
+  # Pill \u2014 pane cells when the current session has agents; otherwise retain
+  # a dim icon-only state so switching sessions does not make Copilot disappear.
   local pill_block=
   if [ -n "$pill" ]; then
     local glyph_fg
@@ -219,6 +220,8 @@ tmux_status() {
       *) glyph_fg=$COLOR_ACCENT ;;
     esac
     pill_block="#[fg=${glyph_fg},bg=${COLOR_PILL_BG},bold]   ${pill}#[bg=${COLOR_STATUS_BG},nobold]"
+  else
+    pill_block="#[fg=${COLOR_DIM},bg=${COLOR_PILL_BG},bold]   #[bg=${COLOR_STATUS_BG},nobold]"
   fi
 
   # Radar \u2014 one dot per session (creation order); only when >1 session exists.
@@ -240,8 +243,6 @@ tmux_status() {
     done <<<"$session_order"
     radar="$dots"
   fi
-
-  [ -n "$pill_block" ] || [ -n "$radar" ] || return
 
   local out=
   [ -n "$pill_block" ] && out="$pill_block"

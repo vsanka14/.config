@@ -58,6 +58,10 @@ run_hook preToolUse \
 assert_eq awaiting "$(state_value .status)" "single batched ask_user waits for user"
 run_hook postToolUse ',"toolName":"ask_user"'
 assert_eq working "$(state_value .status)" "completed ask_user clears awaiting"
+run_hook preToolUse ',"toolName":"exit_plan_mode"'
+assert_eq awaiting "$(state_value .status)" "plan review waits for user"
+run_hook postToolUse ',"toolName":"exit_plan_mode"'
+assert_eq working "$(state_value .status)" "completed plan review clears awaiting"
 run_hook notification ',"notification_type":"elicitation_dialog"'
 assert_eq awaiting "$(state_value .status)" "elicitation dialog status"
 run_hook postToolUse ',"toolName":"ask_user"'
@@ -319,6 +323,44 @@ cross_session_status=$(
 )
 assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.1 #[bg=#050505,nobold] #[fg=#f7768e]◉ #[fg=#565f89]● #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$cross_session_status" "cross-session radar rendering"
+
+# A session without Copilot panes keeps a dim icon-only pill instead of making
+# the status affordance disappear entirely.
+empty_fixture_dir=$temp_dir/empty-fixtures
+mkdir -p "$empty_fixture_dir"
+: >"$empty_fixture_dir/panes"
+: >"$empty_fixture_dir/processes"
+cat >"$empty_fixture_dir/fake-tmux" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1" in
+  list-panes) cat "$FIXTURE_DIR/panes" ;;
+  list-sessions)
+    fmt=
+    while [ $# -gt 0 ]; do
+      if [ "$1" = -F ]; then fmt=$2; break; fi
+      shift
+    done
+    case "$fmt" in
+      *session_created*) printf '100\tquiet\n' ;;
+      *) printf 'quiet\n' ;;
+    esac
+    ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "$empty_fixture_dir/fake-tmux"
+empty_status=$(
+  FIXTURE_DIR="$empty_fixture_dir" \
+    TMUX_AGENT_ENGINE_TMUX_BIN="$empty_fixture_dir/fake-tmux" \
+    TMUX_AGENT_ENGINE_PS_FILE="$empty_fixture_dir/processes" \
+    TMUX_AGENT_ENGINE_STATE_DIR="$temp_dir/empty-state" \
+    TMUX_AGENT_ENGINE_NOW=2000000000 \
+    NO_COLOR=1 \
+    "$engine" --tmux-status quiet
+)
+assert_eq '#[fg=#414868,bg=#24283b,bold]   #[bg=#050505,nobold]#[default]' \
+  "$empty_status" "session without agents keeps a dim Copilot icon"
 
 # Precompute (--refresh) writes each session's status-right string to STATUS_DIR,
 # and the render path (--tmux-status-cached) serves it by a bare cat so a session

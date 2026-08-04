@@ -9,7 +9,7 @@ agent_event_status() {
     sessionStart) printf 'idle' ;;
     preToolUse)
       case "${2:-}" in
-        ask_user|AskUserQuestion) printf 'awaiting' ;;
+        ask_user|AskUserQuestion|exit_plan_mode) printf 'awaiting' ;;
         *) printf 'working' ;;
       esac
       ;;
