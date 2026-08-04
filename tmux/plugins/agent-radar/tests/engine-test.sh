@@ -218,8 +218,8 @@ case "$1" in
       shift
     done
     case "$fmt" in
-      *session_created*) printf '100\talpha\n200\tbeta\n300\tgamma\n400\tdelta\n' ;;
-      *) printf 'alpha\nbeta\ngamma\ndelta\n' ;;
+      *session_created*) printf '100\talpha\n200\tbeta\n300\tgamma\n400\tdelta\n500\tepsilon\n' ;;
+      *) printf 'alpha\nbeta\ngamma\ndelta\nepsilon\n' ;;
     esac
     ;;
   capture-pane)
@@ -251,6 +251,7 @@ write_state 2 working 2000000000
 write_state 3 working 1999998000
 printf '{bad json' >"$state_dir/4.json"
 write_state 99 idle 2000000000
+# epsilon intentionally has no Copilot pane; its background dot stays neutral.
 
 rows=$(
   FIXTURE_DIR="$fixture_dir" \
@@ -309,7 +310,7 @@ tmux_status=$(
     NO_COLOR=1 \
     "$engine" --tmux-status beta
 )
-assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#f7768e]● #[fg=#9ece6a]◉ #[fg=#565f89]● #[fg=#565f89]● #[default]' \
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#f7768e]● #[fg=#9ece6a]◉ #[fg=#565f89]● #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$tmux_status" "tmux status rendering"
 
 cross_session_status=$(
@@ -321,7 +322,7 @@ cross_session_status=$(
     NO_COLOR=1 \
     "$engine" --tmux-status alpha
 )
-assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.1 #[bg=#050505,nobold] #[fg=#f7768e]◉ #[fg=#565f89]● #[fg=#565f89]● #[fg=#565f89]● #[default]' \
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.1 #[bg=#050505,nobold] #[fg=#f7768e]◉ #[fg=#565f89]● #[fg=#565f89]● #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$cross_session_status" "cross-session radar rendering"
 
 # A session without Copilot panes keeps a dim icon-only pill instead of making
@@ -472,7 +473,7 @@ flash_status=$(
     NO_COLOR=1 \
     "$engine" --tmux-status beta
 )
-assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#3fb950,bold]✓1.4 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#f7768e]● #[fg=#3fb950]◉ #[fg=#565f89]● #[fg=#565f89]● #[default]' \
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#3fb950,bold]✓1.4 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#f7768e]● #[fg=#3fb950]◉ #[fg=#565f89]● #[fg=#565f89]● #[fg=#565f89]● #[default]' \
   "$flash_status" "completion flash renders green in the pill"
 rm -f "$state_dir/8.json"
 

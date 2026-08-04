@@ -40,10 +40,7 @@ dot_color() {
     1) printf '%s' "$COLOR_DONE"; return ;;
   esac
   if [ "$is_current" = 1 ]; then printf '%s' "$COLOR_IDLE"; return; fi
-  case "$priority" in
-    2) printf '%s' "$COLOR_MUTED" ;;
-    *) printf '%s' "$COLOR_DIM" ;;
-  esac
+  printf '%s' "$COLOR_MUTED"
 }
 
 format_display_row() {
