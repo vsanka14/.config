@@ -70,8 +70,14 @@ vim.lsp.config("ember", {
 	root_markers = { "ember-cli-build.js", ".ember-cli" },
 })
 
+vim.lsp.config("rust_analyzer", {
+	cmd = { "rust-analyzer" },
+	filetypes = { "rust" },
+	root_markers = { "Cargo.toml", "rust-project.json", ".git" },
+})
+
 -- Enable all non-jdtls servers (jdtls is managed by nvim-jdtls plugin)
-vim.lsp.enable({ "vtsls", "lua_ls", "ember" })
+vim.lsp.enable({ "vtsls", "lua_ls", "ember", "rust_analyzer" })
 
 -- LspAttach keymaps and features
 vim.api.nvim_create_autocmd("LspAttach", {
