@@ -171,6 +171,47 @@ map("n", "<Leader>fd", function()
 	})
 end, { desc = "Find diagnostics" })
 
+-- LSP
+map("n", "<Leader>lD", function()
+	local bufnr = vim.api.nvim_get_current_buf()
+	local detached = vim.b[bufnr].detached_lsp_clients
+
+	if detached then
+		local names = {}
+		for _, client_id in ipairs(detached) do
+			local client = vim.lsp.get_client_by_id(client_id)
+			if client then
+				vim.lsp.buf_attach_client(bufnr, client_id)
+				table.insert(names, client.name)
+			end
+		end
+		vim.b[bufnr].detached_lsp_clients = nil
+
+		if #names == 0 then
+			vim.notify("LSP clients are no longer running", vim.log.levels.WARN)
+			return
+		end
+		vim.notify("Enabled LSP: " .. table.concat(names, ", "))
+		return
+	end
+
+	local clients = vim.lsp.get_clients({ bufnr = bufnr })
+	if #clients == 0 then
+		vim.notify("No LSP clients attached", vim.log.levels.WARN)
+		return
+	end
+
+	local client_ids = {}
+	local names = {}
+	for _, client in ipairs(clients) do
+		table.insert(client_ids, client.id)
+		table.insert(names, client.name)
+		vim.lsp.buf_detach_client(bufnr, client.id)
+	end
+	vim.b[bufnr].detached_lsp_clients = client_ids
+	vim.notify("Disabled LSP: " .. table.concat(names, ", "))
+end, { desc = "Toggle buffer LSP" })
+
 -- DAP (debug adapter)
 map("n", "<Leader>db", function()
 	require("dap").toggle_breakpoint()
