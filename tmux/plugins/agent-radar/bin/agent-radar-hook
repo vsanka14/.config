@@ -70,8 +70,9 @@ emit_refresh() {
   "$TMUX_BIN" refresh-client -S >/dev/null 2>&1 || true
 }
 
-# One-shot delayed redraw so a transient "done" flash decays crisply at expiry
-# instead of lingering until the next poll.
+# One-shot delayed redraw so external notification consumers clear the
+# transient "done" flash at expiry. Tmux surfaces retain completion until the
+# next lifecycle event updates the pane state.
 schedule_refresh() {
   local command
   refresh_enabled || return 0
@@ -220,7 +221,7 @@ if [ -f "$state_file" ] && [ ! -L "$state_file" ]; then
 fi
 
 if [ "$status" = removed ]; then
-  rm -f -- "$state_file" 2>/dev/null
+  rm -f -- "$state_file" "$state_dir/.ack/${pane_id#%}" 2>/dev/null
   emit_refresh
   emit_external_notify
   exit 0
@@ -259,6 +260,8 @@ fi
 
 temp_file=$(mktemp "$state_dir/.agent-radar-hook.XXXXXX" 2>/dev/null) || exit 0
 trap 'rm -f -- "$temp_file" 2>/dev/null; exit 0' ERR HUP INT TERM
+flash_id=
+[ "$flash_kind" != done ] || flash_id=${temp_file##*/}
 
 jq -n \
   --arg pane_id "$pane_id" \
@@ -269,6 +272,7 @@ jq -n \
   --arg subagent_name "$subagent_name" \
   --arg updated_at "$updated_at" \
   --arg flash_kind "$flash_kind" \
+  --arg flash_id "$flash_id" \
   --argjson process_pid "$process_pid" \
   --argjson updated_epoch "$updated_epoch" \
   --argjson flash_until "$flash_until" '
@@ -283,11 +287,21 @@ jq -n \
   }
   + (if $tool_name == "" then {} else {tool_name: $tool_name} end)
   + (if $subagent_name == "" then {} else {subagent_name: $subagent_name} end)
-  + (if $flash_kind == "" then {} else {flash: {kind: $flash_kind, until_epoch: $flash_until}} end)
+  + (
+      if $flash_kind == "" then {}
+      else {
+        flash: {
+          kind: $flash_kind,
+          until_epoch: $flash_until,
+          id: $flash_id
+        }
+      }
+    end)
 ' >"$temp_file" 2>/dev/null || exit 0
 
 chmod 600 "$temp_file" 2>/dev/null || exit 0
 mv -f -- "$temp_file" "$state_file" 2>/dev/null || exit 0
+[ "$flash_kind" = done ] || rm -f -- "$state_dir/.ack/${pane_id#%}" 2>/dev/null
 
 if [ "$prev_status" != "$status" ] || [ -n "$flash_kind" ]; then
   emit_refresh

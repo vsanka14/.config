@@ -32,7 +32,7 @@ Supported options include:
 ```tmux
 set -g @agent-radar-popup-key 'M-c'
 set -g @agent-radar-status 'on'
-set -g @agent-radar-done-ttl '3'
+set -g @agent-radar-done-ttl '3' # external notification duration
 set -g @agent-radar-cache-ttl '2'
 set -g @agent-radar-state-dir '/absolute/path/to/agent-radar'
 ```
@@ -40,6 +40,11 @@ set -g @agent-radar-state-dir '/absolute/path/to/agent-radar'
 Colors are configurable through the `@agent-radar-color-*` options defined in
 `agent-radar.tmux`. A current session with no Copilot panes keeps a dim,
 icon-only pill so the status affordance remains stable across session switches.
+Completed panes remain `done` in the tmux status bar and popup until their next
+lifecycle event or until the pane is visited. Pane/window/session selection and
+pane focus acknowledge the completion automatically. `@agent-radar-done-ttl`
+only controls how long external notification consumers such as SketchyBar
+expose an unacknowledged completion.
 Re-run setup after changing `@agent-radar-state-dir` so the Copilot hook
 descriptor uses the same directory.
 
@@ -74,6 +79,7 @@ bin/agent-radar --list
 bin/agent-radar --tmux-status SESSION
 bin/agent-radar --tmux-status-cached SESSION
 bin/agent-radar --notify-lines
+bin/agent-radar --ack-pane PANE
 bin/agent-radar --refresh --notify
 ```
 

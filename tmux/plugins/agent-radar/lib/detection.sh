@@ -8,7 +8,13 @@ state_status() {
     | select(.status == "idle" or .status == "working" or .status == "awaiting")
     | select((.updated_epoch | type) == "number")
     | select(.updated_epoch <= ($now + 300))
-    | [.status, .updated_epoch, (.flash.kind // ""), (.flash.until_epoch // 0)] | @tsv
+    | [
+        .status,
+        .updated_epoch,
+        (.flash.kind // ""),
+        (.flash.until_epoch // 0),
+        (.flash.id // ((.flash.until_epoch // 0) | tostring))
+      ] | @tsv
   ' "$state_file" 2>/dev/null
 }
 
@@ -95,6 +101,7 @@ list_rows() {
 
   local pane_id session window pane_index pane_pid title target state_file
   local state_data hook_status status rank label display
+  local flash_kind flash_until flash_token ack_file ack_token
   while IFS=$'\t' read -r pane_id session window pane_index pane_pid title; do
     case "$pane_id" in
       %|%*[!0-9]*|[!%]*|'') continue ;;
@@ -109,12 +116,22 @@ list_rows() {
     hook_status=; flash_kind=; flash_until=0
 
     if state_data=$(state_status "$state_file" "$pane_id"); then
-      IFS=$'\t' read -r hook_status _ flash_kind flash_until <<<"$state_data"
+      IFS=$'\t' read -r hook_status _ flash_kind flash_until flash_token <<<"$state_data"
     fi
 
     status=${hook_status:-unknown}
-    if [ "$status" = idle ] && [ "$flash_kind" = done ] && [ "${flash_until:-0}" -gt "$NOW" ]; then
-      status=done
+    if [ "$status" = idle ] && [ "$flash_kind" = done ]; then
+      ack_file=$STATE_DIR/.ack/${pane_id#%}
+      ack_token=
+      if [ -f "$ack_file" ] && [ ! -L "$ack_file" ]; then
+        IFS= read -r ack_token <"$ack_file" || ack_token=
+      fi
+      # Tmux surfaces retain the last completed state until the next lifecycle
+      # event. External notification consumers keep the configured TTL.
+      if [ "$ack_token" != "$flash_token" ] &&
+         { [ "$mode" != notify ] || [ "${flash_until:-0}" -gt "$NOW" ]; }; then
+        status=done
+      fi
     fi
 
     case "$status" in
@@ -126,7 +143,7 @@ list_rows() {
     esac
     session=$(clean_field "$session")
     target=$session:$window.$pane_index
-    if [ "$mode" = lean ]; then
+    if [ "$mode" = lean ] || [ "$mode" = notify ]; then
       printf '%s\t%s\t%s\t%s\n' "$rank" "$pane_id" "$session" "$target" >>"$rows_file"
     else
       label=$(status_label "$status")
@@ -142,7 +159,9 @@ list_rows() {
     for candidate in "$STATE_DIR"/*.json; do
       [ -e "$candidate" ] || break
       candidate_pane=%$(basename "$candidate" .json)
-      grep -Fxq "$candidate_pane" "$live_panes_file" || rm -f "$candidate"
+      if ! grep -Fxq "$candidate_pane" "$live_panes_file"; then
+        rm -f "$candidate" "$STATE_DIR/.ack/${candidate_pane#%}"
+      fi
     done
   fi
 

@@ -7,6 +7,7 @@
 #   (no args)               -> interactive fzf picker popup (Alt+C)
 #   --tmux-status-cached    -> tmux status-right pill + cross-session radar dots
 #   --notify-lines          -> external notification-consumer feed
+#   --ack-pane PANE         -> clear a completion after visiting its pane
 #   --refresh [--notify]    -> recompute cached strings; redraw tmux + nudge bar
 # Consumers must NOT re-implement the scan; extend a mode here so every surface
 # stays in lockstep.
@@ -183,9 +184,9 @@ tmux_status() {
       cut -f3-
   )
 
-  # Most-urgent priority per session (0=awaiting, 1=done flash, 2=other agent),
-  # computed in awk to stay bash 3.2 safe. done outranks working here so a
-  # completion still flashes green even alongside a working pane.
+  # Most-urgent priority per session (0=awaiting, 1=done, 2=other agent),
+  # computed in awk to stay bash 3.2 safe. done outranks working here so the
+  # last completed pane remains visible even alongside a working pane.
   local prioritymap
   prioritymap=$(printf '%s\n' "$rows" | awk -F '\t' '
     $1 ~ /^[0-9]+$/ {
@@ -253,9 +254,9 @@ tmux_status() {
   printf '%s#[default]' "$out"
 }
 
-# Notification feed. Reuses the shared lean scan + the same per-session priority
-# folding as the status-right pill (awaiting=0 > done-flash=1 > other=2) so the
-# menu-bar icon and popup stay in lockstep with tmux. Emits:
+# Notification feed. Uses the shared pane scan with notification-specific
+# expiration plus the same per-session priority folding as the status-right
+# pill (awaiting=0 > active done flash=1 > other=2). Emits:
 #   COLOR<TAB><hex>            global most-urgent icon colour (only when >=1 agent
 #                              is tracked; absent output => hide the bar icon)
 #   LINE<TAB><session><TAB><kind>  one per session whose most-urgent state is
@@ -267,7 +268,7 @@ notify_lines() {
   local session_order rows
   session_order=$("$TMUX_BIN" list-sessions -F '#{session_created}	#{session_name}' 2>/dev/null |
     sort -n | cut -f2-) || session_order=
-  rows=$(cached_lean_rows) || rows=
+  rows=$(list_rows notify) || rows=
   printf '%s\n' "$rows" | ORDERLIST="$session_order" awk -F '\t' '
     BEGIN {
       n = split(ENVIRON["ORDERLIST"], arr, "\n")
@@ -305,6 +306,39 @@ notify_lines() {
 # Filename-safe, collision-free key for a session name (hex of its raw bytes).
 session_key() {
   printf '%s' "$1" | od -An -v -tx1 2>/dev/null | tr -d ' \n'
+}
+
+acknowledge_pane() {
+  local pane_id=$1 state_file token ack_dir ack_file current tmp
+  case "$pane_id" in
+    %|%*[!0-9]*|[!%]*|'') die "invalid pane ID: $pane_id" ;;
+  esac
+
+  state_file=$STATE_DIR/${pane_id#%}.json
+  [ -f "$state_file" ] && [ ! -L "$state_file" ] || return 0
+  token=$(jq -er '
+    select(.status == "idle" and .flash.kind == "done")
+    | (.flash.id // ((.flash.until_epoch // 0) | tostring))
+  ' "$state_file" 2>/dev/null) || return 0
+  [ -n "$token" ] || return 0
+
+  ack_dir=$STATE_DIR/.ack
+  [ ! -L "$STATE_DIR" ] || return 0
+  mkdir -p "$ack_dir" 2>/dev/null || return 0
+  chmod 700 "$STATE_DIR" "$ack_dir" 2>/dev/null || true
+  ack_file=$ack_dir/${pane_id#%}
+  current=
+  if [ -f "$ack_file" ] && [ ! -L "$ack_file" ]; then
+    IFS= read -r current <"$ack_file" || current=
+  fi
+  [ "$current" != "$token" ] || return 0
+
+  tmp=$(mktemp "$ack_dir/.ack.XXXXXX") || return 0
+  printf '%s\n' "$token" >"$tmp"
+  chmod 600 "$tmp" 2>/dev/null || true
+  mv -f "$tmp" "$ack_file"
+  rm -f "$CACHE_FILE" 2>/dev/null || true
+  refresh_all 1
 }
 
 # Precompute every session's status-right string into STATUS_DIR so the render
@@ -438,6 +472,13 @@ case "${1:-}" in
     ;;
   --notify-lines)
     notify_lines
+    exit 0
+    ;;
+  --ack-pane)
+    [ $# -eq 2 ] || die "--ack-pane requires a pane ID"
+    require_command jq
+    require_command "$TMUX_BIN"
+    acknowledge_pane "$2"
     exit 0
     ;;
   --refresh)

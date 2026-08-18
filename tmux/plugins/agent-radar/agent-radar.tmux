@@ -51,12 +51,25 @@ engine_env="$engine_env AGENT_RADAR_COLOR_STATUS_BG=$(shell_quote "$(option @age
 engine_command="$engine_env $(shell_quote "$ENGINE")"
 tmux set-option -gq @agent-radar-runtime-command "$engine_command"
 
-if [ "${1:-}" = --refresh ]; then
-  exec /bin/sh -c "$engine_command --refresh --notify"
-fi
+case "${1:-}" in
+  --refresh)
+    exec /bin/sh -c "$engine_command --refresh --notify"
+    ;;
+  --ack-pane)
+    [ $# -eq 2 ] || exit 1
+    exec /bin/sh -c "$engine_command --ack-pane $(shell_quote "$2")"
+    ;;
+esac
 
 popup_key=$(option @agent-radar-popup-key 'M-c')
 tmux bind-key -n "$popup_key" display-popup -B -E -w 80% -h 80% "$engine_command"
+
+ack_command="$(shell_quote "$CURRENT_DIR/agent-radar.tmux") --ack-pane #{pane_id}"
+ack_hook="run-shell -b $(shell_quote "$ack_command")"
+tmux set-hook -g 'after-select-pane[90]' "$ack_hook"
+tmux set-hook -g 'after-select-window[90]' "$ack_hook"
+tmux set-hook -g 'client-session-changed[90]' "$ack_hook"
+tmux set-hook -g 'pane-focus-in[90]' "$ack_hook"
 
 fragment="#($engine_command --tmux-status-cached #{q:session_name})"
 status_right=$(tmux show-option -gqv status-right)

@@ -32,6 +32,9 @@ case "$command" in
   bind-key)
     printf '%s\n' "$*" >>"$state/bindings"
     ;;
+  set-hook)
+    printf '%s\n' "$*" >>"$state/hooks"
+    ;;
   *)
     exit 1
     ;;
@@ -64,6 +67,14 @@ grep -Fq -- '-n M-c display-popup' "$temp_dir/state/bindings" || {
   printf 'not ok - popup binding was not configured\n' >&2
   exit 1
 }
+
+for hook in after-select-pane after-select-window client-session-changed pane-focus-in; do
+  grep -Fq -- "$hook" "$temp_dir/state/hooks" &&
+    grep -Fq -- '--ack-pane #{pane_id}' "$temp_dir/state/hooks" || {
+      printf 'not ok - %s acknowledgement hook was not configured\n' "$hook" >&2
+      exit 1
+    }
+done
 
 if grep -Eq 'RECONCILE|STALE_SECONDS|STATUS_TTL|AWAITING_IDLE_GRACE' \
   "$temp_dir/state/_agent-radar-runtime-command"; then

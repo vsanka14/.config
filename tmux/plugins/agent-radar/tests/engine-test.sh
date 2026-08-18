@@ -428,8 +428,8 @@ rm -rf "$state_dir/.status"
 assert_eq "$direct_beta" "$(env "${engine_env[@]}" "$engine" --tmux-status-cached beta)" "cached render falls back to sync compute when uncached"
 rm -rf "$state_dir/.status"
 
-# Transient completion (done) flash: an idle pane carrying an unexpired
-# flash.kind=done renders as rank 3 "done", then decays back to idle.
+# Completion state: tmux surfaces retain an idle pane carrying flash.kind=done
+# after the notification TTL expires.
 cat >>"$fixture_dir/panes" <<'EOF'
 %8	beta	1	4	800	Finished Task - GitHub Copilot
 EOF
@@ -452,9 +452,9 @@ done_row=$(
     NO_COLOR=1 \
     "$engine" --list | awk -F '\t' '$2 == "%8" { print $1 "\t" $5 }'
 )
-assert_eq $'3\t✓ done' "$done_row" "active done flash renders as done"
+assert_eq $'3\t✓ done' "$done_row" "active completion renders as done"
 
-decayed_row=$(
+persistent_row=$(
   FIXTURE_DIR="$fixture_dir" \
     TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
     TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
@@ -463,7 +463,7 @@ decayed_row=$(
     NO_COLOR=1 \
     "$engine" --list | awk -F '\t' '$2 == "%8" { print $1 "\t" $5 }'
 )
-assert_eq $'4\t✓ idle' "$decayed_row" "expired done flash decays to idle"
+assert_eq $'3\t✓ done' "$persistent_row" "expired done flash persists in popup rows"
 flash_status=$(
   FIXTURE_DIR="$fixture_dir" \
     TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
@@ -474,7 +474,35 @@ flash_status=$(
     "$engine" --tmux-status beta
 )
 assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#3fb950,bold]✓1.4 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#f7768e]● #[fg=#3fb950]◉ #[fg=#565f89]● #[fg=#565f89]● #[fg=#565f89]● #[default]' \
-  "$flash_status" "completion flash renders green in the pill"
+  "$flash_status" "completion renders green in the pill"
+persistent_status=$(
+  FIXTURE_DIR="$fixture_dir" \
+    TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
+    TMUX_AGENT_ENGINE_NOW=2000000100 \
+    NO_COLOR=1 \
+    "$engine" --tmux-status beta
+)
+assert_eq "$flash_status" "$persistent_status" "expired done flash persists in tmux status"
+
+FIXTURE_DIR="$fixture_dir" \
+  TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+  TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+  TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
+  TMUX_AGENT_ENGINE_NOW=2000000100 \
+  NO_COLOR=1 \
+  "$engine" --ack-pane %8
+acknowledged_row=$(
+  FIXTURE_DIR="$fixture_dir" \
+    TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
+    TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
+    TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \
+    TMUX_AGENT_ENGINE_NOW=2000000100 \
+    NO_COLOR=1 \
+    "$engine" --list | awk -F '\t' '$2 == "%8" { print $1 "\t" $5 }'
+)
+assert_eq $'4\t✓ idle' "$acknowledged_row" "visiting a completed pane clears done"
 rm -f "$state_dir/8.json"
 
 # Shared render cache: an enabled run (real clock) writes the cache so
@@ -544,9 +572,9 @@ preview_output=$(
 grep -Fxq -- '-e' "$preview_args" || fail "tmux preview did not preserve ANSI colors"
 assert_eq $'\033[31mred\033[0m' "$preview_output" "preview ANSI output"
 
-# --notify-lines feeds external notification consumers. It reuses the lean scan
-# and the same awaiting>done>other priority folding, emitting a global COLOR and
-# one LINE per notable (awaiting|done) session in creation order.
+# --notify-lines feeds external notification consumers. It uses the same pane
+# scan and awaiting>done>other priority folding while honoring the done TTL,
+# emitting a global COLOR and one LINE per notable session in creation order.
 nfix=$temp_dir/notify-fixtures
 nstate=$temp_dir/notify-state
 mkdir -p "$nfix" "$nstate"
@@ -613,8 +641,13 @@ jq -n '{pane_id:"%31", session_id:"test", status:"idle", event:"agentStop",
 assert_eq $'COLOR\t#f7768e\nLINE\tsolo\tawaiting\nLINE\tduo\tdone' \
   "$(notify_run 3000000000)" "notify-lines emits awaiting+done in creation order"
 
-# Both idle (done flash expired): icon still shows (agents tracked) but no
-# notable lines, so the popup would be empty.
+mkdir -p "$nstate/.ack"
+printf '3000000005\n' >"$nstate/.ack/31"
+assert_eq $'COLOR\t#f7768e\nLINE\tsolo\tawaiting' \
+  "$(notify_run 3000000000)" "notify-lines clears acknowledged done state"
+rm -f "$nstate/.ack/31"
+
+# Both idle (done flash expired): the external consumer gets no notable lines.
 nwrite_state 30 idle 3000000000
 assert_eq $'COLOR\t#7dcfff' \
   "$(notify_run 3000000100)" "notify-lines shows colour-only when nothing notable"
