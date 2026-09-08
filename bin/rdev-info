@@ -1,70 +1,235 @@
 #!/bin/bash
 #
-# rdev-info — print info about the rdev for the current directory.
+# rdev-info — print info about the rdev for a local path.
 #
-# Looks up the mutagen sync whose Alpha URL is an ancestor of $PWD and
-# derives the rdev name from the Beta host. With --url / -v, also resolves
-# the rdev's Server URL via `rdev ls -a` (only meaningful for hostable
-# frontend MPs).
+# Looks up the Mutagen sync whose local endpoint covers the requested path and
+# derives the rdev name from the remote host. Bidirectional project sessions
+# are preferred over auxiliary one-way sessions such as .git or build syncs.
 #
 # Usage:
-#   rdev-info               # print rdev name (default; works for any MP)
-#   rdev-info --name        # same as default
-#   rdev-info --url         # print Server URL (errors if MP has no URL)
-#   rdev-info -v|--verbose  # print "<name>\t<url-or-dash>"
+#   rdev-info [--name] [--path <directory>]
+#   rdev-info --url [--path <directory>]
+#   rdev-info -v|--verbose [--path <directory>]
+#   rdev-info --sync-status [--path <directory>]
 #
-# Compose for actions:
-#   open "$(rdev-info --url)"     # open in browser
-#   ssh  "$(rdev-info | tr / _)"  # ssh into the rdev
-#
+# --sync-status emits JSON for statusline and other programmatic consumers.
 
 set -euo pipefail
 
 mode="name"
-case "${1:-}" in
-    ""|--name)     mode="name" ;;
-    --url)         mode="url" ;;
-    -v|--verbose)  mode="verbose" ;;
-    -h|--help)
-        sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'
-        exit 0
-        ;;
-    *)
-        echo "rdev-info: unknown option: $1" >&2
-        exit 2
-        ;;
-esac
+requested_path="$PWD"
 
-pwd_dir="$(pwd -P)"
+while (($# > 0)); do
+    case "$1" in
+        --name)
+            mode="name"
+            ;;
+        --url)
+            mode="url"
+            ;;
+        -v|--verbose)
+            mode="verbose"
+            ;;
+        --sync-status)
+            mode="sync-status"
+            ;;
+        --path)
+            shift
+            if (($# == 0)); then
+                echo "rdev-info: --path requires a directory" >&2
+                exit 2
+            fi
+            requested_path="$1"
+            ;;
+        -h|--help)
+            sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        *)
+            echo "rdev-info: unknown option: $1" >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
 
-# Find Beta host from the first sync whose Alpha URL is a prefix of $PWD.
-beta_host=$(mutagen sync list 2>/dev/null | awk -v pwd="${pwd_dir}/" '
-    /^Alpha:/  { in_alpha=1; in_beta=0; next }
-    /^Beta:/   { in_alpha=0; in_beta=1; next }
-    /^Status:/ { in_alpha=0; in_beta=0; next }
-    $1 == "URL:" {
-        url = $2
-        if (in_alpha) {
-            alpha_url = url
-        } else if (in_beta && alpha_url != "") {
-            if (index(pwd, alpha_url "/") == 1) {
-                colon = index(url, ":")
-                if (colon > 0) {
-                    print substr(url, 1, colon - 1)
-                    exit
-                }
-            }
-        }
-    }
-')
+if [[ ! -d "$requested_path" ]]; then
+    echo "rdev-info: path is not a directory: $requested_path" >&2
+    exit 2
+fi
+local_path="$(cd -- "$requested_path" && pwd -P)"
+project_path=$(git -C "$local_path" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$local_path")
 
-if [[ -z "$beta_host" ]]; then
-    echo "rdev-info: no mutagen sync found covering $pwd_dir" >&2
+for dependency in mutagen jq; do
+    if ! command -v "$dependency" >/dev/null 2>&1; then
+        echo "rdev-info: required command not found: $dependency" >&2
+        exit 1
+    fi
+done
+
+if ! sessions_json=$(mutagen sync list --template '{{json .}}'); then
+    echo "rdev-info: unable to query Mutagen synchronization sessions" >&2
     exit 1
 fi
 
-# Beta host is "<repo>_<rdev-suffix>"; rdev names join them with "/".
-rdev_name="${beta_host%_*}/${beta_host##*_}"
+# Select a covering session with a remote peer. Prefer bidirectional sessions,
+# then the most specific local synchronization root.
+session_record=$(
+    jq -r --arg path "$local_path" --arg project "$project_path" '
+        def endpoint:
+            if .alpha.protocol == "local" and (.beta.host // "") != "" then
+                {
+                    localRoot: .alpha.path,
+                    remoteHost: .beta.host,
+                    localConnected: .alpha.connected,
+                    remoteConnected: .beta.connected
+                }
+            elif .beta.protocol == "local" and (.alpha.host // "") != "" then
+                {
+                    localRoot: .beta.path,
+                    remoteHost: .alpha.host,
+                    localConnected: .beta.connected,
+                    remoteConnected: .alpha.connected
+                }
+            else
+                empty
+            end;
+        def covers($root):
+            $path == $root or
+            (if $root == "/" then
+                ($path | startswith("/"))
+            else
+                ($path | startswith($root + "/"))
+            end);
+
+        [
+            (. // [])[] |
+            . as $session |
+            endpoint as $endpoint |
+            if covers($endpoint.localRoot) then
+                $session + $endpoint + {matchRank: 0}
+            elif $endpoint.localRoot == ($project + "/.git") then
+                $session + $endpoint + {matchRank: 1}
+            else
+                empty
+            end
+        ]
+        | sort_by([
+            .matchRank,
+            (if (.mode | startswith("two-way-")) then 0 else 1 end),
+            -(.localRoot | length)
+        ])
+        | .[0]
+        | if . == null then
+            empty
+        else
+            [
+                .mode,
+                .status,
+                (.paused | tostring),
+                (.localConnected | tostring),
+                (.remoteConnected | tostring),
+                .remoteHost,
+                .localRoot,
+                ((.conflicts // []) | length | tostring),
+                ([
+                    .alpha.scanProblems[]?,
+                    .alpha.transitionProblems[]?,
+                    .beta.scanProblems[]?,
+                    .beta.transitionProblems[]?
+                ] | length | tostring)
+            ]
+            | @tsv
+        end
+    ' <<<"$sessions_json"
+)
+
+if [[ -z "$session_record" ]]; then
+    if [[ "$mode" == "sync-status" ]]; then
+        jq -cn \
+            --arg category "missing" \
+            --arg path "$local_path" \
+            '{category: $category, path: $path}'
+        exit 0
+    fi
+    echo "rdev-info: no Mutagen rdev sync found covering $local_path" >&2
+    exit 1
+fi
+
+IFS=$'\t' read -r sync_mode raw_status paused local_connected remote_connected \
+    remote_host sync_root conflict_count problem_count <<<"$session_record"
+
+if [[ "$remote_host" == *_* ]]; then
+    rdev_name="${remote_host%_*}/${remote_host##*_}"
+    short_name="${remote_host##*_}"
+else
+    rdev_name="$remote_host"
+    short_name="$remote_host"
+fi
+
+if [[ "$mode" == "sync-status" ]]; then
+    case "$sync_mode" in
+        two-way-safe|two-way-resolved) ;;
+        *) category="wrong-mode" ;;
+    esac
+
+    if [[ -z "${category:-}" ]]; then
+        if [[ "$paused" == "true" ]]; then
+            category="paused"
+        elif [[ "$raw_status" == halted-on-root-* ]]; then
+            category="halted"
+        elif [[ "$raw_status" == "connecting-alpha" || "$raw_status" == "connecting-beta" ]]; then
+            category="connecting"
+        elif [[ "$raw_status" == "disconnected" ||
+                "$local_connected" != "true" ||
+                "$remote_connected" != "true" ]]; then
+            category="disconnected"
+        elif ((conflict_count > 0 || problem_count > 0)); then
+            category="error"
+        else
+            case "$raw_status" in
+                watching)
+                    category="healthy"
+                    ;;
+                scanning|waiting-for-rescan|reconciling|staging-alpha|staging-beta|transitioning|saving)
+                    category="syncing"
+                    ;;
+                *)
+                    category="error"
+                    ;;
+            esac
+        fi
+    fi
+
+    jq -cn \
+        --arg category "$category" \
+        --arg rdev "$rdev_name" \
+        --arg shortName "$short_name" \
+        --arg mode "$sync_mode" \
+        --arg status "$raw_status" \
+        --arg path "$local_path" \
+        --arg root "$sync_root" \
+        --argjson paused "$paused" \
+        --argjson localConnected "$local_connected" \
+        --argjson remoteConnected "$remote_connected" \
+        --argjson conflicts "$conflict_count" \
+        --argjson problems "$problem_count" \
+        '{
+            category: $category,
+            rdev: $rdev,
+            shortName: $shortName,
+            mode: $mode,
+            status: $status,
+            paused: $paused,
+            localConnected: $localConnected,
+            remoteConnected: $remoteConnected,
+            conflicts: $conflicts,
+            problems: $problems,
+            path: $path,
+            root: $root
+        }'
+    exit 0
+fi
 
 if [[ "$mode" == "name" ]]; then
     echo "$rdev_name"
@@ -83,7 +248,9 @@ url=$(rdev ls -a 2>/dev/null | awk -F'|' -v target="$rdev_name" '
 ')
 
 case "$mode" in
-    verbose) printf '%s\t%s\n' "$rdev_name" "${url:--}" ;;
+    verbose)
+        printf '%s\t%s\n' "$rdev_name" "${url:--}"
+        ;;
     url)
         if [[ -z "$url" ]]; then
             echo "rdev-info: no Server URL for rdev '$rdev_name' (not a hostable MP, or not running?)" >&2
