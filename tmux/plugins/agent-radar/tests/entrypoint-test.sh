@@ -76,6 +76,14 @@ for hook in after-select-pane after-select-window client-session-changed pane-fo
     }
 done
 
+for hook in session-created session-closed session-renamed; do
+  grep -F -- "$hook" "$temp_dir/state/hooks" |
+    grep -Fq -- 'agent-radar.tmux --refresh' || {
+      printf 'not ok - %s refresh hook was not configured\n' "$hook" >&2
+      exit 1
+    }
+done
+
 if grep -Eq 'RECONCILE|STALE_SECONDS|STATUS_TTL|AWAITING_IDLE_GRACE' \
   "$temp_dir/state/_agent-radar-runtime-command"; then
   printf 'not ok - removed reconciliation settings remain in the runtime\n' >&2

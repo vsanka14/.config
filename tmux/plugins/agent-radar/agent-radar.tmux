@@ -71,6 +71,12 @@ tmux set-hook -g 'after-select-window[90]' "$ack_hook"
 tmux set-hook -g 'client-session-changed[90]' "$ack_hook"
 tmux set-hook -g 'pane-focus-in[90]' "$ack_hook"
 
+refresh_command="$(shell_quote "$CURRENT_DIR/agent-radar.tmux") --refresh"
+refresh_hook="run-shell -b $(shell_quote "$refresh_command")"
+tmux set-hook -g 'session-created[90]' "$refresh_hook"
+tmux set-hook -g 'session-closed[90]' "$refresh_hook"
+tmux set-hook -g 'session-renamed[90]' "$refresh_hook"
+
 fragment="#($engine_command --tmux-status-cached #{q:session_name})"
 status_right=$(tmux show-option -gqv status-right)
 previous_fragment=$(tmux show-option -gqv @agent-radar-fragment)
