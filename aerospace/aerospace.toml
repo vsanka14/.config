@@ -24,10 +24,10 @@ default-root-container-orientation = 'horizontal'
 [gaps]
 inner.horizontal = 8
 inner.vertical = 8
-outer.left = [{ monitor."DELL S2725QC" = 144 }, 72]
-outer.bottom = [{ monitor."DELL S2725QC" = 144 }, 72]
-outer.top = [{ monitor."DELL S2725QC" = 144 }, 72]
-outer.right = [{ monitor."DELL S2725QC" = 144 }, 72]
+outer.left = [{ monitor."DELL S2725QC" = 112 }, 40]
+outer.bottom = [{ monitor."DELL S2725QC" = 112 }, 40]
+outer.top = [{ monitor."DELL S2725QC" = 112 }, 40]
+outer.right = [{ monitor."DELL S2725QC" = 112 }, 40]
 
 # ============================================
 # MAIN KEYBINDINGS (using ctrl modifier)
