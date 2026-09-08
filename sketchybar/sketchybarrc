@@ -57,6 +57,7 @@ printf '%s\n' "$DISPLAY_PROFILE" > "/tmp/sketchybar-display-profile-${UID}"
 
 # Bar appearance
 sketchybar --bar \
+    drawing=on \
     height=$BAR_HEIGHT \
     blur_radius=$BLUR_RADIUS \
     position=top \
