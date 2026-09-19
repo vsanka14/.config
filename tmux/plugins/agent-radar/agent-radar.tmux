@@ -38,6 +38,7 @@ tmux set-option -gu @agent-radar-use-shell 2>/dev/null || true
 
 engine_env="env"
 engine_env="$engine_env AGENT_RADAR_STATE_DIR=$(shell_quote "$(option @agent-radar-state-dir "${XDG_STATE_HOME:-$HOME/.local/state}/agent-radar")")"
+engine_env="$engine_env AGENT_RADAR_DONE_TTL=$(shell_quote "$(option @agent-radar-done-ttl 3)")"
 engine_env="$engine_env AGENT_RADAR_CACHE_TTL=$(shell_quote "$(option @agent-radar-cache-ttl 2)")"
 engine_env="$engine_env AGENT_RADAR_ON_CHANGE=$(shell_quote "$(option @agent-radar-on-change '')")"
 engine_env="$engine_env AGENT_RADAR_COLOR_AWAITING=$(shell_quote "$(option @agent-radar-color-awaiting '#f7768e')")"
