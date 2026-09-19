@@ -8,3 +8,5 @@ gh/
 DUAL_REMOTE.md
 zsh/.zsh_history
 zsh/.zcompdump*
+tmux/plugins/agent-radar/target/
+tmux/plugins/agent-radar/bin/agent-radar-rust

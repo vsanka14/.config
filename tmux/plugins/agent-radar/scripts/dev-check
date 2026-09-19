@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+plugin_dir=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+candidate=$plugin_dir/target/release/agent-radar
+
+cd "$plugin_dir"
+
+printf '== Rust formatting ==\n'
+cargo fmt -- --check
+
+printf '\n== Rust unit tests ==\n'
+cargo test --locked
+
+printf '\n== Release build ==\n'
+cargo build --locked --release
+
+export AGENT_RADAR_RUST_BIN=$candidate
+
+printf '\n== Shell syntax ==\n'
+bash -n \
+  agent-radar.tmux \
+  bin/agent-radar \
+  bin/agent-radar-hook \
+  bin/agent-radar-setup \
+  scripts/dev-check \
+  tests/*.sh
+
+for test in \
+  engine-test.sh \
+  entrypoint-test.sh \
+  setup-test.sh \
+  notification-test.sh \
+  popup-live-test.sh \
+  boundary-test.sh
+do
+  printf '\n== %s ==\n' "$test"
+  bash "tests/$test"
+done
+
+printf '\nValidation passed against:\n  %s\n' "$candidate"
+printf '\nInstall separately with:\n'
+printf '  install -m 755 %q %q\n' \
+  "$candidate" \
+  "$plugin_dir/bin/agent-radar-rust"

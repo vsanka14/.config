@@ -34,6 +34,7 @@ set_default @agent-radar-color-muted '#565f89'
 set_default @agent-radar-color-dim '#414868'
 set_default @agent-radar-color-pill-bg '#24283b'
 set_default @agent-radar-color-status-bg '#050505'
+tmux set-option -gu @agent-radar-use-shell 2>/dev/null || true
 
 engine_env="env"
 engine_env="$engine_env AGENT_RADAR_STATE_DIR=$(shell_quote "$(option @agent-radar-state-dir "${XDG_STATE_HOME:-$HOME/.local/state}/agent-radar")")"

@@ -6,13 +6,12 @@ tmux, and jumping to them from an fzf popup.
 ## Architecture
 
 - `agent-radar.tmux` owns the popup binding and one `status-right` fragment.
-- `bin/agent-radar` provides the popup, status renderer, refresh worker, and
-  `--notify-lines` consumer API.
-- `bin/agent-radar-hook` converts Copilot lifecycle events into privacy-safe
-  per-pane state.
-- `agents/copilot.sh` contains Copilot-specific process, title, and event rules.
-- `lib/` contains shared configuration, detection, rendering, and notification
-  logic.
+- `bin/agent-radar`, `bin/agent-radar-hook`, and `bin/agent-radar-setup` are
+  stable wrappers that use the installed Rust binary by default.
+- `Cargo.toml` and `src/` contain the Rust engine, hook, setup, popup, rendering,
+  process detection, state, cache, and notification implementation.
+- The previous shell implementation is preserved on the
+  `vsankar/agent-radar-shell-legacy` branch.
 - Runtime state defaults to
   `${XDG_STATE_HOME:-$HOME/.local/state}/agent-radar`.
 
@@ -88,13 +87,19 @@ status precedence.
 
 ## Tests
 
+Run the complete development validation workflow from the required tmux pane:
+
 ```bash
-bash -n agent-radar.tmux bin/* lib/*.sh agents/*.sh tests/*.sh
-bash tests/engine-test.sh
-bash tests/entrypoint-test.sh
-bash tests/setup-test.sh
-bash tests/boundary-test.sh
-bash tests/popup-live-test.sh
+cd tmux/plugins/agent-radar
+./scripts/dev-check
+```
+
+The workflow formats, tests, builds, and runs every acceptance test against the
+newly built `target/release/agent-radar`. It does not change the live plugin.
+After validation passes, install the candidate separately:
+
+```bash
+install -m 755 target/release/agent-radar bin/agent-radar-rust
 ```
 
 The suite also guards the hot paths: cached status paints must not invoke tmux,

@@ -47,7 +47,7 @@ tmux -L "$server" -f /dev/null new-session -d -s popup \
 socket=
 attempt=0
 while [ -z "$socket" ] && [ "$attempt" -lt 60 ]; do
-  registration=$(find "$temp_dir/state/.popups" -type f -print -quit 2>/dev/null || true)
+  registration=$(find "$temp_dir/state/.popups" -type f -name '[0-9]*' -print -quit 2>/dev/null || true)
   if [ -n "$registration" ]; then
     IFS= read -r socket <"$registration" || socket=
     [ -S "$socket" ] || socket=
@@ -85,14 +85,12 @@ jq -n --argjson now "$now" \
   '{pane_id:"%1", session_id:"test", status:"awaiting", event:"permissionRequest",
     updated_at:"test", updated_epoch:$now}' >"$temp_dir/state/1.json"
 
+FIXTURE_DIR="$temp_dir" \
+TMUX_AGENT_ENGINE_TMUX_BIN="$temp_dir/bin/fake-tmux" \
+TMUX_AGENT_ENGINE_PS_FILE="$temp_dir/processes" \
 AGENT_RADAR_STATE_DIR="$temp_dir/state" \
-AGENT_RADAR_ENGINE_BIN="$engine" \
-PLUGIN_ROOT="$plugin_dir" \
-bash -c '
-  source "$PLUGIN_ROOT/lib/config.sh"
-  source "$PLUGIN_ROOT/lib/notify.sh"
-  refresh_agent_radar_popups
-'
+AGENT_RADAR_NOTIFY=0 \
+"$engine" --refresh --notify
 
 wait_for_text awaiting || {
   printf 'not ok - open popup did not reload awaiting state\n' >&2
@@ -107,18 +105,16 @@ while kill -0 "$owner_pid" 2>/dev/null && [ "$attempt" -lt 40 ]; do
   attempt=$((attempt + 1))
 done
 
+FIXTURE_DIR="$temp_dir" \
+TMUX_AGENT_ENGINE_TMUX_BIN="$temp_dir/bin/fake-tmux" \
+TMUX_AGENT_ENGINE_PS_FILE="$temp_dir/processes" \
 AGENT_RADAR_STATE_DIR="$temp_dir/state" \
-AGENT_RADAR_ENGINE_BIN="$engine" \
-PLUGIN_ROOT="$plugin_dir" \
-bash -c '
-  source "$PLUGIN_ROOT/lib/config.sh"
-  source "$PLUGIN_ROOT/lib/notify.sh"
-  refresh_agent_radar_popups
-'
+AGENT_RADAR_NOTIFY=0 \
+"$engine" --refresh --notify
 
 attempt=0
 while { [ -S "$socket" ] ||
-        find "$temp_dir/state/.popups" -type f -print -quit 2>/dev/null |
+        find "$temp_dir/state/.popups" -type f -name '[0-9]*' -print -quit 2>/dev/null |
           grep -q .; } && [ "$attempt" -lt 40 ]; do
   sleep 0.05
   attempt=$((attempt + 1))
@@ -127,7 +123,7 @@ done
   printf 'not ok - popup socket leaked after exit\n' >&2
   exit 1
 }
-if find "$temp_dir/state/.popups" -type f -print -quit 2>/dev/null | grep -q .; then
+if find "$temp_dir/state/.popups" -type f -name '[0-9]*' -print -quit 2>/dev/null | grep -q .; then
   printf 'not ok - popup registration leaked after exit\n' >&2
   exit 1
 fi

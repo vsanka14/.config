@@ -9,8 +9,7 @@ trap 'rm -rf "$temp_dir"' EXIT
 if grep -R -n -E '(\$HOME/\.config|~/\.config|sketchybar|bin/tmux-agent-(engine|status))' \
   "$plugin_dir/agent-radar.tmux" \
   "$plugin_dir/bin" \
-  "$plugin_dir/lib" \
-  "$plugin_dir/agents"; then
+  "$plugin_dir/src"; then
   printf 'not ok - plugin boundary violation\n' >&2
   exit 1
 fi
