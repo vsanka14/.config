@@ -318,8 +318,6 @@ pub struct RadarConfig {
     pub color_dim: String,
     pub color_pill_bg: String,
     pub color_status_bg: String,
-    #[serde(default)]
-    pub radar_numbers: bool,
 }
 
 impl Default for RadarConfig {
@@ -334,7 +332,6 @@ impl Default for RadarConfig {
             color_dim: "#414868".into(),
             color_pill_bg: "#24283b".into(),
             color_status_bg: "#050505".into(),
-            radar_numbers: false,
         }
     }
 }
@@ -503,7 +500,7 @@ pub fn pill_cell(status: Status, pane_target: &str, theme: &RadarConfig) -> Stri
     }
 }
 
-pub fn dot_color(priority: SessionPriority, is_current: bool, theme: &RadarConfig) -> &str {
+pub fn badge_color(priority: SessionPriority, is_current: bool, theme: &RadarConfig) -> &str {
     match priority {
         SessionPriority::Awaiting => &theme.color_awaiting,
         SessionPriority::Done => &theme.color_done,
@@ -512,25 +509,11 @@ pub fn dot_color(priority: SessionPriority, is_current: bool, theme: &RadarConfi
     }
 }
 
-pub fn radar_glyph(position: usize, is_current: bool, numbered: bool) -> &'static str {
-    const NUMBERED: [&str; 10] = [
-        "\u{f0ca0}",
-        "\u{f0ca2}",
-        "\u{f0ca4}",
-        "\u{f0ca6}",
-        "\u{f0ca8}",
-        "\u{f0caa}",
-        "\u{f0cac}",
-        "\u{f0cae}",
-        "\u{f0cb0}",
-        "\u{f0fec}",
-    ];
-    if numbered && (1..=10).contains(&position) {
-        NUMBERED[position - 1]
-    } else if is_current {
-        "◉"
-    } else {
-        "●"
+pub fn radar_label(position: usize) -> String {
+    match position {
+        1..=9 => position.to_string(),
+        10 => "0".to_string(),
+        other => other.to_string(),
     }
 }
 
@@ -840,17 +823,23 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
             .iter()
             .enumerate()
             .map(|(index, session)| {
-                format!(
-                    "#[fg={}]{} ",
-                    dot_color(
-                        *priorities
-                            .get(session.as_str())
-                            .unwrap_or(&SessionPriority::Other),
-                        session == current,
-                        &config.theme,
-                    ),
-                    radar_glyph(index + 1, session == current, config.theme.radar_numbers)
-                )
+                let priority = *priorities
+                    .get(session.as_str())
+                    .unwrap_or(&SessionPriority::Other);
+                let is_current = session == current;
+                let label = radar_label(index + 1);
+                let signal = is_current
+                    || matches!(priority, SessionPriority::Awaiting | SessionPriority::Done);
+                if signal {
+                    format!(
+                        "#[fg={},bg={},bold] {} #[default] ",
+                        config.theme.color_status_bg,
+                        badge_color(priority, is_current, &config.theme),
+                        label,
+                    )
+                } else {
+                    format!("#[fg={},nobold]{} ", config.theme.color_muted, label)
+                }
             })
             .collect::<String>()
     } else {
@@ -867,25 +856,11 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
     )
 }
 
-fn render_config(config: &Config, tmux: &Tmux) -> Config {
-    let mut configured = config.clone();
-    configured.theme.radar_numbers = tmux
-        .output(&["show-option", "-gqv", "@agent-radar-radar-numbers"])
-        .map(|value| value.trim() == "on")
-        .unwrap_or(false);
-    configured
-}
-
 pub fn status(config: &Config, current: &str) -> io::Result<String> {
     let tmux = Tmux::new(config.tmux.clone());
     let sessions = tmux.sessions()?;
     let rows = cached_lean_rows(config)?;
-    Ok(render_status(
-        &render_config(config, &tmux),
-        current,
-        &sessions,
-        &rows,
-    ))
+    Ok(render_status(config, current, &sessions, &rows))
 }
 
 pub fn cached_status(config: &Config, session: &str) -> io::Result<String> {
@@ -950,11 +925,10 @@ fn refresh_status_files(
     let tmux = Tmux::new(config.tmux.clone());
     let sessions = tmux.sessions()?;
     let fresh_rows = rows_excluding(config, RowMode::Lean, excluded_panes)?;
-    let render_config = render_config(config, &tmux);
     for session in &sessions {
         state::atomic_write(
             &directory.join(format!("{}.txt", session_key(session))),
-            render_status(&render_config, session, &sessions, &fresh_rows).as_bytes(),
+            render_status(config, session, &sessions, &fresh_rows).as_bytes(),
         )?;
     }
     let keep: BTreeSet<_> = sessions
