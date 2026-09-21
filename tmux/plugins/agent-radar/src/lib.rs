@@ -513,22 +513,6 @@ pub fn badge_color(priority: SessionPriority, is_current: bool, theme: &RadarCon
     }
 }
 
-/// Returns a darker shade of a `#RRGGBB` color by scaling each channel toward
-/// black. Falls back to the input when it is not a 6-digit hex string.
-pub fn darken_hex(hex: &str, factor: f32) -> String {
-    let channel = |range: std::ops::Range<usize>| -> Option<u8> {
-        hex.get(range)
-            .and_then(|part| u8::from_str_radix(part, 16).ok())
-    };
-    match (channel(1..3), channel(3..5), channel(5..7)) {
-        (Some(r), Some(g), Some(b)) if hex.starts_with('#') && hex.len() == 7 => {
-            let scale = |value: u8| (f32::from(value) * factor).round().clamp(0.0, 255.0) as u8;
-            format!("#{:02x}{:02x}{:02x}", scale(r), scale(g), scale(b))
-        }
-        _ => hex.to_string(),
-    }
-}
-
 pub fn radar_label(position: usize) -> String {
     match position {
         1..=9 => position.to_string(),
@@ -857,18 +841,14 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
                             | SessionPriority::Working
                     );
                 if is_current {
-                    // Focused session: same footprint as any other badge, but its
-                    // border cells use a darker shade of the status color so the
-                    // focused session stays distinguishable even when it and other
-                    // sessions share the same status color.
-                    let color = badge_color(priority, is_current, &config.theme);
-                    let border = darken_hex(color, 0.6);
+                    // Focused session: same solid fill as any other badge, plus an
+                    // underline so the focused session stays distinguishable even
+                    // when it and other sessions share the same status color.
                     format!(
-                        "#[fg={bg},bg={border},bold] #[bg={color}]{label}#[bg={border}] #[default] ",
-                        bg = config.theme.color_status_bg,
-                        border = border,
-                        color = color,
-                        label = label,
+                        "#[fg={},bg={},bold,underscore] {} #[default] ",
+                        config.theme.color_status_bg,
+                        badge_color(priority, is_current, &config.theme),
+                        label,
                     )
                 } else if signal {
                     format!(
