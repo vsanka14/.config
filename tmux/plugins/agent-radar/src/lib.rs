@@ -841,14 +841,15 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
                             | SessionPriority::Working
                     );
                 if is_current {
-                    // Focused session: outline (status-colored text on the dark
-                    // bg) so it stays distinguishable even when it and other
-                    // sessions share the same status color (e.g. both working).
+                    // Focused session: keep the solid status-color fill but frame
+                    // it with accent-colored edges so it stays distinguishable even
+                    // when it and other sessions share the same status color.
                     format!(
-                        "#[fg={},bg={},bold] {} #[default] ",
-                        badge_color(priority, is_current, &config.theme),
-                        config.theme.color_status_bg,
-                        label,
+                        "#[fg={accent},bg={bg}]▐#[fg={bg},bg={color},bold] {label} #[fg={accent},bg={bg}]▌#[default] ",
+                        accent = config.theme.color_accent,
+                        bg = config.theme.color_status_bg,
+                        color = badge_color(priority, is_current, &config.theme),
+                        label = label,
                     )
                 } else if signal {
                     format!(
