@@ -841,18 +841,18 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
                             | SessionPriority::Working
                     );
                 if is_current {
-                    // Focused session: same solid fill as any other badge, plus an
-                    // underline so the focused session stays distinguishable even
-                    // when it and other sessions share the same status color.
+                    // Focused session: same solid fill as any other badge, but its
+                    // number is bold so the focused session stays distinguishable
+                    // even when it and other sessions share the same status color.
                     format!(
-                        "#[fg={},bg={},bold,underscore] {} #[default] ",
+                        "#[fg={},bg={},bold] {} #[default] ",
                         config.theme.color_status_bg,
                         badge_color(priority, is_current, &config.theme),
                         label,
                     )
                 } else if signal {
                     format!(
-                        "#[fg={},bg={},bold] {} #[default] ",
+                        "#[fg={},bg={},nobold] {} #[default] ",
                         config.theme.color_status_bg,
                         badge_color(priority, is_current, &config.theme),
                         label,
