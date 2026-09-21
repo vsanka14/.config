@@ -310,7 +310,7 @@ tmux_status=$(
     NO_COLOR=1 \
     "$engine" --tmux-status beta
 )
-assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#050505,bg=#f7768e,bold] 1 #[default] #[fg=#050505,bg=#9ece6a,bold] 2 #[default] #[fg=#565f89,nobold]3 #[fg=#565f89,nobold]4 #[fg=#565f89,nobold]5 #[default]' \
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#050505,bg=#f7768e,bold] 1 #[default] #[fg=#050505,bg=#e0af68,bold] 2 #[default] #[fg=#565f89,nobold]3 #[fg=#565f89,nobold]4 #[fg=#565f89,nobold]5 #[default]' \
   "$tmux_status" "tmux status rendering"
 
 cross_session_status=$(

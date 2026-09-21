@@ -79,6 +79,7 @@ pub enum StatusRank {
 pub enum SessionPriority {
     Awaiting,
     Done,
+    Working,
     Other,
 }
 
@@ -87,6 +88,7 @@ impl SessionPriority {
         match status {
             Status::Awaiting => Self::Awaiting,
             Status::Done => Self::Done,
+            Status::Working => Self::Working,
             _ => Self::Other,
         }
     }
@@ -95,7 +97,8 @@ impl SessionPriority {
         match self {
             Self::Awaiting => 0,
             Self::Done => 1,
-            Self::Other => 2,
+            Self::Working => 2,
+            Self::Other => 3,
         }
     }
 }
@@ -504,8 +507,9 @@ pub fn badge_color(priority: SessionPriority, is_current: bool, theme: &RadarCon
     match priority {
         SessionPriority::Awaiting => &theme.color_awaiting,
         SessionPriority::Done => &theme.color_done,
-        SessionPriority::Other if is_current => &theme.color_idle,
-        SessionPriority::Other => &theme.color_muted,
+        SessionPriority::Working if is_current => &theme.color_working,
+        _ if is_current => &theme.color_idle,
+        _ => &theme.color_muted,
     }
 }
 
@@ -580,7 +584,7 @@ pub fn notification_records(
     let color = match global {
         SessionPriority::Awaiting => &theme.color_awaiting,
         SessionPriority::Done => &theme.color_done,
-        SessionPriority::Other => &theme.color_accent,
+        SessionPriority::Working | SessionPriority::Other => &theme.color_accent,
     };
     let mut records = vec![NotificationRecord::Color(color.clone())];
     let mut emitted = BTreeSet::new();
@@ -612,6 +616,7 @@ fn priority_status(priority: SessionPriority) -> Status {
     match priority {
         SessionPriority::Awaiting => Status::Awaiting,
         SessionPriority::Done => Status::Done,
+        SessionPriority::Working => Status::Working,
         SessionPriority::Other => Status::Unknown,
     }
 }
@@ -788,7 +793,7 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
     let glyph = match global {
         SessionPriority::Awaiting => &config.theme.color_awaiting,
         SessionPriority::Done => &config.theme.color_done,
-        SessionPriority::Other => &config.theme.color_accent,
+        SessionPriority::Working | SessionPriority::Other => &config.theme.color_accent,
     };
     let mut current_rows: Vec<_> = rows.iter().filter(|row| row.session == current).collect();
     current_rows.sort_by_key(|row| {
@@ -1363,6 +1368,28 @@ pub mod boundary {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn current_session_badge_turns_working_yellow() {
+        let theme = RadarConfig::default();
+        // Current-session indicator: yellow while working, idle-green otherwise.
+        assert_eq!(
+            badge_color(SessionPriority::Working, true, &theme),
+            theme.color_working.as_str()
+        );
+        assert_eq!(
+            badge_color(SessionPriority::Other, true, &theme),
+            theme.color_idle.as_str()
+        );
+        // Non-current sessions are unaffected by the working state.
+        assert_eq!(
+            badge_color(SessionPriority::Working, false, &theme),
+            theme.color_muted.as_str()
+        );
+        // Awaiting/done keep precedence for the badge regardless of focus.
+        assert!(SessionPriority::Awaiting < SessionPriority::Working);
+        assert!(SessionPriority::Done < SessionPriority::Working);
+    }
 
     #[test]
     fn formats_iso_utc_without_a_subprocess() {
