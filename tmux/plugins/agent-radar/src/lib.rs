@@ -507,9 +507,9 @@ pub fn badge_color(priority: SessionPriority, is_current: bool, theme: &RadarCon
     match priority {
         SessionPriority::Awaiting => &theme.color_awaiting,
         SessionPriority::Done => &theme.color_done,
-        SessionPriority::Working if is_current => &theme.color_working,
-        _ if is_current => &theme.color_idle,
-        _ => &theme.color_muted,
+        SessionPriority::Working => &theme.color_working,
+        SessionPriority::Other if is_current => &theme.color_idle,
+        SessionPriority::Other => &theme.color_muted,
     }
 }
 
@@ -834,7 +834,12 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
                 let is_current = session == current;
                 let label = radar_label(index + 1);
                 let signal = is_current
-                    || matches!(priority, SessionPriority::Awaiting | SessionPriority::Done);
+                    || matches!(
+                        priority,
+                        SessionPriority::Awaiting
+                            | SessionPriority::Done
+                            | SessionPriority::Working
+                    );
                 if signal {
                     format!(
                         "#[fg={},bg={},bold] {} #[default] ",
@@ -1370,23 +1375,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn current_session_badge_turns_working_yellow() {
+    fn working_badge_lights_up_like_awaiting_and_done() {
         let theme = RadarConfig::default();
-        // Current-session indicator: yellow while working, idle-green otherwise.
+        // Working fills the badge yellow whether or not it is the focused session.
         assert_eq!(
             badge_color(SessionPriority::Working, true, &theme),
             theme.color_working.as_str()
         );
         assert_eq!(
+            badge_color(SessionPriority::Working, false, &theme),
+            theme.color_working.as_str()
+        );
+        // A plain (idle/other) session is still green when current, muted otherwise.
+        assert_eq!(
             badge_color(SessionPriority::Other, true, &theme),
             theme.color_idle.as_str()
         );
-        // Non-current sessions are unaffected by the working state.
         assert_eq!(
-            badge_color(SessionPriority::Working, false, &theme),
+            badge_color(SessionPriority::Other, false, &theme),
             theme.color_muted.as_str()
         );
-        // Awaiting/done keep precedence for the badge regardless of focus.
+        // Awaiting/done still outrank working for the badge.
         assert!(SessionPriority::Awaiting < SessionPriority::Working);
         assert!(SessionPriority::Done < SessionPriority::Working);
     }

@@ -310,7 +310,7 @@ tmux_status=$(
     NO_COLOR=1 \
     "$engine" --tmux-status beta
 )
-assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#050505,bg=#f7768e,bold] 1 #[default] #[fg=#050505,bg=#e0af68,bold] 2 #[default] #[fg=#565f89,nobold]3 #[fg=#565f89,nobold]4 #[fg=#565f89,nobold]5 #[default]' \
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#050505,bg=#f7768e,bold] 1 #[default] #[fg=#050505,bg=#e0af68,bold] 2 #[default] #[fg=#050505,bg=#e0af68,bold] 3 #[default] #[fg=#565f89,nobold]4 #[fg=#565f89,nobold]5 #[default]' \
   "$tmux_status" "tmux status rendering"
 
 cross_session_status=$(
@@ -322,7 +322,7 @@ cross_session_status=$(
     NO_COLOR=1 \
     "$engine" --tmux-status alpha
 )
-assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.1 #[bg=#050505,nobold] #[fg=#050505,bg=#f7768e,bold] 1 #[default] #[fg=#565f89,nobold]2 #[fg=#565f89,nobold]3 #[fg=#565f89,nobold]4 #[fg=#565f89,nobold]5 #[default]' \
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#f7768e,bold]1.1 #[bg=#050505,nobold] #[fg=#050505,bg=#f7768e,bold] 1 #[default] #[fg=#050505,bg=#e0af68,bold] 2 #[default] #[fg=#050505,bg=#e0af68,bold] 3 #[default] #[fg=#565f89,nobold]4 #[fg=#565f89,nobold]5 #[default]' \
   "$cross_session_status" "cross-session radar rendering"
 
 # A session without Copilot panes keeps a dim icon-only pill instead of making
@@ -473,7 +473,7 @@ flash_status=$(
     NO_COLOR=1 \
     "$engine" --tmux-status beta
 )
-assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#3fb950,bold]✓1.4 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#050505,bg=#f7768e,bold] 1 #[default] #[fg=#050505,bg=#3fb950,bold] 2 #[default] #[fg=#565f89,nobold]3 #[fg=#565f89,nobold]4 #[fg=#565f89,nobold]5 #[default]' \
+assert_eq '#[fg=#f7768e,bg=#24283b,bold]   #[fg=#e0af68,bold]1.2 #[fg=#9ece6a,nobold]1.3 #[fg=#3fb950,bold]✓1.4 #[fg=#9ece6a,nobold]1.10 #[bg=#050505,nobold] #[fg=#050505,bg=#f7768e,bold] 1 #[default] #[fg=#050505,bg=#3fb950,bold] 2 #[default] #[fg=#050505,bg=#e0af68,bold] 3 #[default] #[fg=#565f89,nobold]4 #[fg=#565f89,nobold]5 #[default]' \
   "$flash_status" "completion renders green in the pill"
 persistent_status=$(
   FIXTURE_DIR="$fixture_dir" \
