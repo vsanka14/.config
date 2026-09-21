@@ -1120,13 +1120,30 @@ fn parent_pid() -> u32 {
 }
 
 fn iso_now() -> String {
-    Command::new("date")
-        .args(["-u", "+%Y-%m-%dT%H:%M:%SZ"])
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
-        .unwrap_or_else(|| epoch_now().to_string())
+    format_iso_utc(epoch_now())
+}
+
+pub fn format_iso_utc(epoch: i64) -> String {
+    let days = epoch.div_euclid(86_400);
+    let seconds = epoch.rem_euclid(86_400);
+    let (hour, minute, second) = (seconds / 3600, (seconds % 3600) / 60, seconds % 60);
+    // Howard Hinnant's civil-from-days algorithm (epoch shifted to 0000-03-01).
+    let shifted = days + 719_468;
+    let era = shifted.div_euclid(146_097);
+    let day_of_era = shifted.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_position = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_position + 2) / 5 + 1;
+    let month = if month_position < 10 {
+        month_position + 3
+    } else {
+        month_position - 9
+    };
+    let year = if month <= 2 { year + 1 } else { year };
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
 }
 
 pub fn descriptor(config: &Config, hook: &Path) -> Value {
@@ -1346,6 +1363,15 @@ pub mod boundary {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn formats_iso_utc_without_a_subprocess() {
+        assert_eq!(format_iso_utc(0), "1970-01-01T00:00:00Z");
+        assert_eq!(format_iso_utc(1_000_000_000), "2001-09-09T01:46:40Z");
+        assert_eq!(format_iso_utc(1_774_084_867), "2026-03-21T09:21:07Z");
+        // Leap-day handling.
+        assert_eq!(format_iso_utc(1_582_934_400), "2020-02-29T00:00:00Z");
+    }
 
     #[test]
     fn maps_copilot_events_and_flash_actions() {

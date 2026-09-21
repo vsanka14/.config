@@ -64,8 +64,10 @@ fn dispatch(command: Command, config: &Config) -> Result<(), String> {
             print_line(boundary::notification_text(config).map_err(|error| error.to_string())?)
         }
         Command::AcknowledgePane(pane) => {
-            boundary::acknowledge(config, &pane).map_err(|error| error.to_string())?;
-            boundary::refresh(config, true).map_err(|error| error.to_string())
+            if boundary::acknowledge(config, &pane).map_err(|error| error.to_string())? {
+                boundary::refresh(config, true).map_err(|error| error.to_string())?;
+            }
+            Ok(())
         }
         Command::Refresh { notify } => {
             boundary::refresh(config, notify).map_err(|error| error.to_string())

@@ -57,7 +57,7 @@ status_file=$temp_dir/state/status-right
   exit 1
 }
 
-count=$(grep -o 'agent-radar --tmux-status-cached' "$status_file" | wc -l | tr -d ' ')
+count=$(grep -o -- '--tmux-status-cached' "$status_file" | wc -l | tr -d ' ')
 [ "$count" = 1 ] || {
   printf 'not ok - status fragment was injected %s times\n' "$count" >&2
   exit 1
@@ -70,7 +70,7 @@ grep -Fq -- '-n M-c display-popup' "$temp_dir/state/bindings" || {
 
 for hook in after-select-pane after-select-window client-session-changed pane-focus-in; do
   grep -Fq -- "$hook" "$temp_dir/state/hooks" &&
-    grep -Fq -- '--ack-pane\ #\{pane_id\}' "$temp_dir/state/hooks" || {
+    grep -Fq -- '@agent-radar-runtime-command\}\ --ack-pane\ #\{pane_id\}' "$temp_dir/state/hooks" || {
       printf 'not ok - %s acknowledgement hook was not configured\n' "$hook" >&2
       exit 1
     }
@@ -78,7 +78,7 @@ done
 
 for hook in session-created session-closed session-renamed; do
   grep -F -- "$hook" "$temp_dir/state/hooks" |
-    grep -Fq -- 'agent-radar.tmux\ --refresh' || {
+    grep -Fq -- '@agent-radar-runtime-command\}\ --refresh\ --notify' || {
       printf 'not ok - %s refresh hook was not configured\n' "$hook" >&2
       exit 1
     }

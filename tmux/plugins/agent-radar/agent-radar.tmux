@@ -3,7 +3,12 @@
 set -euo pipefail
 
 CURRENT_DIR=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# Call the Rust binary directly on the hot paths (status render, ack, refresh,
+# popup) to avoid the bash-wrapper start-up cost on every status repaint. Fall
+# back to the stable wrapper only when the compiled binary is unavailable.
 ENGINE=$CURRENT_DIR/bin/agent-radar
+RUST_ENGINE=${AGENT_RADAR_RUST_BIN:-$CURRENT_DIR/bin/agent-radar-rust}
+[ -x "$RUST_ENGINE" ] && ENGINE=$RUST_ENGINE
 
 option() {
   local name=$1 fallback=$2 value
@@ -66,14 +71,14 @@ esac
 popup_key=$(option @agent-radar-popup-key 'M-c')
 tmux bind-key -n "$popup_key" display-popup -B -E -w 80% -h 80% "$engine_command"
 
-ack_command="$(shell_quote "$CURRENT_DIR/agent-radar.tmux") --ack-pane #{pane_id}"
+ack_command="#{@agent-radar-runtime-command} --ack-pane #{pane_id}"
 ack_hook="run-shell -b $(shell_quote "$ack_command")"
 tmux set-hook -g 'after-select-pane[90]' "$ack_hook"
 tmux set-hook -g 'after-select-window[90]' "$ack_hook"
 tmux set-hook -g 'client-session-changed[90]' "$ack_hook"
 tmux set-hook -g 'pane-focus-in[90]' "$ack_hook"
 
-refresh_command="$(shell_quote "$CURRENT_DIR/agent-radar.tmux") --refresh"
+refresh_command="#{@agent-radar-runtime-command} --refresh --notify"
 refresh_hook="run-shell -b $(shell_quote "$refresh_command")"
 tmux set-hook -g 'session-created[90]' "$refresh_hook"
 tmux set-hook -g 'session-closed[90]' "$refresh_hook"
