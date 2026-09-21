@@ -840,7 +840,17 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
                             | SessionPriority::Done
                             | SessionPriority::Working
                     );
-                if signal {
+                if is_current {
+                    // Focused session: outline (status-colored text on the dark
+                    // bg) so it stays distinguishable even when it and other
+                    // sessions share the same status color (e.g. both working).
+                    format!(
+                        "#[fg={},bg={},bold] {} #[default] ",
+                        badge_color(priority, is_current, &config.theme),
+                        config.theme.color_status_bg,
+                        label,
+                    )
+                } else if signal {
                     format!(
                         "#[fg={},bg={},bold] {} #[default] ",
                         config.theme.color_status_bg,
