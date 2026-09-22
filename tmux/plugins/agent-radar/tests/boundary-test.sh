@@ -14,7 +14,13 @@ if grep -R -n -E '(\$HOME/\.config|~/\.config|sketchybar|bin/tmux-agent-(engine|
   exit 1
 fi
 
-cp -R "$plugin_dir" "$temp_dir/agent-radar"
+# Copy the plugin into isolation, excluding the Rust build directory: it is
+# ~300MB / 14k files, would slow this copy to minutes, and triggers a large
+# antivirus scan burst. The isolated engine-test uses bin/agent-radar ->
+# bin/agent-radar-rust, not target/.
+mkdir -p "$temp_dir/agent-radar"
+tar -C "$plugin_dir" --exclude './target' -cf - . \
+  | tar -C "$temp_dir/agent-radar" -xf -
 bash "$temp_dir/agent-radar/tests/engine-test.sh" >/dev/null
 
 printf 'ok - agent radar plugin boundary\n'
