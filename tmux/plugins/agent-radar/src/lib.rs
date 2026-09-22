@@ -841,9 +841,8 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
                             | SessionPriority::Working
                     );
                 if is_current {
-                    // Focused session: same solid fill as any other badge, but its
-                    // number is bold so the focused session stays distinguishable
-                    // even when it and other sessions share the same status color.
+                    // Focused session: dark number on the solid status fill so it
+                    // reads as the "selected" badge.
                     format!(
                         "#[fg={},bg={},bold] {} #[default] ",
                         config.theme.color_status_bg,
@@ -851,9 +850,12 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
                         label,
                     )
                 } else if signal {
+                    // Non-focused signal badge: gray number on the status fill so
+                    // it stays distinguishable from the focused (dark-number) badge
+                    // even when they share the same status color.
                     format!(
-                        "#[fg={},bg={},nobold] {} #[default] ",
-                        config.theme.color_status_bg,
+                        "#[fg={},bg={},bold] {} #[default] ",
+                        config.theme.color_muted,
                         badge_color(priority, is_current, &config.theme),
                         label,
                     )
