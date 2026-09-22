@@ -318,6 +318,7 @@ pub struct RadarConfig {
     pub color_idle: String,
     pub color_accent: String,
     pub color_muted: String,
+    pub color_muted_light: String,
     pub color_dim: String,
     pub color_pill_bg: String,
     pub color_status_bg: String,
@@ -332,6 +333,7 @@ impl Default for RadarConfig {
             color_idle: "#9ece6a".into(),
             color_accent: "#7dcfff".into(),
             color_muted: "#565f89".into(),
+            color_muted_light: "#a9b1d6".into(),
             color_dim: "#414868".into(),
             color_pill_bg: "#24283b".into(),
             color_status_bg: "#050505".into(),
@@ -371,6 +373,10 @@ impl Config {
         set_color(&mut theme.color_idle, "AGENT_RADAR_COLOR_IDLE");
         set_color(&mut theme.color_accent, "AGENT_RADAR_COLOR_ACCENT");
         set_color(&mut theme.color_muted, "AGENT_RADAR_COLOR_MUTED");
+        set_color(
+            &mut theme.color_muted_light,
+            "AGENT_RADAR_COLOR_MUTED_LIGHT",
+        );
         set_color(&mut theme.color_dim, "AGENT_RADAR_COLOR_DIM");
         set_color(&mut theme.color_pill_bg, "AGENT_RADAR_COLOR_PILL_BG");
         set_color(&mut theme.color_status_bg, "AGENT_RADAR_COLOR_STATUS_BG");
@@ -850,12 +856,13 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
                         label,
                     )
                 } else if signal {
-                    // Non-focused signal badge: gray number on the status fill so
-                    // it stays distinguishable from the focused (dark-number) badge
-                    // even when they share the same status color.
+                    // Non-focused signal badge: light-gray number on the status
+                    // fill so it stays distinguishable from the focused
+                    // (dark-number) badge even when they share the same status
+                    // color.
                     format!(
                         "#[fg={},bg={},bold] {} #[default] ",
-                        config.theme.color_muted,
+                        config.theme.color_muted_light,
                         badge_color(priority, is_current, &config.theme),
                         label,
                     )
