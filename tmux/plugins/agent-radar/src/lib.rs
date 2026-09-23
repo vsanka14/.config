@@ -841,24 +841,22 @@ fn render_status(config: &Config, current: &str, sessions: &[String], rows: &[Pa
                             | SessionPriority::Working
                     );
                 if is_current {
-                    // Focused session: the same solid status fill as any other
-                    // badge, but with the underline applied to only the number
-                    // (not the surrounding pad) so the focused session stays
-                    // distinguishable even when it and other sessions share the
-                    // same status color.
+                    // Focused session: the only badge with a solid status fill.
+                    // The fill itself is what marks focus — every other signal
+                    // badge is just a status-colored number on the bar — so no
+                    // extra underline/marker is needed to pick it out.
                     format!(
-                        "#[fg={},bg={},bold] #[underscore]{}#[nounderscore] #[default] ",
+                        "#[fg={},bg={},bold] {} #[default] ",
                         config.theme.color_status_bg,
                         badge_color(priority, is_current, &config.theme),
                         label,
                     )
                 } else if signal {
-                    // Non-focused signal badge: dark number on the solid status
-                    // fill — a filled chip that stays fully readable so you can
-                    // spot an awaiting session and jump straight to it.
+                    // Non-focused signal badge: the status color on the number
+                    // itself (no fill), keeping awaiting/working/done legible jump
+                    // targets while the focused session stays the single filled chip.
                     format!(
-                        "#[fg={},bg={},bold] {} #[default] ",
-                        config.theme.color_status_bg,
+                        "#[fg={},bold]{} ",
                         badge_color(priority, is_current, &config.theme),
                         label,
                     )
