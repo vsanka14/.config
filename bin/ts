@@ -127,6 +127,16 @@ if [[ $# -eq 1 ]]; then
 else
     active_sessions=$(tmux list-sessions -F '#{session_created}:#S' 2>/dev/null | sort -n | cut -d: -f2-)
 
+    # Session names in creation order, used to annotate each directory with
+    # its jump position. Built once so the per-directory loop below can look
+    # up positions with pure-bash string ops instead of spawning
+    # basename/tr/grep/cut for every entry (hundreds of execs, which are slow
+    # under process-monitoring agents).
+    sess_names=()
+    while IFS= read -r s; do
+        [[ -n "$s" ]] && sess_names+=("$s")
+    done <<< "$active_sessions"
+
     selected=$(
         {
             fd . "${SCAN_DIRS[@]}" --type=d --max-depth=1 --absolute-path
@@ -134,12 +144,22 @@ else
         } | sort -u \
           | sed "s|^$HOME/||" \
           | while IFS= read -r dir; do
-                name=$(basename "$dir" | tr . _)
-                pos=$(echo "$active_sessions" | grep -nx "$name" | cut -d: -f1)
+                name="${dir%/}"
+                name="${name##*/}"
+                name="${name//./_}"
+                pos=""
+                idx=0
+                for s in "${sess_names[@]}"; do
+                    idx=$((idx + 1))
+                    if [[ "$s" == "$name" ]]; then
+                        pos=$idx
+                        break
+                    fi
+                done
                 if [[ -n "$pos" ]]; then
-                    echo -e "0\033[32m●\033[0m \033[33m${pos}\033[0m\t$dir"
+                    printf '0\033[32m●\033[0m \033[33m%s\033[0m\t%s\n' "$pos" "$dir"
                 else
-                    echo -e "1   \t$dir"
+                    printf '1   \t%s\n' "$dir"
                 fi
             done \
           | sort -t' ' -k1,1 -k3,3 \
