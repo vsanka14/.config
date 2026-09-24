@@ -38,9 +38,12 @@ consumer:
   the icon only appears when it needs attention. `plugins/agent.sh` is its single
   owner.
 - **Transient vs blocking** is derived from state, not a trigger flag:
-  - a completion ("done") shows a **transient** green label; it clears itself
-    because the underlying `flash.kind=done` expires after Agent Radar's done
-    TTL, which also re-runs the configured on-change command;
+  - a completion ("done") shows a **transient** green label; in the notify view
+    `effective_status` drops the completion once `flash.kind=done` passes its
+    done TTL. Nothing re-fires the on-change command at that expiry, so the
+    `agent` item relies on its short `update_freq` poll (re-deriving from
+    `--notify-lines`) to clear the label promptly, matching the tmux pill's own
+    poll cadence;
   - an awaiting-permission agent shows a **blocking** red label with a red-tinted
     item background, and it persists until the agent leaves the awaiting state.
 - **Colours** mirror the tmux mapping: awaiting `#f7768e`, done `#3fb950`,
