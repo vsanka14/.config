@@ -2,6 +2,7 @@
 yarn/global/node_modules/
 yarn/global/yarn-error.log
 github-copilot/
+configstore/
 jgit/
 gh/
 .gitconfig
