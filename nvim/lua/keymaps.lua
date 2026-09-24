@@ -62,7 +62,15 @@ end, { desc = "Open blame PR in browser" })
 map("n", "<Leader>gd", "<cmd>CodeDiff<cr>", { desc = "Git diff view" })
 map("n", "<Leader>gh", "<cmd>CodeDiff history<cr>", { desc = "File git history" })
 map("n", "<Leader>gH", "<cmd>CodeDiff history<cr>", { desc = "Branch git history" })
-map("n", "<Leader>gx", "<cmd>CodeDiff q<cr>", { desc = "Close diff view" })
+map("n", "<Leader>gx", function()
+	local ok, lifecycle = pcall(require, "codediff.ui.lifecycle")
+	local tabpage = vim.api.nvim_get_current_tabpage()
+	if not ok or not lifecycle.get_session(tabpage) then
+		vim.notify("Current tab is not a CodeDiff view", vim.log.levels.WARN)
+		return
+	end
+	lifecycle.close(tabpage)
+end, { desc = "Close diff view" })
 
 -- Lazygit
 map("n", "<Leader>gl", function()
