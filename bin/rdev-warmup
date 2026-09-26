@@ -1,0 +1,80 @@
+#!/bin/bash
+
+set -euo pipefail
+
+export PATH="/usr/local/linkedin/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+readonly rexec_bin="/usr/local/linkedin/bin/rexec"
+readonly rdev_info_bin="$HOME/.config/bin/rdev-info"
+readonly sync_timeout_seconds=60
+
+case "${1:-}" in
+    campaign-manager-web)
+        workspace="$HOME/code/campaign-manager-web"
+        stream_command=(bash -lc "exec env BUILD_TESTS=true ember s")
+        ;;
+    lms-measurement-web)
+        workspace="$HOME/code/lms-measurement-web"
+        stream_command=()
+        ;;
+    *)
+        echo "Usage: rdev-warmup {campaign-manager-web|lms-measurement-web}" >&2
+        exit 2
+        ;;
+esac
+
+if [[ ! -x "$rexec_bin" ]]; then
+    echo "rdev-warmup: rexec not found at $rexec_bin" >&2
+    exit 1
+fi
+
+if [[ ! -x "$rdev_info_bin" ]]; then
+    echo "rdev-warmup: rdev-info not found at $rdev_info_bin" >&2
+    exit 1
+fi
+
+if [[ ! -d "$workspace" ]]; then
+    echo "rdev-warmup: workspace not found: $workspace" >&2
+    exit 1
+fi
+
+cd "$workspace"
+echo "rdev-warmup: fetching origin/master for ${1} at $(date)"
+git fetch origin master:refs/remotes/origin/master
+
+echo "rdev-warmup: recreating the rdev and installing dependencies"
+"$rexec_bin" --recreate -- yarn
+
+echo "rdev-warmup: starting continuous two-way sync"
+"$rexec_bin" --stream-changes -- "${stream_command[@]}" &
+stream_pid=$!
+
+cleanup() {
+    if kill -0 "$stream_pid" 2>/dev/null; then
+        kill "$stream_pid"
+    fi
+}
+trap cleanup EXIT INT TERM
+
+deadline=$((SECONDS + sync_timeout_seconds))
+while ((SECONDS < deadline)); do
+    if ! kill -0 "$stream_pid" 2>/dev/null; then
+        wait "$stream_pid"
+        exit $?
+    fi
+
+    sync_status=$("$rdev_info_bin" --sync-status --path "$workspace")
+    sync_category=$(jq -r '.category' <<<"$sync_status")
+    echo "rdev-warmup: sync status is $sync_category"
+
+    if [[ "$sync_category" == "healthy" ]]; then
+        echo "rdev-warmup: ${1} is synced both ways at $(date)"
+        wait "$stream_pid"
+        exit $?
+    fi
+
+    sleep 5
+done
+
+echo "rdev-warmup: two-way sync did not become healthy within ${sync_timeout_seconds} seconds" >&2
+exit 1
