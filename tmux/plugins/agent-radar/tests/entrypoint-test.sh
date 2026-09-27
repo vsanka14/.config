@@ -35,6 +35,9 @@ case "$command" in
   set-hook)
     printf '%s\n' "$*" >>"$state/hooks"
     ;;
+  run-shell)
+    printf '%s\n' "$*" >>"$state/run-shell"
+    ;;
   *)
     exit 1
     ;;
@@ -57,9 +60,13 @@ status_file=$temp_dir/state/status-right
   exit 1
 }
 
-count=$(grep -o -- '--tmux-status-cached' "$status_file" | wc -l | tr -d ' ')
+count=$(grep -oF '#{@agent-radar-status}' "$status_file" | wc -l | tr -d ' ')
 [ "$count" = 1 ] || {
-  printf 'not ok - status fragment was injected %s times\n' "$count" >&2
+  printf 'not ok - direct status fragment was injected %s times\n' "$count" >&2
+  exit 1
+}
+grep -Fq -- '--refresh' "$temp_dir/state/run-shell" || {
+  printf 'not ok - initial status publication was not scheduled\n' >&2
   exit 1
 }
 

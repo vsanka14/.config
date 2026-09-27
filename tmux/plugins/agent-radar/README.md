@@ -8,8 +8,14 @@ tmux, and jumping to them from an fzf popup.
 - `agent-radar.tmux` owns the popup binding and one `status-right` fragment.
 - `bin/agent-radar`, `bin/agent-radar-hook`, and `bin/agent-radar-setup` are
   stable wrappers that use the installed Rust binary by default.
-- `Cargo.toml` and `src/` contain the Rust engine, hook, setup, popup, rendering,
-  process detection, state, cache, and notification implementation.
+- `src/model.rs` and `src/config.rs` define shared domain values and runtime
+  configuration without performing I/O.
+- `src/render.rs`, `src/scan.rs`, `src/status.rs`, and `src/notify.rs` own
+  presentation, pane-state assembly, status access, and notification policy.
+- `src/hooks.rs`, `src/refresh.rs`, and `src/setup.rs` coordinate the Copilot
+  lifecycle, cached status publication, and installation workflows.
+- `src/state.rs`, `src/tmux.rs`, and `src/popup.rs` isolate filesystem, tmux,
+  process, and fzf integration. `src/lib.rs` is the small public facade.
 - The previous shell implementation is preserved on the
   `vsankar/agent-radar-shell-legacy` branch.
 - Runtime state defaults to
@@ -103,4 +109,6 @@ install -m 755 target/release/agent-radar bin/agent-radar-rust
 ```
 
 The suite also guards the hot paths: cached status paints must not invoke tmux,
-and full scans must not resolve tmux options at runtime.
+and full scans must not resolve tmux options at runtime. Normal status paints
+read a session-scoped tmux option directly, so switching sessions does not
+start a process or wait for an asynchronous `#()` result.

@@ -84,7 +84,7 @@ tmux set-hook -g 'session-created[90]' "$refresh_hook"
 tmux set-hook -g 'session-closed[90]' "$refresh_hook"
 tmux set-hook -g 'session-renamed[90]' "$refresh_hook"
 
-fragment="#($engine_command --tmux-status-cached #{q:session_name})"
+fragment='#{@agent-radar-status}'
 status_right=$(tmux show-option -gqv status-right)
 previous_fragment=$(tmux show-option -gqv @agent-radar-fragment)
 if [ -n "$previous_fragment" ]; then
@@ -102,3 +102,5 @@ if [ "$(option @agent-radar-status 'on')" = on ]; then
 else
   tmux set-option -g status-right "$status_right"
 fi
+
+tmux run-shell -b "$engine_command --refresh"
