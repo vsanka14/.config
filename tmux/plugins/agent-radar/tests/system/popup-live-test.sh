@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-plugin_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-engine=$plugin_dir/bin/agent-radar
+plugin_dir=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+engine=${AGENT_RADAR_BIN:-$plugin_dir/bin/agent-radar}
 temp_dir=$(mktemp -d)
 server=agent-radar-popup-$$
 trap 'tmux -L "$server" kill-server 2>/dev/null || true; rm -rf "$temp_dir"' EXIT

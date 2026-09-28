@@ -2,13 +2,13 @@
 
 set -euo pipefail
 
-plugin_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+plugin_dir=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+candidate=${AGENT_RADAR_BIN:-$plugin_dir/bin/agent-radar}
 temp_dir=$(mktemp -d)
 trap 'rm -rf "$temp_dir"' EXIT
 
 if grep -R -n -E '(\$HOME/\.config|~/\.config|sketchybar|bin/tmux-agent-(engine|status))' \
   "$plugin_dir/agent-radar.tmux" \
-  "$plugin_dir/bin" \
   "$plugin_dir/src"; then
   printf 'not ok - plugin boundary violation\n' >&2
   exit 1
@@ -16,11 +16,17 @@ fi
 
 # Copy the plugin into isolation, excluding the Rust build directory: it is
 # ~300MB / 14k files, would slow this copy to minutes, and triggers a large
-# antivirus scan burst. The relocated engine resolves its binary through
-# bin/agent-radar -> bin/agent-radar-rust and never needs target/.
+# antivirus scan burst. Install the validated candidate into the relocated
+# plugin so the smoke test exercises the same single-binary layout as runtime.
 copy_dir=$temp_dir/agent-radar
 mkdir -p "$copy_dir"
-tar -C "$plugin_dir" --exclude './target' -cf - . | tar -C "$copy_dir" -xf -
+tar -C "$plugin_dir" \
+  --exclude './target' \
+  --exclude './bin/agent-radar' \
+  --exclude './bin/agent-radar-hook' \
+  -cf - . |
+  tar -C "$copy_dir" -xf -
+install -m 755 "$candidate" "$copy_dir/bin/agent-radar"
 
 # Relocation smoke test: prove the plugin renders from a fresh location with no
 # dependency on its original path. The full engine-test suite already ran
@@ -71,8 +77,7 @@ jq -n '{pane_id:"%2",session_id:"test",status:"working",event:"test",updated_at:
   >"$state_dir/2.json"
 
 render=$(
-  env -u AGENT_RADAR_RUST_BIN \
-    FIXTURE_DIR="$fixture_dir" \
+  FIXTURE_DIR="$fixture_dir" \
     TMUX_AGENT_ENGINE_TMUX_BIN="$fixture_dir/fake-tmux" \
     TMUX_AGENT_ENGINE_PS_FILE="$fixture_dir/processes" \
     TMUX_AGENT_ENGINE_STATE_DIR="$state_dir" \

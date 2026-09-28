@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-RUST_BIN=${AGENT_RADAR_RUST_BIN:-$SCRIPT_DIR/agent-radar-rust}
-[ -x "$RUST_BIN" ] || {
-  printf 'agent-radar-setup: missing Rust binary at %s\n' "$RUST_BIN" >&2
-  exit 1
-}
-AGENT_RADAR_HOOK_BIN="$SCRIPT_DIR/agent-radar-hook" exec "$RUST_BIN" setup "$@"

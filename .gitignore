@@ -10,4 +10,6 @@ DUAL_REMOTE.md
 zsh/.zsh_history
 zsh/.zcompdump*
 tmux/plugins/agent-radar/target/
-tmux/plugins/agent-radar/bin/agent-radar-rust
+tmux/plugins/agent-radar/bin/agent-radar
+# Current Copilot sessions may retain the pre-consolidation hook path.
+tmux/plugins/agent-radar/bin/agent-radar-hook

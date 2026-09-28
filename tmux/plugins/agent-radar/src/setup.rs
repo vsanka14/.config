@@ -7,11 +7,11 @@ use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-pub fn descriptor(config: &Config, hook: &Path) -> Value {
+pub fn descriptor(config: &Config, executable: &Path) -> Value {
     let command = format!(
-        "env AGENT_RADAR_STATE_DIR={} {}",
+        "env AGENT_RADAR_STATE_DIR={} {} hook",
         shell_quote(&config.state_dir.to_string_lossy()),
-        shell_quote(&hook.to_string_lossy())
+        shell_quote(&executable.to_string_lossy())
     );
     let events = [
         "sessionStart",
@@ -54,7 +54,7 @@ fn shell_quote(value: &str) -> String {
 pub fn install(
     config: &Config,
     descriptor_path: &Path,
-    hook: &Path,
+    executable: &Path,
     legacy: &Path,
 ) -> io::Result<()> {
     state::secure_dir(&config.state_dir)?;
@@ -65,12 +65,13 @@ pub fn install(
     state::secure_dir(parent)?;
     state::atomic_write(
         descriptor_path,
-        &serde_json::to_vec_pretty(&descriptor(config, hook)).expect("descriptor serialization"),
+        &serde_json::to_vec_pretty(&descriptor(config, executable))
+            .expect("descriptor serialization"),
     )?;
     state::clean_legacy(legacy, &config.state_dir)
 }
 
-pub fn doctor(config: &Config, descriptor_path: &Path, hook: &Path) -> (String, bool) {
+pub fn doctor(config: &Config, descriptor_path: &Path, executable: &Path) -> (String, bool) {
     let mut lines = Vec::new();
     let mut ok = true;
     for (name, executable) in [("tmux", config.tmux.as_str()), ("fzf", "fzf")] {
@@ -86,7 +87,7 @@ pub fn doctor(config: &Config, descriptor_path: &Path, hook: &Path) -> (String, 
     let valid_descriptor = fs::read(descriptor_path)
         .ok()
         .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
-        .is_some_and(|value| value == descriptor(config, hook));
+        .is_some_and(|value| value == descriptor(config, executable));
     lines.push(format!(
         "{} - Copilot hook descriptor",
         if valid_descriptor { "ok" } else { "not ok" }
@@ -121,7 +122,7 @@ pub fn install_default(config: &Config) -> Result<PathBuf, String> {
     install(
         &configured_setup_config(config),
         &descriptor,
-        &hook_path()?,
+        &executable_path()?,
         &legacy_state_dir(),
     )
     .map_err(|error| error.to_string())?;
@@ -132,7 +133,7 @@ pub fn doctor_default(config: &Config) -> Result<(String, bool), String> {
     Ok(doctor(
         &configured_setup_config(config),
         &descriptor_path(),
-        &hook_path()?,
+        &executable_path()?,
     ))
 }
 
@@ -153,15 +154,11 @@ fn descriptor_path() -> PathBuf {
         })
 }
 
-fn hook_path() -> Result<PathBuf, String> {
-    if let Some(path) = env::var_os("AGENT_RADAR_HOOK_BIN") {
+fn executable_path() -> Result<PathBuf, String> {
+    if let Some(path) = env::var_os("AGENT_RADAR_BIN") {
         return Ok(path.into());
     }
-    let binary = env::current_exe().map_err(|error| error.to_string())?;
-    Ok(binary
-        .parent()
-        .ok_or_else(|| "agent-radar executable has no parent directory".to_owned())?
-        .join("agent-radar-hook"))
+    env::current_exe().map_err(|error| error.to_string())
 }
 
 fn legacy_state_dir() -> PathBuf {
@@ -194,8 +191,15 @@ mod tests {
     #[test]
     fn makes_descriptor_with_exact_events() {
         let config = Config::from_env();
-        let descriptor = descriptor(&config, Path::new("/hook"));
+        let descriptor = descriptor(&config, Path::new("/agent-radar"));
         assert_eq!(descriptor["hooks"].as_object().expect("hooks").len(), 12);
+        assert_eq!(
+            descriptor["hooks"]["preToolUse"][0]["command"],
+            format!(
+                "env AGENT_RADAR_STATE_DIR={} /agent-radar hook preToolUse",
+                config.state_dir.display()
+            )
+        );
         assert_eq!(
             descriptor["hooks"]["notification"][0]["matcher"],
             "permission_prompt|elicitation_dialog"

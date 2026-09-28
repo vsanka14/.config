@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-plugin_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+plugin_dir=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 temp_dir=$(mktemp -d)
 trap 'rm -rf "$temp_dir"' EXIT
 
@@ -77,7 +77,8 @@ grep -Fq -- '-n M-c display-popup' "$temp_dir/state/bindings" || {
 
 for hook in after-select-pane after-select-window client-session-changed pane-focus-in; do
   grep -Fq -- "$hook" "$temp_dir/state/hooks" &&
-    grep -Fq -- '@agent-radar-runtime-command\}\ --ack-pane\ #\{pane_id\}' "$temp_dir/state/hooks" || {
+    grep -Fq -- '@agent-radar-runtime-command\}\ --ack-pane\ #\{pane_id\}' "$temp_dir/state/hooks" &&
+    grep -Fq -- 'Agent\\\ Radar:\\\ pane\\\ acknowledgement\\\ failed' "$temp_dir/state/hooks" || {
       printf 'not ok - %s acknowledgement hook was not configured\n' "$hook" >&2
       exit 1
     }
@@ -85,7 +86,9 @@ done
 
 for hook in session-created session-closed session-renamed; do
   grep -F -- "$hook" "$temp_dir/state/hooks" |
-    grep -Fq -- '@agent-radar-runtime-command\}\ --refresh\ --notify' || {
+    grep -Fq -- '@agent-radar-runtime-command\}\ --refresh\ --notify' &&
+    grep -F -- "$hook" "$temp_dir/state/hooks" |
+    grep -Fq -- 'Agent\\\ Radar:\\\ status\\\ refresh\\\ failed' || {
       printf 'not ok - %s refresh hook was not configured\n' "$hook" >&2
       exit 1
     }

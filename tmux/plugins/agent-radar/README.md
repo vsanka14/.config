@@ -6,8 +6,8 @@ tmux, and jumping to them from an fzf popup.
 ## Architecture
 
 - `agent-radar.tmux` owns the popup binding and one `status-right` fragment.
-- `bin/agent-radar`, `bin/agent-radar-hook`, and `bin/agent-radar-setup` are
-  stable wrappers that use the installed Rust binary by default.
+- `bin/agent-radar` is the single installed runtime binary. Normal commands,
+  Copilot hooks, and setup use its top-level, `hook`, and `setup` command modes.
 - `src/model.rs` and `src/config.rs` define shared domain values and runtime
   configuration without performing I/O.
 - `src/render.rs`, `src/scan.rs`, `src/status.rs`, and `src/notify.rs` own
@@ -58,8 +58,8 @@ descriptor uses the same directory.
 Install or update the descriptor:
 
 ```bash
-tmux/plugins/agent-radar/bin/agent-radar-setup install
-tmux/plugins/agent-radar/bin/agent-radar-setup doctor
+tmux/plugins/agent-radar/bin/agent-radar setup install
+tmux/plugins/agent-radar/bin/agent-radar setup doctor
 ```
 
 Setup generates the descriptor with the plugin's resolved absolute path,
@@ -74,7 +74,7 @@ Copilot does not expose turn cancellation as a public hook. This setup
 intentionally compensates with an untracked user extension at
 `~/.copilot/extensions/agent-radar/extension.mjs`; it subscribes to the
 Extension SDK's session `abort` event and forwards root-turn cancellation to
-`agent-radar-hook abort`.
+`agent-radar hook abort`.
 
 ## Public commands
 
@@ -105,8 +105,15 @@ newly built `target/release/agent-radar`. It does not change the live plugin.
 After validation passes, install the candidate separately:
 
 ```bash
-install -m 755 target/release/agent-radar bin/agent-radar-rust
+install -m 755 target/release/agent-radar bin/agent-radar
 ```
+
+Behavior tests under `tests/integration/` launch the compiled CLI against
+reusable fake tmux, process, session, and pane fixtures. They assert public
+commands, hook input, generated descriptors, and session-scoped status output
+rather than calling implementation modules. Shell tests under `tests/system/`
+remain only for the actual tmux entrypoint, live fzf/tmux integration, and
+plugin relocation boundaries.
 
 The suite also guards the hot paths: cached status paints must not invoke tmux,
 and full scans must not resolve tmux options at runtime. Normal status paints
