@@ -95,17 +95,19 @@ end
 
 local function wrap_text(text, width)
 	local lines = {}
-	local line = ""
-	for word in text:gmatch("%S+") do
-		local candidate = line == "" and word or (line .. " " .. word)
-		if line ~= "" and vim.fn.strdisplaywidth(candidate) > width then
-			table.insert(lines, line)
-			line = word
-		else
-			line = candidate
+	for raw_line in (text .. "\n"):gmatch("(.-)\n") do
+		local line = ""
+		for word in raw_line:gmatch("%S+") do
+			local candidate = line == "" and word or (line .. " " .. word)
+			if line ~= "" and vim.fn.strdisplaywidth(candidate) > width then
+				table.insert(lines, line)
+				line = word
+			else
+				line = candidate
+			end
 		end
+		table.insert(lines, line)
 	end
-	table.insert(lines, line)
 	return lines
 end
 
@@ -152,13 +154,55 @@ local function render_all()
 		render_buffer(bufnr)
 	end
 end
-local function input_comment(default, on_submit)
-	vim.ui.input({ prompt = "Review comment: ", default = default }, function(text)
-		text = text and trim(text) or ""
+local function edit_comment(default, on_submit)
+	local width = math.max(1, math.min(80, vim.o.columns - 8))
+	local height = math.max(1, math.min(10, vim.o.lines - 8))
+	local buf = vim.api.nvim_create_buf(false, true)
+	local win = vim.api.nvim_open_win(buf, true, {
+		relative = "editor",
+		width = width,
+		height = height,
+		col = math.floor((vim.o.columns - width) / 2),
+		row = math.floor((vim.o.lines - height) / 2),
+		style = "minimal",
+		border = "rounded",
+		title = " Review comment ",
+		title_pos = "center",
+	})
+	vim.bo[buf].buftype = "nofile"
+	vim.bo[buf].bufhidden = "wipe"
+	vim.bo[buf].filetype = "markdown"
+	vim.wo[win].wrap = true
+	vim.wo[win].linebreak = true
+
+	if default then
+		vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(default, "\n", { plain = true }))
+	end
+
+	local function close()
+		if vim.api.nvim_win_is_valid(win) then
+			vim.api.nvim_win_close(win, true)
+		elseif vim.api.nvim_buf_is_valid(buf) then
+			vim.api.nvim_buf_delete(buf, { force = true })
+		end
+	end
+	local function submit()
+		local text = trim(table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n"))
 		if text ~= "" then
+			close()
 			on_submit(text)
 		end
-	end)
+	end
+
+	vim.keymap.set({ "n", "i" }, "<C-s>", submit, { buffer = buf, desc = "Save review comment" })
+	vim.keymap.set("n", "q", close, { buffer = buf, desc = "Cancel review comment" })
+	vim.keymap.set("n", "<Esc>", close, { buffer = buf, desc = "Cancel review comment" })
+	if default then
+		local last_line = vim.api.nvim_buf_line_count(buf)
+		local last_text = vim.api.nvim_buf_get_lines(buf, last_line - 1, last_line, false)[1]
+		vim.api.nvim_win_set_cursor(win, { last_line, #(last_text or "") })
+	end
+	vim.cmd.startinsert()
 end
 
 function M.add(use_visual_range)
@@ -183,7 +227,7 @@ function M.add(use_visual_range)
 	line = math.max(1, math.min(line, line_count))
 	line_end = math.max(line, math.min(line_end, line_count))
 	local source = vim.api.nvim_buf_get_lines(bufnr, line - 1, line_end, false)
-	input_comment(nil, function(text)
+	edit_comment(nil, function(text)
 		table.insert(comments, {
 			git_root = context.git_root,
 			path = context.path,
@@ -275,7 +319,7 @@ function M.edit_at_cursor()
 		return
 	end
 
-	input_comment(comment.text, function(text)
+	edit_comment(comment.text, function(text)
 		comment.text = text
 		render_buffer(bufnr)
 	end)
