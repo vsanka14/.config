@@ -16,13 +16,21 @@ local function notify(message, level)
 end
 
 local function normalize_repo_path(git_root, path)
-	local root = vim.fs.normalize(git_root):gsub("/$", "")
+	local root = vim.fs.normalize(git_root):gsub("/+$", "")
+	if root == "" then
+		root = "/"
+	end
 	local normalized = vim.fs.normalize(path):gsub("^%./", "")
-	local prefix = root .. "/"
+	local prefix = root == "/" and root or (root .. "/")
 	if normalized:sub(1, #prefix) == prefix then
 		return normalized:sub(#prefix + 1)
 	end
 	return normalized
+end
+
+local function normalize_git_root(git_root)
+	local normalized = vim.fs.normalize(git_root):gsub("/+$", "")
+	return normalized ~= "" and normalized or "/"
 end
 
 local function session_path(ref)
@@ -62,11 +70,12 @@ local function get_context(bufnr)
 		return nil, "Select a file in CodeDiff before adding a comment"
 	end
 
+	local git_root = normalize_git_root(session.git_root)
 	return {
 		bufnr = bufnr,
-		git_root = session.git_root,
-		path = normalize_repo_path(session.git_root, path),
-		file_key = normalize_repo_path(session.git_root, modified_path or path),
+		git_root = git_root,
+		path = normalize_repo_path(git_root, path),
+		file_key = normalize_repo_path(git_root, modified_path or path),
 		side = side,
 	}
 end
@@ -462,10 +471,74 @@ restore_comments = function()
 		return
 	end
 
-	comments = state.comments
-	next_id = tonumber(state.next_id) or 1
-	for _, comment in ipairs(comments) do
-		next_id = math.max(next_id, (tonumber(comment.id) or 0) + 1)
+	local restored = {}
+	local restored_next_id = 1
+	local skipped = 0
+	for _, comment in ipairs(state.comments) do
+		local valid = type(comment) == "table"
+		local id = valid and tonumber(comment.id) or nil
+		local line = valid and tonumber(comment.line) or nil
+		local line_end = valid and tonumber(comment.line_end) or nil
+		valid = valid
+			and id
+			and id >= 1
+			and id % 1 == 0
+			and type(comment.git_root) == "string"
+			and comment.git_root ~= ""
+			and type(comment.path) == "string"
+			and comment.path ~= ""
+			and type(comment.file_key) == "string"
+			and comment.file_key ~= ""
+			and (comment.side == "old" or comment.side == "new")
+			and line
+			and line >= 1
+			and line % 1 == 0
+			and line_end
+			and line_end >= line
+			and line_end % 1 == 0
+			and type(comment.source) == "table"
+			and type(comment.text) == "string"
+			and trim(comment.text) ~= ""
+
+		local source = {}
+		if valid then
+			for _, source_line in ipairs(comment.source) do
+				if type(source_line) ~= "string" then
+					valid = false
+					break
+				end
+				table.insert(source, source_line)
+			end
+		end
+
+		if valid then
+			local git_root = normalize_git_root(comment.git_root)
+			table.insert(restored, {
+				id = id,
+				git_root = git_root,
+				path = normalize_repo_path(git_root, comment.path),
+				file_key = normalize_repo_path(git_root, comment.file_key),
+				side = comment.side,
+				line = line,
+				line_end = line_end,
+				source = source,
+				text = comment.text,
+			})
+			restored_next_id = math.max(restored_next_id, id + 1)
+		else
+			skipped = skipped + 1
+		end
+	end
+
+	comments = restored
+	local persisted_next_id = tonumber(state.next_id)
+	if not persisted_next_id or persisted_next_id < 1 or persisted_next_id % 1 ~= 0 then
+		persisted_next_id = 1
+	end
+	next_id = math.max(persisted_next_id, restored_next_id)
+	if skipped > 0 then
+		local suffix = skipped == 1 and "" or "s"
+		notify(string.format("Ignored %d invalid persisted review comment%s", skipped, suffix), vim.log.levels.WARN)
 	end
 end
 
@@ -719,34 +792,42 @@ function M.review_summary()
 end
 
 local function attach_buffer(bufnr)
-	if not vim.api.nvim_buf_is_valid(bufnr) then
+	if type(bufnr) ~= "number" or not vim.api.nvim_buf_is_valid(bufnr) then
 		return
 	end
 
-	vim.b[bufnr].diff_review_attached = true
-	vim.keymap.set("n", "<leader>gc", function()
-		M.add(false)
-	end, { buffer = bufnr, desc = "Add diff review comment" })
-	vim.keymap.set("x", "<leader>gc", function()
-		M.add(true)
-	end, { buffer = bufnr, desc = "Add diff review comment" })
-	vim.keymap.set("n", "<leader>ge", M.edit_at_cursor, { buffer = bufnr, desc = "Edit diff review comment" })
-	vim.keymap.set("n", "<leader>gD", M.delete_at_cursor, { buffer = bufnr, desc = "Delete diff review comment" })
-	vim.keymap.set("n", "<leader>gS", M.review_summary, { buffer = bufnr, desc = "Review comment summary" })
-	vim.keymap.set("n", "<leader>gs", M.send, { buffer = bufnr, desc = "Send review comments to Copilot" })
-	vim.keymap.set("n", "<leader>gC", M.clear, { buffer = bufnr, desc = "Clear diff review comments" })
-	vim.keymap.set("n", "]r", M.next_comment, { buffer = bufnr, desc = "Next diff review comment" })
-	vim.keymap.set("n", "[r", M.previous_comment, { buffer = bufnr, desc = "Previous diff review comment" })
+	if not get_context(bufnr) then
+		return
+	end
+
+	if not vim.b[bufnr].diff_review_attached then
+		vim.b[bufnr].diff_review_attached = true
+		vim.keymap.set("n", "<leader>gc", function()
+			M.add(false)
+		end, { buffer = bufnr, desc = "Add diff review comment" })
+		vim.keymap.set("x", "<leader>gc", function()
+			M.add(true)
+		end, { buffer = bufnr, desc = "Add diff review comment" })
+		vim.keymap.set("n", "<leader>ge", M.edit_at_cursor, { buffer = bufnr, desc = "Edit diff review comment" })
+		vim.keymap.set("n", "<leader>gD", M.delete_at_cursor, { buffer = bufnr, desc = "Delete diff review comment" })
+		vim.keymap.set("n", "<leader>gS", M.review_summary, { buffer = bufnr, desc = "Review comment summary" })
+		vim.keymap.set("n", "<leader>gs", M.send, { buffer = bufnr, desc = "Send review comments to Copilot" })
+		vim.keymap.set("n", "<leader>gC", M.clear, { buffer = bufnr, desc = "Clear diff review comments" })
+		vim.keymap.set("n", "]r", M.next_comment, { buffer = bufnr, desc = "Next diff review comment" })
+		vim.keymap.set("n", "[r", M.previous_comment, { buffer = bufnr, desc = "Previous diff review comment" })
+	end
+
 	render_buffer(bufnr)
 end
 
-function M.setup()
-	restore_comments()
-	local group = vim.api.nvim_create_augroup("diff_review", { clear = true })
-
+local function setup_highlights()
 	vim.api.nvim_set_hl(0, "DiffReviewBubbleBorder", { default = true, link = "DiagnosticInfo" })
 	vim.api.nvim_set_hl(0, "DiffReviewBubbleText", { default = true, link = "NormalFloat" })
 	vim.api.nvim_set_hl(0, "DiffReviewSidebarBadge", { default = true, link = "DiagnosticInfo" })
+end
+
+local function setup_autocmds()
+	local group = vim.api.nvim_create_augroup("diff_review", { clear = true })
 
 	vim.api.nvim_create_autocmd("User", {
 		group = group,
@@ -770,13 +851,27 @@ function M.setup()
 			if not package.loaded["codediff.ui.lifecycle"] then
 				return
 			end
-			local context = get_context(args.buf)
-			if context then
-				attach_buffer(args.buf)
-			end
+			attach_buffer(args.buf)
 		end,
 	})
 
+	vim.api.nvim_create_autocmd("BufDelete", {
+		group = group,
+		callback = function(args)
+			rendered_buffers[args.buf] = nil
+		end,
+	})
+
+	vim.api.nvim_create_autocmd("ColorScheme", {
+		group = group,
+		callback = setup_highlights,
+	})
+end
+
+function M.setup()
+	restore_comments()
+	setup_highlights()
+	setup_autocmds()
 end
 
 return M
