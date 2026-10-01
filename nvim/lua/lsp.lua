@@ -76,8 +76,32 @@ vim.lsp.config("rust_analyzer", {
 	root_markers = { "Cargo.toml", "rust-project.json", ".git" },
 })
 
--- Enable all non-jdtls servers (jdtls is managed by nvim-jdtls plugin)
-vim.lsp.enable({ "vtsls", "lua_ls", "ember", "rust_analyzer" })
+-- Non-jdtls servers (jdtls is managed by nvim-jdtls plugin)
+local servers = { "vtsls", "lua_ls", "ember", "rust_analyzer" }
+
+-- LSP is off by default (trying a no-LSP flow). Configs above stay intact;
+-- toggle on with :LspToggle, or set `vim.g.lsp_enabled = true` before this file loads.
+if vim.g.lsp_enabled == nil then
+	vim.g.lsp_enabled = false
+end
+
+if vim.g.lsp_enabled then
+	vim.lsp.enable(servers)
+end
+
+vim.api.nvim_create_user_command("LspToggle", function()
+	vim.g.lsp_enabled = not vim.g.lsp_enabled
+	vim.lsp.enable(servers, vim.g.lsp_enabled)
+	if not vim.g.lsp_enabled then
+		for _, client in ipairs(vim.lsp.get_clients()) do
+			client:stop()
+		end
+	else
+		-- Re-trigger attach for the current buffer's filetype
+		vim.cmd("edit")
+	end
+	vim.notify("LSP " .. (vim.g.lsp_enabled and "enabled" or "disabled"), vim.log.levels.INFO)
+end, { desc = "Toggle LSP servers on/off" })
 
 -- LspAttach keymaps and features
 vim.api.nvim_create_autocmd("LspAttach", {
