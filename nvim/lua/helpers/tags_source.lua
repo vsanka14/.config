@@ -84,7 +84,10 @@ function Source:enabled()
 end
 
 function Source:get_completions(_, callback)
-	local empty = { is_incomplete_forward = false, is_incomplete_backward = false, items = {} }
+	-- Mark the "nothing yet" result incomplete so blink keeps re-querying as the
+	-- keyword grows past min_keyword; a complete empty list would be cached and
+	-- never refreshed, so completions would never appear.
+	local empty = { is_incomplete_forward = true, is_incomplete_backward = true, items = {} }
 
 	local col = vim.api.nvim_win_get_cursor(0)[2]
 	local before = vim.api.nvim_get_current_line():sub(1, col)
