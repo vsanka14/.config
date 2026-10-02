@@ -13,6 +13,30 @@ autocmd({ "FocusGained", "BufEnter", "CursorHold", "CursorHoldI" }, {
 	desc = "Auto refresh buffer if file changed on disk",
 })
 
+-- Refresh the ctags index in the background when focus returns to nvim (e.g.
+-- switching back from the AI agent pane). Reuses gutentags' async full regen
+-- (~10s, non-blocking) rather than maintaining an incremental index. Debounced
+-- so rapid pane-hopping can't thrash; the buffer-local command only exists in
+-- gutentags-managed buffers, which also gates this to real projects.
+local tags_refresh_group = augroup("tags_auto_refresh", { clear = true })
+local last_tags_refresh = 0
+
+autocmd("FocusGained", {
+	group = tags_refresh_group,
+	callback = function()
+		if vim.fn.exists(":GutentagsUpdate") == 0 then
+			return
+		end
+		local now = os.time()
+		if now - last_tags_refresh < 30 then
+			return
+		end
+		last_tags_refresh = now
+		vim.cmd("silent! GutentagsUpdate!")
+	end,
+	desc = "Background ctags refresh on focus (debounced)",
+})
+
 -- Reapply italic highlights on colorscheme change
 autocmd("ColorScheme", {
 	group = augroup("italic_highlights", { clear = true }),

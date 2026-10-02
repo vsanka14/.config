@@ -258,5 +258,32 @@ map("n", "<Leader>q,", "<cmd>TrinoPrev<cr>", { desc = "Trino: Previous result" }
 -- Clear search highlights
 map("n", "<Esc>", "<cmd>nohlsearch | redrawstatus<cr>", { desc = "Clear highlights" })
 
+-- No-LSP navigation via ctags + ripgrep. When an LSP attaches, its buffer-local
+-- gd/gr (lua/lsp.lua) override these, so both flows coexist.
+
+-- Drop Neovim's LSP-only gr-prefix defaults so a bare `gr` fires without delay.
+for _, lhs in ipairs({ "grr", "gra", "grn", "gri", "grt" }) do
+	for _, mode in ipairs({ "n", "x" }) do
+		pcall(vim.keymap.del, mode, lhs)
+	end
+end
+
+map("n", "gd", function()
+	require("helpers.tags").goto_definition()
+end, { desc = "Go to definition (ctags)" })
+
+map("n", "<C-]>", function()
+	require("helpers.tags").goto_definition()
+end, { desc = "Go to definition (ctags)" })
+
+map("n", "gr", function()
+	local word = vim.fn.expand("<cword>")
+	if word ~= "" then
+		MiniPick.builtin.grep({ pattern = "\\b" .. word .. "\\b" })
+	end
+end, { desc = "Find references (ripgrep)" })
+
+map("n", "<Leader>ft", "<cmd>GutentagsUpdate!<cr>", { desc = "Regenerate tags" })
+
 -- Zen mode (centered buffer, dimmed UI)
 map("n", "<Leader>z", "<cmd>ZenMode<cr>", { desc = "Toggle Zen Mode" })

@@ -1,0 +1,34 @@
+# Universal-ctags global config (auto-loaded from ~/.config/ctags/*.ctags).
+#
+# Drives the no-LSP navigation flow: `gd` / <C-]> tag jumps and tags-based
+# completion. gutentags feeds ctags an explicit `git ls-files` list per repo,
+# so the --exclude rules below only apply to ad-hoc recursive runs
+# (e.g. `:GutentagsUpdate` outside a git repo, or manual `ctags -R`).
+
+# Richer tag entries: access, inheritance, line, implementation, signature, etc.
+--fields=+ailmnS
+
+# Emit qualified tags (Class::method) in addition to bare names.
+--extras=+q
+
+# Keep tag file paths relative to the tag file (portable, cache-friendly).
+--tag-relative=yes
+
+# Recurse by default for manual `ctags -R` invocations.
+--recurse=yes
+
+# Skip vendored / generated / build output when ctags does its own walk.
+--exclude=.git
+--exclude=node_modules
+--exclude=bower_components
+--exclude=dist
+--exclude=build
+--exclude=out
+--exclude=target
+--exclude=tmp
+--exclude=vendor
+--exclude=.venv
+--exclude=__pycache__
+--exclude=*.min.js
+--exclude=*.min.css
+--exclude=*.map

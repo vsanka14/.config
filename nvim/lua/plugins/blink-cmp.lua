@@ -11,7 +11,7 @@ return {
 			["<CR>"] = { "accept", "fallback" },
 		},
 		sources = {
-			default = { "lsp", "path", "snippets", "buffer" },
+			default = { "lsp", "path", "snippets", "buffer", "tags" },
 			per_filetype = {
 				markdown = {},
 				mdx = {},
@@ -27,6 +27,18 @@ return {
 					opts = {
 						db_path = vim.fn.expand("~/.cache/meta-gridtable-index/index.sqlite3"),
 						list_limit = 500,
+					},
+				},
+				-- Cross-file symbol completion from the ctags index (no LSP needed).
+				tags = {
+					name = "Tags",
+					module = "helpers.tags_source",
+					min_keyword_length = 3,
+					-- Rank below lsp/snippets/buffer so semantic/local results win.
+					score_offset = -3,
+					opts = {
+						min_keyword = 3,
+						list_limit = 200,
 					},
 				},
 			},

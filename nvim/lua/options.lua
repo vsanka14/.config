@@ -38,6 +38,14 @@ opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
 opt.foldlevel = 99
 opt.foldlevelstart = 99
 
+-- No-LSP navigation: ripgrep for :grep, ctags for tag jumps (gutentags appends
+-- its cached per-repo tagfile to &tags automatically; this is the fallback path).
+if vim.fn.executable("rg") == 1 then
+	opt.grepprg = "rg --vimgrep --smart-case"
+	opt.grepformat = "%f:%l:%c:%m"
+end
+opt.tags = "./tags;,tags"
+
 -- Filetype registration
 vim.filetype.add({
 	extension = {
