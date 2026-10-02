@@ -140,7 +140,7 @@ function Source:get_completions(_, callback)
 			kind = best[name].kind,
 			insertText = name,
 			insertTextFormat = PlainText,
-			labelDetails = { description = "tag" },
+			labelDetails = { description = Kind[best[name].kind] },
 		}
 		if #items >= config.list_limit then
 			break
