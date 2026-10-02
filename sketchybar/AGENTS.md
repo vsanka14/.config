@@ -28,11 +28,17 @@ consumer:
   This dotfiles config sets it to `sketchybar --trigger agent_notify`; Agent Radar
   itself does not know about SketchyBar.
 - **Source of truth**: `plugins/agent.sh` re-derives the icon colour and the
-  notable session list from
+  notable session counts from
   `../tmux/plugins/agent-radar/bin/agent-radar --notify-lines` (which
-  reuses the tmux pill/radar scan and priority folding). Do **not** reimplement
-  the pane scan in the plugin — extend `--notify-lines` instead so the bar and
-  tmux stay in lockstep.
+  reuses the tmux pill/radar scan and priority folding, emitting one `LINE` per
+  session). Do **not** reimplement the pane scan in the plugin — extend
+  `--notify-lines` instead so the bar and tmux stay in lockstep.
+- **Label**: a compact, count-based summary of the notable sessions rather than a
+  list of names, so it never overflows the bar regardless of how many agents are
+  tracked: `⏸ N awaiting` (awaiting only), `✓ M done` (done only), or
+  `⏸ N awaiting  ✓ M done` (both, awaiting first). The plugin counts the engine's
+  `LINE` records; the `label.max_chars` in `sketchybarrc` is just a safety net the
+  counts stay well under.
 - **Item contract**: `agent` is hidden (`drawing=off`) unless there is a
   **notable** agent (awaiting or done). Idle/working-only agents draw nothing, so
   the icon only appears when it needs attention. `plugins/agent.sh` is its single

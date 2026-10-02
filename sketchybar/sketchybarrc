@@ -218,6 +218,9 @@ sketchybar --add bracket clock_container calendar clock \
 # close, coalesced refreshes). A short `update_freq` re-derives from
 # `--notify-lines` so this item self-heals on roughly the same 2-5s cadence as
 # the tmux status pill instead of lingering until the next incidental push.
+# The label is a count-based summary ("⏸ N awaiting  ✓ M done"), so the plugin
+# self-limits width via counts rather than listing names; `label.max_chars`
+# below is only a safety net that the counts stay well under.
 # The Copilot glyph reads a touch heavy, so render it ~2pt below ICON_SIZE.
 AGENT_ICON_SIZE=$(awk -v s="$ICON_SIZE" 'BEGIN { printf "%.1f", s - 2 }')
 sketchybar --add item agent right \
