@@ -80,7 +80,13 @@ local config = {
 local cache = { root = nil, tags = nil }
 local function query_prefix(prefix)
 	local root = cache.root
-	if root and #prefix >= #root and prefix:sub(1, #root) == root then
+	-- Only take the in-memory fast path when the cached root actually has hits.
+	-- An empty cache must never short-circuit: the first scan of a word can come
+	-- back empty transiently (gutentags mid-reindex, just-swapped tagfile, &tags
+	-- not ready yet), and filtering an empty set would keep the whole word empty
+	-- until an unrelated prefix forces a re-query. Falling through re-scans and
+	-- self-heals once the index is readable.
+	if root and cache.tags and #cache.tags > 0 and #prefix >= #root and prefix:sub(1, #root) == root then
 		if prefix == root then
 			return cache.tags
 		end
@@ -100,7 +106,13 @@ local function query_prefix(prefix)
 	if not ok or type(tags) ~= "table" then
 		tags = {}
 	end
-	cache.root, cache.tags = prefix, tags
+	-- Don't cache an empty result as a root; leave the cache unset so the next
+	-- keystroke re-queries instead of filtering nothing.
+	if #tags > 0 then
+		cache.root, cache.tags = prefix, tags
+	else
+		cache.root, cache.tags = nil, nil
+	end
 	return tags
 end
 
