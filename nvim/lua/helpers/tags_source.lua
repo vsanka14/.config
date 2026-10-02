@@ -64,23 +64,57 @@ local config = {
 	list_limit = 200,
 }
 
--- taglist() builds a dict for every match, so a broad prefix (thousands of hits)
--- blocks the UI for ~100ms. Cache the last prefix's raw result so the tags source
--- and the buffer dedupe hook share one lookup per keystroke instead of each doing
--- its own. Keyed by the escaped pattern; a single slot is enough since typing only
--- ever queries the current prefix.
-local tag_cache = { pattern = nil, tags = nil }
+-- taglist() builds a dict for every match and runs on the main thread, so a
+-- broad prefix (thousands of hits) blocks the UI ~10-100ms. Two layers cut that:
+--
+--   1. Prefix-extension cache: taglist("^conv") already returns every conv* tag,
+--      so "conve", "conver", ... are subsets. When the new prefix extends the
+--      cached one we filter the cached result in Lua (sub-ms) instead of paying
+--      another taglist scan, so a word costs one scan at its root, not one per
+--      keystroke. The working set also shrinks as you type.
+--   2. Same-keystroke sharing: the tags source and the buffer dedupe hook both
+--      call this for the current prefix; the second hits the cache for free.
+--
+-- Filtering is case-insensitive (a safe superset); blink's fuzzy matcher does the
+-- final exact narrowing on the returned items.
+local cache = { root = nil, tags = nil }
 local function query_prefix(prefix)
-	local pattern = "^" .. vim.fn.escape(prefix, "\\/.*$^~[]")
-	if tag_cache.pattern == pattern then
-		return tag_cache.tags
+	local root = cache.root
+	if root and #prefix >= #root and prefix:sub(1, #root) == root then
+		if prefix == root then
+			return cache.tags
+		end
+		local lp = prefix:lower()
+		local n = #prefix
+		local filtered = {}
+		for _, t in ipairs(cache.tags) do
+			local name = t.name
+			if name and name:lower():sub(1, n) == lp then
+				filtered[#filtered + 1] = t
+			end
+		end
+		cache.root, cache.tags = prefix, filtered
+		return filtered
 	end
-	local ok, tags = pcall(vim.fn.taglist, pattern)
+	local ok, tags = pcall(vim.fn.taglist, "^" .. vim.fn.escape(prefix, "\\/.*$^~[]"))
 	if not ok or type(tags) ~= "table" then
 		tags = {}
 	end
-	tag_cache.pattern, tag_cache.tags = pattern, tags
+	cache.root, cache.tags = prefix, tags
 	return tags
+end
+
+-- Symbol completion is pure cost (and noise) inside comments and string
+-- literals, which is where prose like commit notes gets typed. A cheap
+-- treesitter node check skips the taglist scan there; if there's no parser the
+-- pcall fails closed and completion proceeds as normal.
+local function in_prose_context()
+	local ok, node = pcall(vim.treesitter.get_node)
+	if not ok or not node then
+		return false
+	end
+	local t = node:type()
+	return t:find("comment") ~= nil or t:find("string") ~= nil
 end
 
 -- Prose filetypes where symbol completion is just noise.
@@ -122,6 +156,11 @@ function Source:get_completions(_, callback)
 	local before = vim.api.nvim_get_current_line():sub(1, col)
 	local prefix = before:match("[%w_]+$")
 	if not prefix or #prefix < config.min_keyword then
+		callback(empty)
+		return
+	end
+
+	if in_prose_context() then
 		callback(empty)
 		return
 	end
