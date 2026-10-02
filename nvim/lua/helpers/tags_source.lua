@@ -60,9 +60,28 @@ local KIND_PRIORITY = {
 local Source = {}
 
 local config = {
-	min_keyword = 3,
+	min_keyword = 4,
 	list_limit = 200,
 }
+
+-- taglist() builds a dict for every match, so a broad prefix (thousands of hits)
+-- blocks the UI for ~100ms. Cache the last prefix's raw result so the tags source
+-- and the buffer dedupe hook share one lookup per keystroke instead of each doing
+-- its own. Keyed by the escaped pattern; a single slot is enough since typing only
+-- ever queries the current prefix.
+local tag_cache = { pattern = nil, tags = nil }
+local function query_prefix(prefix)
+	local pattern = "^" .. vim.fn.escape(prefix, "\\/.*$^~[]")
+	if tag_cache.pattern == pattern then
+		return tag_cache.tags
+	end
+	local ok, tags = pcall(vim.fn.taglist, pattern)
+	if not ok or type(tags) ~= "table" then
+		tags = {}
+	end
+	tag_cache.pattern, tag_cache.tags = pattern, tags
+	return tags
+end
 
 -- Prose filetypes where symbol completion is just noise.
 local DISABLED = {
@@ -107,11 +126,7 @@ function Source:get_completions(_, callback)
 		return
 	end
 
-	local ok, tags = pcall(vim.fn.taglist, "^" .. vim.fn.escape(prefix, "\\/.*$^~[]"))
-	if not ok or type(tags) ~= "table" then
-		callback(empty)
-		return
-	end
+	local tags = query_prefix(prefix)
 
 	-- First pass: collect unique names in first-seen order, upgrading each to
 	-- the highest-priority kind seen across all of its tags.
@@ -149,5 +164,9 @@ function Source:get_completions(_, callback)
 
 	callback({ is_incomplete_forward = true, is_incomplete_backward = true, items = items })
 end
+
+-- Exposed so the buffer provider's dedupe hook can reuse the cached lookup
+-- instead of running a second taglist() per keystroke.
+Source.query_prefix = query_prefix
 
 return Source

@@ -32,15 +32,15 @@ return {
 						local col = vim.api.nvim_win_get_cursor(0)[2]
 						local before = vim.api.nvim_get_current_line():sub(1, col)
 						local prefix = before:match("[%w_]+$")
-						if not prefix or #prefix < 3 then
+						if not prefix or #prefix < 4 then
 							return items
 						end
-						local ok, tags = pcall(vim.fn.taglist, "^" .. vim.fn.escape(prefix, "\\/.*$^~[]"))
-						if not ok or type(tags) ~= "table" then
+						local ok, src = pcall(require, "helpers.tags_source")
+						if not ok then
 							return items
 						end
 						local is_tag = {}
-						for _, t in ipairs(tags) do
+						for _, t in ipairs(src.query_prefix(prefix)) do
 							is_tag[t.name] = true
 						end
 						return vim.tbl_filter(function(it)
@@ -61,12 +61,12 @@ return {
 				tags = {
 					name = "Tags",
 					module = "helpers.tags_source",
-					min_keyword_length = 3,
+					min_keyword_length = 4,
 					-- Above buffer (-3): with LSP off, tags is the symbol authority,
 					-- so its items win dedupe and show the right kind/icon.
 					score_offset = 0,
 					opts = {
-						min_keyword = 3,
+						min_keyword = 4,
 						list_limit = 200,
 					},
 				},
