@@ -23,6 +23,27 @@ local KIND_MAP = {
 	g = Kind.Enum,
 	e = Kind.EnumMember,
 	s = Kind.Struct,
+	M = Kind.Field,
+}
+
+-- A name is often tagged in many places with different kinds (e.g. the real
+-- `const` plus field re-assignments/imports). When deduping, keep the most
+-- meaningful kind so the icon reflects the actual definition, not whichever
+-- tag happened to sort first.
+local KIND_PRIORITY = {
+	c = 9,
+	C = 8,
+	f = 7,
+	F = 7,
+	m = 6,
+	i = 6,
+	g = 5,
+	t = 5,
+	s = 5,
+	e = 4,
+	p = 3,
+	M = 2,
+	v = 1,
 }
 
 --- @class blink.cmp.Source
@@ -79,22 +100,36 @@ function Source:get_completions(_, callback)
 		return
 	end
 
-	local items, seen = {}, {}
+	-- First pass: collect unique names in first-seen order, upgrading each to
+	-- the highest-priority kind seen across all of its tags.
+	local order, best = {}, {}
 	for _, t in ipairs(tags) do
 		local name = t.name
 		-- Skip qualified tags (Foo.bar) so completion inserts plain identifiers.
-		if name and name:match("^[%w_]+$") and not seen[name] then
-			seen[name] = true
-			items[#items + 1] = {
-				label = name,
-				kind = KIND_MAP[t.kind] or Kind.Text,
-				insertText = name,
-				insertTextFormat = PlainText,
-				labelDetails = { description = "tag" },
-			}
-			if #items >= config.list_limit then
-				break
+		if name and name:match("^[%w_]+$") then
+			local prio = KIND_PRIORITY[t.kind] or 0
+			local cur = best[name]
+			if not cur then
+				order[#order + 1] = name
+				best[name] = { kind = KIND_MAP[t.kind] or Kind.Text, prio = prio }
+			elseif prio > cur.prio then
+				cur.kind = KIND_MAP[t.kind] or Kind.Text
+				cur.prio = prio
 			end
+		end
+	end
+
+	local items = {}
+	for _, name in ipairs(order) do
+		items[#items + 1] = {
+			label = name,
+			kind = best[name].kind,
+			insertText = name,
+			insertTextFormat = PlainText,
+			labelDetails = { description = "tag" },
+		}
+		if #items >= config.list_limit then
+			break
 		end
 	end
 
