@@ -10,6 +10,11 @@ return {
 			["<C-l>"] = { "accept", "fallback" },
 			["<CR>"] = { "accept", "fallback" },
 		},
+		-- Surface exact/prefix matches first, then the Rust matcher's score
+		-- (already boosted by proximity + frecency) orders the rest.
+		fuzzy = {
+			sorts = { "exact", "score", "sort_text" },
+		},
 		sources = {
 			default = { "lsp", "path", "snippets", "buffer", "tags" },
 			per_filetype = {
@@ -20,6 +25,29 @@ return {
 				sql = { "gridtable", "lsp", "path", "snippets", "buffer" },
 			},
 			providers = {
+				-- Drop buffer words that are already indexed as tags so the tags
+				-- provider owns them (correct kind/icon) instead of showing a dupe.
+				buffer = {
+					transform_items = function(_, items)
+						local col = vim.api.nvim_win_get_cursor(0)[2]
+						local before = vim.api.nvim_get_current_line():sub(1, col)
+						local prefix = before:match("[%w_]+$")
+						if not prefix or #prefix < 3 then
+							return items
+						end
+						local ok, tags = pcall(vim.fn.taglist, "^" .. vim.fn.escape(prefix, "\\/.*$^~[]"))
+						if not ok or type(tags) ~= "table" then
+							return items
+						end
+						local is_tag = {}
+						for _, t in ipairs(tags) do
+							is_tag[t.name] = true
+						end
+						return vim.tbl_filter(function(it)
+							return not is_tag[it.label]
+						end, items)
+					end,
+				},
 				gridtable = {
 					name = "GridTable",
 					module = "helpers.gridtable",
@@ -34,8 +62,9 @@ return {
 					name = "Tags",
 					module = "helpers.tags_source",
 					min_keyword_length = 3,
-					-- Rank below lsp/snippets/buffer so semantic/local results win.
-					score_offset = -3,
+					-- Above buffer (-3): with LSP off, tags is the symbol authority,
+					-- so its items win dedupe and show the right kind/icon.
+					score_offset = 0,
 					opts = {
 						min_keyword = 3,
 						list_limit = 200,

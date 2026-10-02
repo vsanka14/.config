@@ -24,6 +24,15 @@ local KIND_MAP = {
 	e = Kind.EnumMember,
 	s = Kind.Struct,
 	M = Kind.Field,
+	G = Kind.Property,
+}
+
+-- ctags kinds that are noise for cross-file completion: import aliases (dupes of
+-- the real definition elsewhere), batch labels, and preprocessor/style locals.
+local DROP_KINDS = {
+	a = true,
+	l = true,
+	z = true,
 }
 
 -- A name is often tagged in many places with different kinds (e.g. the real
@@ -40,6 +49,7 @@ local KIND_PRIORITY = {
 	g = 5,
 	t = 5,
 	s = 5,
+	G = 5,
 	e = 4,
 	p = 3,
 	M = 2,
@@ -108,8 +118,9 @@ function Source:get_completions(_, callback)
 	local order, best = {}, {}
 	for _, t in ipairs(tags) do
 		local name = t.name
-		-- Skip qualified tags (Foo.bar) so completion inserts plain identifiers.
-		if name and name:match("^[%w_]+$") then
+		-- Skip qualified tags (Foo.bar) so completion inserts plain identifiers,
+		-- and low-value kinds (imports, labels, style locals).
+		if name and name:match("^[%w_]+$") and not DROP_KINDS[t.kind] then
 			local prio = KIND_PRIORITY[t.kind] or 0
 			local cur = best[name]
 			if not cur then
