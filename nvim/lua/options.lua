@@ -46,6 +46,14 @@ if vim.fn.executable("rg") == 1 then
 end
 opt.tags = "./tags;,tags"
 
+-- Formatter binaries (stylua, sql_formatter, ...) live under this dir. Prepend it
+-- to PATH so conform.nvim can find them now that the mason.nvim plugin (which used
+-- to add this automatically) has been removed from the no-LSP setup.
+local formatter_bin = vim.fn.stdpath("data") .. "/mason/bin"
+if vim.fn.isdirectory(formatter_bin) == 1 and not string.find(vim.env.PATH or "", formatter_bin, 1, true) then
+	vim.env.PATH = formatter_bin .. ":" .. (vim.env.PATH or "")
+end
+
 -- Filetype registration
 vim.filetype.add({
 	extension = {

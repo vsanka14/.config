@@ -16,13 +16,13 @@ return {
 			sorts = { "exact", "score", "sort_text" },
 		},
 		sources = {
-			default = { "lsp", "path", "snippets", "buffer", "tags" },
+			default = { "path", "snippets", "buffer", "tags" },
 			per_filetype = {
 				markdown = {},
 				mdx = {},
 				text = {},
 				-- Offline SQLite-backed dataset-name + column completion.
-				sql = { "gridtable", "lsp", "path", "snippets", "buffer" },
+				sql = { "gridtable", "path", "snippets", "buffer" },
 			},
 			providers = {
 				-- Drop buffer words that are already indexed as tags so the tags

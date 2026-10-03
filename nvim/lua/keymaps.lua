@@ -111,7 +111,7 @@ map("n", "<Leader>e", function()
 	})
 end, { desc = "File Explorer (yazi)" })
 
--- Yank helpers: yank file path, file path w/ code line(s), diagnostics, test module name, etc
+-- Yank helpers: yank file path, file path w/ code line(s), test module name, etc
 map("n", "<Leader>yp", function()
 	require("helpers.yank").copy_path()
 end, { desc = "Copy file path" })
@@ -121,9 +121,6 @@ end, { desc = "Copy absolute file path" })
 map("n", "<Leader>yc", function()
 	require("helpers.yank").copy_path_line()
 end, { desc = "Copy file path:line" })
-map("n", "<Leader>yd", function()
-	require("helpers.yank").copy_diagnostic()
-end, { desc = "Copy diagnostic" })
 map("n", "<Leader>yt", function()
 	require("helpers.ember").copy_test_module()
 end, { desc = "Yank test module name" })
@@ -155,96 +152,6 @@ end, { desc = "Find buffers" })
 map("n", "<Leader>fh", function()
 	MiniPick.builtin.help()
 end, { desc = "Find help" })
-map("n", "<Leader>fd", function()
-	local items = {}
-	for _, d in ipairs(vim.diagnostic.get(nil)) do
-		local fname = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(d.bufnr), ":~:.")
-		local severity = vim.diagnostic.severity[d.severity]
-		table.insert(items, {
-			text = string.format("%s:%d:%d [%s] %s", fname, d.lnum + 1, d.col + 1, severity, d.message),
-			bufnr = d.bufnr,
-			lnum = d.lnum + 1,
-			col = d.col + 1,
-		})
-	end
-	MiniPick.start({
-		source = {
-			name = "Diagnostics",
-			items = items,
-			choose = function(item)
-				vim.api.nvim_set_current_buf(item.bufnr)
-				vim.api.nvim_win_set_cursor(0, { item.lnum, item.col - 1 })
-			end,
-		},
-	})
-end, { desc = "Find diagnostics" })
-
--- LSP
-map("n", "<Leader>lD", function()
-	local bufnr = vim.api.nvim_get_current_buf()
-	local detached = vim.b[bufnr].detached_lsp_clients
-
-	if detached then
-		local names = {}
-		for _, client_id in ipairs(detached) do
-			local client = vim.lsp.get_client_by_id(client_id)
-			if client then
-				vim.lsp.buf_attach_client(bufnr, client_id)
-				table.insert(names, client.name)
-			end
-		end
-		vim.b[bufnr].detached_lsp_clients = nil
-
-		if #names == 0 then
-			vim.notify("LSP clients are no longer running", vim.log.levels.WARN)
-			return
-		end
-		vim.notify("Enabled LSP: " .. table.concat(names, ", "))
-		return
-	end
-
-	local clients = vim.lsp.get_clients({ bufnr = bufnr })
-	if #clients == 0 then
-		vim.notify("No LSP clients attached", vim.log.levels.WARN)
-		return
-	end
-
-	local client_ids = {}
-	local names = {}
-	for _, client in ipairs(clients) do
-		table.insert(client_ids, client.id)
-		table.insert(names, client.name)
-		vim.lsp.buf_detach_client(bufnr, client.id)
-	end
-	vim.b[bufnr].detached_lsp_clients = client_ids
-	vim.notify("Disabled LSP: " .. table.concat(names, ", "))
-end, { desc = "Toggle buffer LSP" })
-
--- DAP (debug adapter)
-map("n", "<Leader>db", function()
-	require("dap").toggle_breakpoint()
-end, { desc = "Toggle breakpoint" })
-map("n", "<Leader>dc", function()
-	require("dap").continue()
-end, { desc = "Continue" })
-map("n", "<Leader>di", function()
-	require("dap").step_into()
-end, { desc = "Step into" })
-map("n", "<Leader>do", function()
-	require("dap").step_over()
-end, { desc = "Step over" })
-map("n", "<Leader>dO", function()
-	require("dap").step_out()
-end, { desc = "Step out" })
-map("n", "<Leader>dr", function()
-	require("dap").repl.open()
-end, { desc = "Open REPL" })
-map("n", "<Leader>dt", function()
-	require("dap").terminate()
-end, { desc = "Terminate" })
-map("n", "<Leader>du", function()
-	require("dapui").toggle()
-end, { desc = "Toggle DAP UI" })
 
 -- Trino (SQL)
 map("n", "<Leader>qr", "<cmd>TrinoRun<cr>", { desc = "Trino: Run query" })
@@ -258,10 +165,10 @@ map("n", "<Leader>q,", "<cmd>TrinoPrev<cr>", { desc = "Trino: Previous result" }
 -- Clear search highlights
 map("n", "<Esc>", "<cmd>nohlsearch | redrawstatus<cr>", { desc = "Clear highlights" })
 
--- No-LSP navigation via ctags + ripgrep. When an LSP attaches, its buffer-local
--- gd/gr (lua/lsp.lua) override these, so both flows coexist.
+-- Navigation via ctags + ripgrep (no LSP on this branch).
 
--- Drop Neovim's LSP-only gr-prefix defaults so a bare `gr` fires without delay.
+-- Drop Neovim's built-in gr-prefix defaults (grr/gra/... call vim.lsp.buf.*) so a
+-- bare `gr` fires the ripgrep references map below without a timeoutlen delay.
 for _, lhs in ipairs({ "grr", "gra", "grn", "gri", "grt" }) do
 	for _, mode in ipairs({ "n", "x" }) do
 		pcall(vim.keymap.del, mode, lhs)

@@ -72,11 +72,6 @@ local hl_defs = {
 	File = { fg = "#c0caf5", bg = "#24283b", bold = true },
 	Git = { fg = "#7aa2f7", bg = "#1a1b26" },
 	GitIcon = { fg = "#e0af68", bg = "#1a1b26" },
-	DiagError = { fg = "#f7768e", bg = "#1a1b26" },
-	DiagWarn = { fg = "#e0af68", bg = "#1a1b26" },
-	DiagInfo = { fg = "#7dcfff", bg = "#1a1b26" },
-	DiagHint = { fg = "#9ece6a", bg = "#1a1b26" },
-	Lsp = { fg = "#565f89", bg = "#1a1b26" },
 	Search = { fg = "#1a1b26", bg = "#ff9e64", bold = true },
 	PosIcon = { fg = "#7aa2f7", bg = "#24283b" },
 	PosLine = { fg = "#c0caf5", bg = "#24283b" },
@@ -105,9 +100,6 @@ end
 -- ============================================================================
 local cache = {
 	git_branch = "",
-	lsp_progress = "",
-	lsp_clients = "",
-	diag = "",
 	rdev_sync_hl = "RdevSyncMissing",
 	rdev_sync_text = "",
 }
@@ -132,74 +124,6 @@ local function update_git_branch()
 			end)
 		end,
 	})
-end
-
-local icons = require("helpers.icons")
-local diag_icons = {
-	{ vim.diagnostic.severity.ERROR, "DiagError", icons[vim.diagnostic.severity.ERROR] .. " " },
-	{ vim.diagnostic.severity.WARN, "DiagWarn", icons[vim.diagnostic.severity.WARN] .. " " },
-	{ vim.diagnostic.severity.INFO, "DiagInfo", icons[vim.diagnostic.severity.INFO] .. " " },
-	{ vim.diagnostic.severity.HINT, "DiagHint", icons[vim.diagnostic.severity.HINT] .. " " },
-}
-
-local function update_diagnostics()
-	local parts = {}
-	for _, d in ipairs(diag_icons) do
-		local count = #vim.diagnostic.get(0, { severity = d[1] })
-		if count > 0 then
-			parts[#parts + 1] = hl(d[2], d[3] .. count .. " ")
-		end
-	end
-	cache.diag = table.concat(parts)
-	vim.cmd.redrawstatus()
-end
-
-local function update_lsp_clients()
-	local clients = vim.lsp.get_clients({ bufnr = 0 })
-	if #clients > 0 then
-		local names = {}
-		for _, c in ipairs(clients) do
-			names[#names + 1] = c.name
-		end
-		cache.lsp_clients = table.concat(names, ", ")
-	else
-		cache.lsp_clients = ""
-	end
-	vim.cmd.redrawstatus()
-end
-
-local lsp_progress_map = {}
-
-local function update_lsp_progress(args)
-	local data = args.data
-	if not data or not data.params then
-		return
-	end
-	local val = data.params.value
-	local id = data.client_id
-	if not val or not id then
-		return
-	end
-
-	if val.kind == "end" then
-		lsp_progress_map[id] = nil
-	else
-		local msg = val.title or ""
-		if val.message then
-			msg = msg .. ": " .. val.message
-		end
-		if val.percentage then
-			msg = msg .. " (" .. val.percentage .. "%%%%)"
-		end
-		lsp_progress_map[id] = msg
-	end
-
-	local msgs = {}
-	for _, msg in pairs(lsp_progress_map) do
-		msgs[#msgs + 1] = msg
-	end
-	cache.lsp_progress = table.concat(msgs, " | ")
-	vim.cmd.redrawstatus()
 end
 
 local rdev_sync_display = {
@@ -303,9 +227,6 @@ end
 
 au({ "BufEnter", "FocusGained", "DirChanged" }, update_git_branch)
 au({ "BufEnter", "FocusGained", "DirChanged" }, update_rdev_sync_status)
-au("DiagnosticChanged", update_diagnostics)
-au({ "LspAttach", "LspDetach", "BufEnter" }, update_lsp_clients)
-au("LspProgress", update_lsp_progress)
 au({ "RecordingEnter", "RecordingLeave" }, function()
 	vim.cmd.redrawstatus()
 end)
@@ -355,13 +276,8 @@ function M.render()
 		left = left .. hl("GitIcon", " \u{e725} ") .. hl("Git", cache.git_branch .. " ")
 	end
 
-	-- Right: diagnostics + lsp + position
-	local right = cache.diag
-	if cache.lsp_progress ~= "" then
-		right = right .. hl("Lsp", " " .. cache.lsp_progress .. " ")
-	elseif cache.lsp_clients ~= "" then
-		right = right .. hl("Lsp", " " .. cache.lsp_clients .. " ")
-	end
+	-- Right: rdev sync + position
+	local right = ""
 
 	local cur = vim.fn.line(".")
 	local total = vim.fn.line("$")
