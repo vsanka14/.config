@@ -35,7 +35,7 @@ return {
 						if not prefix or #prefix < 4 then
 							return items
 						end
-						local ok, src = pcall(require, "helpers.tags_source")
+						local ok, src = pcall(require, "helpers.tags-completion")
 						if not ok then
 							return items
 						end
@@ -60,7 +60,7 @@ return {
 				-- Cross-file symbol completion from the ctags index (no LSP needed).
 				tags = {
 					name = "Tags",
-					module = "helpers.tags_source",
+					module = "helpers.tags-completion",
 					min_keyword_length = 4,
 					-- Above buffer (-3): with LSP off, tags is the symbol authority,
 					-- so its items win dedupe and show the right kind/icon.

@@ -1,4 +1,4 @@
--- helpers/tags_source.lua - blink.cmp completion from the ctags index.
+-- helpers/tags-completion.lua - blink.cmp completion from the ctags index.
 --
 -- Fills the gap LSP leaves while typing: inline completion of symbols defined in
 -- other files. Backed by the same on-disk tags index gutentags builds, so it
