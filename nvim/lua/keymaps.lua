@@ -191,6 +191,3 @@ map("n", "gr", function()
 end, { desc = "Find references (ripgrep)" })
 
 map("n", "<Leader>ft", "<cmd>GutentagsUpdate!<cr>", { desc = "Regenerate tags" })
-
--- Zen mode (centered buffer, dimmed UI)
-map("n", "<Leader>z", "<cmd>ZenMode<cr>", { desc = "Toggle Zen Mode" })
