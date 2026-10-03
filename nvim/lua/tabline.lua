@@ -3,6 +3,39 @@ local M = {}
 local sel_bg = "#1a1b26"
 local fill_bg = "#050505"
 
+-- Keep the MAX_BUFFERS most-recently-used saved files, plus every unsaved file;
+-- unlist the rest so the tabline stays short. Unlisted buffers stay in memory
+-- and reopen with :e / :b. Recency uses Neovim's own `lastused` timestamp, with
+-- the current buffer pinned newest (it isn't stamped until you leave it).
+local MAX_BUFFERS = 4
+
+local function prune()
+	local current = vim.api.nvim_get_current_buf()
+	local files = vim.tbl_filter(function(info)
+		return vim.bo[info.bufnr].buftype == ""
+	end, vim.fn.getbufinfo({ buflisted = 1 }))
+
+	table.sort(files, function(a, b)
+		if a.bufnr == current or b.bufnr == current then
+			return a.bufnr == current
+		end
+		if a.lastused ~= b.lastused then
+			return a.lastused > b.lastused
+		end
+		return a.bufnr > b.bufnr
+	end)
+
+	local kept = 0
+	for _, info in ipairs(files) do
+		if info.changed ~= 1 then
+			kept = kept + 1
+			if kept > MAX_BUFFERS then
+				vim.bo[info.bufnr].buflisted = false
+			end
+		end
+	end
+end
+
 local function setup_highlights()
 	vim.api.nvim_set_hl(0, "TabLineBuf", { fg = "#565f89", bg = fill_bg })
 	vim.api.nvim_set_hl(0, "TabLineBufSel", { fg = "#c0caf5", bg = sel_bg })
@@ -86,6 +119,12 @@ vim.api.nvim_create_autocmd("ColorScheme", {
 		icon_hl_cache = {} -- Reset cache so highlights get recreated with new colors
 		setup_highlights()
 	end,
+})
+
+vim.api.nvim_create_autocmd("BufEnter", {
+	group = vim.api.nvim_create_augroup("tabline_buffer_prune", { clear = true }),
+	callback = prune,
+	desc = "Unlist stale buffers so the tabline stays short",
 })
 
 vim.o.showtabline = 2
