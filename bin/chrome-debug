@@ -1,38 +1,25 @@
 #!/bin/bash
 #
-# chrome-debug — launch a Chrome instance with the DevTools Protocol exposed,
-# print the chosen port to stdout so Claude / Playwright MCP can hook onto it.
-#
-# Several instances can run side-by-side: each launch picks a free port, and
-# the profile directory is the only thing that can collide. Pass an optional
-# name to keep a persistent profile (logins, cookies) across runs of the same
-# name; omit it to get a throwaway temp profile.
+# chrome-debug — launch Chrome with remote debugging on and print the CDP port.
+# Defaults to a debug copy of the vsankar@linkedin.com profile, since Chrome 136+
+# won't expose --remote-debugging-port on the real profile dir. The copy's
+# toolbar chip is renamed "DEBUG" so the window is easy to spot.
 #
 # Usage:
-#   chrome-debug                # ephemeral profile, prints port
+#   chrome-debug                # vsankar@linkedin.com profile, prints port
+#   chrome-debug -e|--ephemeral # throwaway profile, no login
 #   chrome-debug <name>         # named profile at ~/chrome-debug-profiles/<name>
 #   chrome-debug -h | --help
-#
-# Stdout: <port>
-# Stderr: human-readable status line, plus the MCP-add command to copy/paste.
-#
-# Hooking Claude up to the resulting browser:
-#   PORT=$(chrome-debug observe)
-#   claude mcp add playwright-$PORT -- \
-#       npx @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:$PORT
-# Then `/mcp` inside Claude should list the new server. Use a unique MCP name
-# per port if you want multiple browsers wired into one Claude session.
 
 set -euo pipefail
 
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 PROFILE_ROOT="$HOME/chrome-debug-profiles"
+REAL_CHROME_DATA="$HOME/Library/Application Support/Google/Chrome"
+LINKEDIN_EMAIL="vsankar@linkedin.com"
 
 case "${1:-}" in
-    -h|--help)
-        sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'
-        exit 0
-        ;;
+    -h|--help) sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 esac
 
 if [[ ! -x "$CHROME" ]]; then
@@ -40,35 +27,148 @@ if [[ ! -x "$CHROME" ]]; then
     exit 1
 fi
 
-# Resolve profile dir
-if [[ $# -ge 1 ]]; then
-    name="$1"
-    profile_dir="$PROFILE_ROOT/$name"
-    mkdir -p "$profile_dir"
+mode=linkedin
+name=""
+case "${1:-}" in
+    -e|--ephemeral) mode=ephemeral ;;
+    "")             mode=linkedin ;;
+    -*)             echo "chrome-debug: unknown option '$1' (try --help)" >&2; exit 1 ;;
+    *)              mode=named; name="$1" ;;
+esac
 
-    # Refuse if a live Chrome is already holding this profile. Chrome would
-    # reject the launch anyway, but we want a clean error instead of a flapping
-    # window. SingletonLock is a symlink "<host>-<pid>".
-    lock="$profile_dir/SingletonLock"
+# SingletonLock is a symlink "<host>-<pid>"; refuse to reuse a dir a live Chrome
+# still owns, and clear a stale lock otherwise.
+check_singleton() {
+    local dir="$1" label="$2" lock="$1/SingletonLock" pid
     if [[ -L "$lock" ]]; then
-        target=$(readlink "$lock")
-        pid="${target##*-}"
+        pid="$(readlink "$lock")"; pid="${pid##*-}"
         if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
-            echo "chrome-debug: profile '$name' is already in use by Chrome (pid $pid)" >&2
+            echo "chrome-debug: $label is already in use by Chrome (pid $pid)" >&2
             exit 1
         fi
-        rm -f "$lock" "$profile_dir/SingletonCookie" "$profile_dir/SingletonSocket"
+        rm -f "$lock" "$dir/SingletonCookie" "$dir/SingletonSocket"
     fi
-else
-    profile_dir=$(mktemp -d "${TMPDIR:-/tmp}/chrome-debug-XXXXXX")
-fi
+}
 
-# Pick a free TCP port by binding to 0 and reading it back.
+# Render the debug avatar (🐞 on red) once and cache it. Uses headless Chrome so
+# there are no extra dependencies; falls back to a solid red square.
+ensure_debug_avatar() {
+    local out="$1"
+    [[ -s "$out" ]] && return 0
+    local html; html="$(mktemp -t dbgavatar)".html
+    cat >"$html" <<'HTML'
+<!doctype html><meta charset="utf-8">
+<style>html,body{margin:0;width:256px;height:256px;overflow:hidden}
+body{background:#000;display:flex;align-items:center;justify-content:center}
+.e{font-size:170px;line-height:256px}</style>
+<div class="e">🐞</div>
+HTML
+    "$CHROME" --headless --disable-gpu --hide-scrollbars --no-first-run \
+        --force-device-scale-factor=1 --window-size=256,256 \
+        --screenshot="$out" "file://$html" >/dev/null 2>&1 || true
+    rm -f "$html"
+    [[ -s "$out" ]] && return 0
+    # Fallback: solid red PNG.
+    python3 - "$out" <<'PY' 2>/dev/null || true
+import sys,zlib,struct
+out=sys.argv[1]; w=h=256; row=bytes((0,0,0,255))*w; raw=bytearray()
+for _ in range(h): raw.append(0); raw+=row
+def chunk(t,d): return struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d)&0xffffffff)
+open(out,'wb').write(b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(bytes(raw),9))+chunk(b'IEND',b''))
+PY
+}
+
+# Make the copy obviously the debug instance: rename the profile label (shown in
+# the toolbar chip) and swap the avatar for the cached debug image.
+mark_debug_profile() {
+    local local_state="$1" profile_subdir="$2" profile_path="$3" avatar_src="$4" label="$5"
+    [[ -f "$local_state" ]] || return 0
+    python3 - "$local_state" "$profile_subdir" "$profile_path" "$avatar_src" "$label" <<'PY' 2>/dev/null || true
+import json,sys,os,shutil
+local_state,sub,profile_path,avatar_src,label=sys.argv[1:6]
+
+d=json.load(open(local_state))
+entry=d.setdefault("profile",{}).setdefault("info_cache",{}).setdefault(sub,{})
+entry["name"]=label
+entry["is_using_default_name"]=False
+
+# Overwrite the account picture with our avatar. Chrome renders the file as-is
+# without re-downloading (same account URL), so the debug avatar sticks.
+if os.path.isdir(profile_path) and os.path.isfile(avatar_src):
+    pic=os.path.join(profile_path, entry.get("gaia_picture_file_name") or "Google Profile Picture.png")
+    shutil.copyfile(avatar_src, pic)
+    entry["gaia_picture_file_name"]=os.path.basename(pic)
+    entry["use_gaia_picture"]=True
+    entry["is_using_default_avatar"]=False
+
+json.dump(d,open(local_state,"w"))
+PY
+}
+
+profile_arg=()
+
+case "$mode" in
+    ephemeral)
+        profile_dir=$(mktemp -d "${TMPDIR:-/tmp}/chrome-debug-XXXXXX")
+        ;;
+
+    named)
+        profile_dir="$PROFILE_ROOT/$name"
+        mkdir -p "$profile_dir"
+        check_singleton "$profile_dir" "profile '$name'"
+        ;;
+
+    linkedin)
+        src_profile=$(cd "$REAL_CHROME_DATA" 2>/dev/null && for d in Default Profile*; do
+            [[ -f "$d/Preferences" ]] || continue
+            if python3 -c "import json,sys; d=json.load(open('$d/Preferences')); sys.exit(0 if any(a.get('email')=='$LINKEDIN_EMAIL' for a in d.get('account_info',[])) else 1)" 2>/dev/null; then
+                echo "$d"; break
+            fi
+        done)
+        if [[ -z "${src_profile:-}" ]]; then
+            echo "chrome-debug: no Chrome profile signed in as $LINKEDIN_EMAIL under $REAL_CHROME_DATA" >&2
+            exit 1
+        fi
+
+        if [[ -L "$REAL_CHROME_DATA/$src_profile/SingletonLock" ]]; then
+            p="$(readlink "$REAL_CHROME_DATA/$src_profile/SingletonLock")"; p="${p##*-}"
+            if [[ "$p" =~ ^[0-9]+$ ]] && kill -0 "$p" 2>/dev/null; then
+                echo "chrome-debug: warning: main Chrome is running (pid $p); quit it for an up-to-date login copy." >&2
+            fi
+        fi
+
+        profile_dir="$PROFILE_ROOT/linkedin"
+        dest_profile="$profile_dir/Default"
+        mkdir -p "$dest_profile"
+        check_singleton "$profile_dir" "profile 'linkedin'"
+
+        echo "chrome-debug: syncing $LINKEDIN_EMAIL profile ($src_profile) -> debug copy..." >&2
+        rsync -a --delete \
+            --exclude='Cache/' --exclude='Code Cache/' --exclude='GPUCache/' \
+            --exclude='GrShaderCache/' --exclude='ShaderCache/' \
+            --exclude='component_crx_cache/' --exclude='extensions_crx_cache/' \
+            --exclude='Service Worker/CacheStorage/' --exclude='Service Worker/ScriptCache/' \
+            --exclude='Application Cache/' --exclude='DawnCache/' \
+            --exclude='DawnGraphiteCache/' --exclude='DawnWebGPUCache/' \
+            --exclude='Singleton*' \
+            "$REAL_CHROME_DATA/$src_profile/" "$dest_profile/"
+
+        # Local State holds the wrapped cookie-encryption key; copy so cookies decrypt.
+        cp -f "$REAL_CHROME_DATA/Local State" "$profile_dir/Local State" 2>/dev/null || true
+
+        ensure_debug_avatar "$PROFILE_ROOT/debug-avatar.png"
+        mark_debug_profile "$profile_dir/Local State" "Default" "$dest_profile" \
+            "$PROFILE_ROOT/debug-avatar.png" "$LINKEDIN_EMAIL"
+        profile_arg=(--profile-directory="Default")
+        ;;
+esac
+
 port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("",0)); print(s.getsockname()[1]); s.close()')
 
 "$CHROME" \
     --remote-debugging-port="$port" \
     --user-data-dir="$profile_dir" \
+    "${profile_arg[@]}" \
     --no-first-run \
     --no-default-browser-check \
     >/dev/null 2>&1 &
@@ -76,12 +176,10 @@ port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("",0)); print(s.get
 chrome_pid=$!
 disown
 
-# Wait for the DevTools endpoint to come up (~5s budget).
 ready=0
 for _ in $(seq 1 50); do
     if curl -sf "http://127.0.0.1:$port/json/version" >/dev/null 2>&1; then
-        ready=1
-        break
+        ready=1; break
     fi
     sleep 0.1
 done
@@ -91,8 +189,5 @@ if (( ! ready )); then
     exit 1
 fi
 
-{
-    printf 'chrome-debug: pid=%s port=%s profile=%s\n' "$chrome_pid" "$port" "$profile_dir"
-} >&2
-
+printf 'chrome-debug: pid=%s port=%s profile=%s\n' "$chrome_pid" "$port" "$profile_dir" >&2
 echo "$port"
