@@ -60,7 +60,7 @@ function M.jump()
 		table.insert(parts, hint_hl .. " [" .. h .. "] " .. text_hl .. name .. " ")
 	end
 	local saved_tabline = vim.o.tabline
-	vim.o.tabline = table.concat(parts) .. "%#TabLineFill#"
+	vim.o.tabline = require("helpers.zen").tabline(table.concat(parts))
 	vim.cmd("redrawtabline")
 
 	-- Wait for keypress

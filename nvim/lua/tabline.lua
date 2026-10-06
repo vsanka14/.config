@@ -1,4 +1,5 @@
 local M = {}
+local zen = require("helpers.zen")
 
 local sel_bg = "#1a1b26"
 local fill_bg = "#050505"
@@ -109,7 +110,7 @@ function M.render()
 		table.insert(parts, string.format("%%%dT%s %s %s%s%s %%T", buf, icon_hl, icon, buf_hl, name, mod_str))
 	end
 
-	return table.concat(parts) .. "%#TabLineFill#%="
+	return zen.tabline(table.concat(parts))
 end
 
 setup_highlights()

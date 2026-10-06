@@ -19,6 +19,8 @@ map("n", "<C-u>", "<C-u>zz", { desc = "Scroll up (centered)" })
 map("n", "<C-f>", "<C-f>zz", { desc = "Page down (centered)" })
 map("n", "<C-b>", "<C-b>zz", { desc = "Page up (centered)" })
 
+map("n", "<Leader>z", "<cmd>Zen<cr>", { desc = "Toggle zen mode" })
+
 -- Buffer navigation
 map("n", "<Leader>bj", function()
 	require("helpers.buffer-jump").jump()
