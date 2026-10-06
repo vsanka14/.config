@@ -124,16 +124,6 @@ pub(crate) fn render_status(
     rows: &[PaneRow],
 ) -> String {
     let priorities = session_priorities(rows);
-    let global = priorities
-        .values()
-        .copied()
-        .min()
-        .unwrap_or(SessionPriority::Other);
-    let glyph = match global {
-        SessionPriority::Awaiting => &theme.color_awaiting,
-        SessionPriority::Done => &theme.color_done,
-        SessionPriority::Working | SessionPriority::Other => &theme.color_accent,
-    };
     let mut current_rows: Vec<_> = rows.iter().filter(|row| row.session == current).collect();
     current_rows.sort_by_key(|row| {
         (
@@ -158,8 +148,8 @@ pub(crate) fn render_status(
         )
     } else {
         format!(
-            "#[fg={glyph},bg={},bold]   {pill}#[bg={},nobold]",
-            theme.color_pill_bg, theme.color_status_bg
+            "#[fg={},bg={},bold]   {pill}#[bg={},nobold]",
+            theme.color_accent, theme.color_pill_bg, theme.color_status_bg
         )
     };
     let radar = if sessions.len() > 1 {

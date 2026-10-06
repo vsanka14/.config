@@ -55,7 +55,7 @@ fn status_commands_return_the_same_user_visible_rendering() {
 
     assert_eq!(cached, direct);
     let bar = StatusBar::new(&cached);
-    assert!(bar.has_icon_color("#f7768e"));
+    assert!(bar.has_icon_color("#7dcfff"));
     assert!(bar.has_pane("1.1", "#f7768e", false));
     assert!(bar.has_current_session("1", "#f7768e"));
     assert!(bar.has_session_signal("2", "#e0af68"));

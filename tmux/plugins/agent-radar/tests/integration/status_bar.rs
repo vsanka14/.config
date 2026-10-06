@@ -19,7 +19,7 @@ fn refresh_publishes_each_session_from_its_own_point_of_view() {
 
     let api_value = scenario.session_option("api");
     let api = StatusBar::new(&api_value);
-    assert!(api.has_icon_color("#f7768e"));
+    assert!(api.has_icon_color("#7dcfff"));
     assert!(api.has_pane("1.1", "#f7768e", false));
     assert!(api.has_current_session("1", "#f7768e"));
     assert!(api.has_session_signal("2", "#3fb950"));
@@ -27,7 +27,7 @@ fn refresh_publishes_each_session_from_its_own_point_of_view() {
 
     let web_value = scenario.session_option("web");
     let web = StatusBar::new(&web_value);
-    assert!(web.has_icon_color("#f7768e"));
+    assert!(web.has_icon_color("#7dcfff"));
     assert!(web.has_pane("2.1", "#3fb950", true));
     assert!(web.has_current_session("2", "#3fb950"));
     assert!(web.has_session_signal("1", "#f7768e"));
