@@ -10,6 +10,8 @@ function M.clean_cache(bufnr) cache[bufnr] = nil end
 
 local function render(bufnr, line, text)
 	M.clear(bufnr)
+	if require("helpers.zen").is_active() then return end
+
 	if text then
 		vim.api.nvim_buf_set_extmark(bufnr, ns, line - 1, 0, {
 			virt_text = { { text, "Comment" } }, virt_text_pos = "eol",
@@ -19,6 +21,8 @@ end
 
 function M.show()
 	local bufnr = vim.api.nvim_get_current_buf()
+	if require("helpers.zen").is_active() then M.clear(bufnr); return end
+
 	local file = vim.api.nvim_buf_get_name(bufnr)
 	if file == "" or vim.bo[bufnr].buftype ~= "" then return end
 

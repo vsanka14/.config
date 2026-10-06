@@ -1,6 +1,6 @@
 local M = {}
 
-local WIDTH = 150
+local WIDTH = 120
 local group = vim.api.nvim_create_augroup("native_zen", { clear = true })
 local gutter_options = {
 	"foldcolumn",
@@ -18,7 +18,7 @@ end
 
 local function config(centered)
 	local top = vim.o.showtabline == 0 and 0 or 1
-	local bottom = vim.o.laststatus == 0 and 1 or 2
+	local bottom = vim.o.cmdheight + (vim.o.laststatus == 0 and 0 or 1)
 	local height = math.max(1, vim.o.lines - top - bottom)
 	local width = centered and math.max(1, math.min(WIDTH, vim.o.columns - 4)) or vim.o.columns
 
@@ -82,6 +82,10 @@ function M.column()
 	return state and config(true).col
 end
 
+function M.is_active()
+	return state ~= nil
+end
+
 function M.tabline(content)
 	local column = M.column()
 	local padding = column and string.rep(" ", column) or ""
@@ -118,6 +122,7 @@ function M.toggle()
 	vim.fn.winrestview(view)
 
 	state = { source = source, backdrop = backdrop, content = content }
+	require("helpers.blame").clear(vim.api.nvim_get_current_buf())
 
 	vim.api.nvim_create_autocmd("VimResized", {
 		group = group,
