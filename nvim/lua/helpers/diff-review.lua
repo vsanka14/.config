@@ -390,18 +390,18 @@ local function list_copilot_panes()
 	return panes
 end
 
-local function build_prompt(root_comments)
+local function build_prompt(root_comments, introduction)
 	table.sort(root_comments, function(left, right)
 		local left_key = string.format("%s\0%s\0%09d", left.path, left.side, left.line)
 		local right_key = string.format("%s\0%s\0%09d", right.path, right.side, right.line)
 		return left_key < right_key
 	end)
 
-	local lines = {
+	local lines = introduction or {
 		"Please address the following review comments in the current working tree.",
 		"Inspect the diff, implement the requested changes, and preserve unrelated work.",
-		"",
 	}
+	table.insert(lines, "")
 
 	for index, comment in ipairs(root_comments) do
 		local line_range = tostring(comment.line)
@@ -422,6 +422,15 @@ local function build_prompt(root_comments)
 	end
 
 	return table.concat(lines, "\n")
+end
+
+local function build_pr_review_prompt(root_comments)
+	return build_prompt(root_comments, {
+		"Help me review a teammate's pull request that is checked out in the current working tree.",
+		"Treat the comments below as draft review feedback: inspect the diff and relevant context, then help me discuss, validate, and refine each comment.",
+		"Do not modify the working tree or post comments to GitHub unless I explicitly ask you to.",
+		"When useful, retrieve the pull request's existing review discussion, including author replies. If I ask you to post comments, preserve each comment's file and line context.",
+	})
 end
 
 local function send_to_pane(pane, prompt, git_root, count)
@@ -446,7 +455,7 @@ local function send_to_pane(pane, prompt, git_root, count)
 	notify(string.format("%d review comment%s sent to Copilot", count, count == 1 and "" or "s"))
 end
 
-function M.send()
+local function send(prompt_builder)
 	local context, err = get_context(vim.api.nvim_get_current_buf())
 	if not context then
 		notify(err, vim.log.levels.WARN)
@@ -461,7 +470,7 @@ function M.send()
 		return
 	end
 
-	local prompt = build_prompt(root_comments)
+	local prompt = prompt_builder(root_comments)
 	local panes, pane_err = list_copilot_panes()
 	if not panes then
 		notify("Could not find Copilot: " .. pane_err, vim.log.levels.ERROR)
@@ -488,6 +497,14 @@ function M.send()
 	end)
 end
 
+function M.send()
+	send(build_prompt)
+end
+
+function M.send_pr_review()
+	send(build_pr_review_prompt)
+end
+
 local function attach_buffer(bufnr)
 	if type(bufnr) ~= "number" or not vim.api.nvim_buf_is_valid(bufnr) then
 		return
@@ -504,6 +521,7 @@ local function attach_buffer(bufnr)
 			{ "n", "<leader>ge", M.edit_at_cursor, "Edit diff review comment" },
 			{ "n", "<leader>gD", M.delete_at_cursor, "Delete diff review comment" },
 			{ "n", "<leader>gs", M.send, "Send review comments to Copilot" },
+			{ "n", "<leader>gr", M.send_pr_review, "Review teammate PR with Copilot" },
 			{ "n", "<leader>gC", M.clear, "Clear diff review comments" },
 			{ "n", "]r", function() jump_to_comment(1) end, "Next diff review comment" },
 			{ "n", "[r", function() jump_to_comment(-1) end, "Previous diff review comment" },
