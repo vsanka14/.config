@@ -108,6 +108,11 @@ function M.toggle()
 	local backdrop_buf = vim.api.nvim_create_buf(false, true)
 	local backdrop = vim.api.nvim_open_win(backdrop_buf, false, config(false))
 	vim.bo[backdrop_buf].bufhidden = "wipe"
+	vim.wo[backdrop].foldcolumn = "0"
+	vim.wo[backdrop].number = false
+	vim.wo[backdrop].relativenumber = false
+	vim.wo[backdrop].signcolumn = "no"
+	vim.wo[backdrop].statuscolumn = ""
 	vim.wo[backdrop].fillchars = "eob: "
 	vim.wo[backdrop].winhighlight = "Normal:Normal,EndOfBuffer:Normal"
 
