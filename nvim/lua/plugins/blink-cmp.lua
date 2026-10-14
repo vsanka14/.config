@@ -21,8 +21,7 @@ return {
 				markdown = {},
 				mdx = {},
 				text = {},
-				-- Offline SQLite-backed dataset-name + column completion.
-				sql = { "gridtable", "path", "snippets", "buffer" },
+				sql = { "path", "snippets", "buffer" },
 			},
 			providers = {
 				-- Drop buffer words that are already indexed as tags so the tags
@@ -47,15 +46,6 @@ return {
 							return not is_tag[it.label]
 						end, items)
 					end,
-				},
-				gridtable = {
-					name = "GridTable",
-					module = "helpers.gridtable",
-					-- The SQLite DB is built externally by ~/code/meta-gridtable-index/build_index.py.
-					opts = {
-						db_path = vim.fn.expand("~/.cache/meta-gridtable-index/index.sqlite3"),
-						list_limit = 500,
-					},
 				},
 				-- Cross-file symbol completion from the ctags index (no LSP needed).
 				tags = {
