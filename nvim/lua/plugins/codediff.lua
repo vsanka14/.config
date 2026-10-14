@@ -14,6 +14,7 @@ return {
 	cmd = "CodeDiff",
 	init = function()
 		require("helpers.diff-review").setup()
+		require("helpers.diff-navigation").setup()
 	end,
 	opts = {
 		diff = {
