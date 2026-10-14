@@ -21,6 +21,35 @@ map("n", "<C-b>", "<C-b>zz", { desc = "Page up (centered)" })
 
 map("n", "<Leader>z", "<cmd>Zen<cr>", { desc = "Toggle zen mode" })
 
+-- NeetCode: run/submit current file's problem in a floating terminal
+map("n", "<Leader>ns", function()
+	require("helpers.neetcode").send("exec")
+end, { desc = "NeetCode submit" })
+
+map("n", "<Leader>nt", function()
+	require("helpers.neetcode").send("test")
+end, { desc = "NeetCode run tests" })
+
+map("n", "<Leader>nf", function()
+	require("helpers.neetcode").select()
+end, { desc = "NeetCode select problem (choose list)" })
+
+map("n", "<Leader>n7", function()
+	require("helpers.neetcode").select("blind75")
+end, { desc = "NeetCode select (Blind 75)" })
+
+map("n", "<Leader>n1", function()
+	require("helpers.neetcode").select("neetcode150")
+end, { desc = "NeetCode select (NeetCode 150)" })
+
+map("n", "<Leader>n2", function()
+	require("helpers.neetcode").select("neetcode250")
+end, { desc = "NeetCode select (NeetCode 250)" })
+
+map("n", "<Leader>no", function()
+	require("helpers.neetcode").open_neetcode()
+end, { desc = "Open problem on NeetCode" })
+
 -- Buffer navigation
 map("n", "<Leader>bj", function()
 	require("helpers.buffer-jump").jump()
