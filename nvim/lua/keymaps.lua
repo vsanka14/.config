@@ -56,6 +56,7 @@ map("n", "<Leader>bj", function()
 end, { desc = "Jump to buffer" })
 map("n", "<Leader>b.", "<cmd>bnext<cr>", { desc = "Next buffer" })
 map("n", "<Leader>b,", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
+map("n", "<Leader>ba", "<cmd>silent %bdelete<cr>", { desc = "Close all buffers" })
 map("n", "<Leader>bc", function()
 	local current = vim.api.nvim_get_current_buf()
 	for _, buf in ipairs(vim.api.nvim_list_bufs()) do
