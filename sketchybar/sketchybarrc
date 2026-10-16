@@ -109,10 +109,10 @@ for sid in 1 2 3 4 5; do
             icon="${SPACE_ICONS[$sid]}" \
             icon.padding_left=$SPACE_ICON_PADDING \
             icon.padding_right=$SPACE_ICON_PADDING \
-            background.color=$ITEM_BG_COLOR \
+            background.color=0x001e2030 \
             background.corner_radius=$SPACE_BG_CORNER_RADIUS \
             background.height=$SPACE_BG_HEIGHT \
-            background.drawing=off \
+            background.drawing=on \
             label.drawing=off
 done
 
@@ -121,7 +121,7 @@ done
 sketchybar --add item workspace_observer left \
     --set workspace_observer \
         drawing=off \
-        script="$CONFIG_DIR/plugins/aerospace.sh" \
+        script="SPACE_BG_HEIGHT=$SPACE_BG_HEIGHT $CONFIG_DIR/plugins/aerospace.sh" \
     --subscribe workspace_observer aerospace_workspace_change
 
 if [ "$SHOW_FRONT_APP" = true ]; then

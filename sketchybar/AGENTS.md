@@ -80,9 +80,15 @@ the active queue for that property, producing visible restarts and choppiness.
 
 The implementation intentionally uses two SketchyBar calls:
 
-- One non-animated call switches workspace backgrounds immediately.
-- One animated call updates all icon colors/offsets and appends every bounce
-  keyframe to the same queue.
+- One non-animated call keeps every workspace pill drawn and resets the
+  focused pill to its small pop-start height.
+- One animated call updates all icon colors/offsets and pill colors/heights,
+  and appends every bounce keyframe to the same queue.
+
+Workspace pills are always `background.drawing=on`. Unfocused pills are
+transparent (`0x001e2030`), so they can fade and shrink instead of snapping
+off. `sketchybarrc` passes the profile's `SPACE_BG_HEIGHT` to
+`plugins/aerospace.sh` through the observer's `script` string.
 
 Do not split bounce keyframes across background processes, shell loops, sleeps,
 or multiple event subscribers.
@@ -97,14 +103,27 @@ rate.
 the same integer position across several frames and can look like a pause.
 Keep each keyframe duration roughly proportional to its travel distance:
 
-- Rise: `0 -> BOUNCE_HEIGHT`
-- Drop: `BOUNCE_HEIGHT -> BOUNCE_REBOUND`
-- Settle: `BOUNCE_REBOUND -> BOUNCE_SETTLE`
-- Finish: `BOUNCE_SETTLE -> 0`
+The bounce is a keyframe table (`BOUNCE_CURVES`, `BOUNCE_DURATIONS`,
+`BOUNCE_FOCUSED`, `BOUNCE_NEIGHBOR`) at the top of `plugins/aerospace.sh`:
+hop, dip, rebound, rest. The `tanh` hop and rebound launch fast and ease out;
+the `sin` legs ease in and out so landings stay soft. Keep the rebound large
+enough to see (about a third of the hop), or the motion reads as a float. Avoid `quadratic` falls and
+anticipation dips, because they look jarring. `BOUNCE_NEIGHBOR` can make the
+adjacent icons hop when the focused icon lands; it is all `0` now (no ripple).
+Each column in the keyframe arrays is one `--animate` group, so all items stay
+on the same timeline.
 
-The current `sin` curve eases into each target. When tuning the bounce:
+The focused pill moves with the icon: it starts opaque at `SPACE_BG_HEIGHT +
+BG_POP_START`, follows `BOUNCE_BG` (overshoot during the hop, squash when the
+icon lands, spring back), and rests at `SPACE_BG_HEIGHT`. Do not fade the
+focused pill in, because the fade hides the pop. A pill that loses focus fades
+to transparent and shrinks back to the pop-start height.
 
-- Change the constants at the top of `plugins/aerospace.sh`.
+When tuning the bounce:
+
+- Change the keyframe arrays at the top of `plugins/aerospace.sh`, and keep
+  all five arrays (including `BOUNCE_BG`) the same length.
+- Keep the peak inside the workspace background (`SPACE_BG_HEIGHT`).
 - Keep the total motion short enough to finish before normal rapid workspace
   switching queues another event.
 - Prefer fewer meaningful frames over increasing duration for “smoothness.”
@@ -161,8 +180,9 @@ sketchybar --query workspace_observer
 sketchybar --query "space.$focused"
 ```
 
-The observer should be subscribed with `drawing=off`, the focused background
-should be on, and the focused icon should settle at `y_offset=0`.
+The observer should be subscribed with `drawing=off`. The focused pill should
+settle at `SPACE_BG_HEIGHT` with color `0xcc1e2030`, other pills should be
+transparent, and the focused icon should settle at `y_offset=0`.
 
 For the agent notification feature:
 
