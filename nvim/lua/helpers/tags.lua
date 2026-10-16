@@ -1,9 +1,7 @@
--- Go-to-definition for the no-LSP flow. Resolves Ember component invocations by
--- path convention first (see helpers/ember.lua) since ctags can't follow them,
+-- Go-to-definition for the no-LSP flow. In .hbs files, resolves Ember component
+-- invocations by path convention first (see helpers/ember.lua),
 -- then falls back to ctags (jump on one match, fuzzy-pick on several) and finally
 -- a ripgrep search. The origin is pushed onto the tag stack so <C-t> returns.
-
-local ember = require("helpers.ember")
 
 local M = {}
 
@@ -60,19 +58,21 @@ local function pick(name, items, on_choose)
 end
 
 function M.goto_definition()
-	local files, token = ember.resolve_component()
-	if #files == 1 then
-		jump_to({ filename = files[1] }, token)
-		return
-	elseif #files > 1 then
-		local items = {}
-		for _, f in ipairs(files) do
-			table.insert(items, { text = vim.fn.fnamemodify(f, ":~:."), path = f })
+	if vim.fn.expand("%:e") == "hbs" then
+		local files, token = require("helpers.ember").resolve_component()
+		if #files == 1 then
+			jump_to({ filename = files[1] }, token)
+			return
+		elseif #files > 1 then
+			local items = {}
+			for _, f in ipairs(files) do
+				table.insert(items, { text = vim.fn.fnamemodify(f, ":~:."), path = f })
+			end
+			pick("Component: " .. token, items, function(item)
+				jump_to({ filename = item.path }, token)
+			end)
+			return
 		end
-		pick("Component: " .. token, items, function(item)
-			jump_to({ filename = item.path }, token)
-		end)
-		return
 	end
 
 	local word = vim.fn.expand("<cword>")
