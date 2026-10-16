@@ -3,8 +3,10 @@
 ## Scope
 
 These instructions apply to everything under `sketchybar/`. Preserve the
-Tokyo Night Moon styling and the separate laptop/external display profiles
-unless a task explicitly requests a visual redesign.
+Tokyo Night Moon styling and the laptop/external display profiles unless a
+task explicitly requests a visual redesign. The laptop profile is a slightly
+smaller bar, hides the front app, shows the battery in the clock block, and
+aligns its edges with the Aerospace laptop outer gap.
 
 ## Configuration Map
 

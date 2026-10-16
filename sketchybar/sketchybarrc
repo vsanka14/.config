@@ -16,44 +16,54 @@ export FG_MUTED=0xff636da6            # Moon muted
 # Font
 FONT="JetBrainsMono Nerd Font"
 
-# Select sizing based on whether the large external display is connected.
+# Per-display sizing. The laptop profile is a slightly smaller bar, hides the
+# front app, shows the battery, and aligns its edges with the Aerospace gaps.
 DISPLAY_PROFILE=$("$CONFIG_DIR/plugins/display.sh" --profile)
 if [ "$DISPLAY_PROFILE" = "external" ]; then
-    BAR_COLOR=0x1a000000
-    ICON_SIZE=24.0
-    LABEL_SIZE=15.0
     CLOCK_LABEL_SIZE=14.0
     STATUS_ICON_WIDTH=30
     STATUS_ICON_SCALE=0.38
+    SHOW_FRONT_APP=true
+    SHOW_BATTERY=false
+    BAR_PADDING_LEFT=120
+    BAR_PADDING_RIGHT=120
     BAR_HEIGHT=80
-    BLUR_RADIUS=50
-    BAR_PADDING=120
-    DEFAULT_PADDING=12
+    ICON_SIZE=24.0
+    LABEL_SIZE=15.0
     SPACE_ICON_PADDING=14
     SPACE_BG_CORNER_RADIUS=10
     SPACE_BG_HEIGHT=48
-    SHOW_BATTERY=false
-    SHOW_FRONT_APP=true
+    # The Copilot glyph reads a touch heavy, so render it ~2pt below ICON_SIZE.
+    AGENT_ICON_SIZE=22.0
+    AGENT_LABEL_SIZE=$LABEL_SIZE
 else
     DISPLAY_PROFILE=laptop
-    BAR_COLOR=0xcc0d0f18
-    ICON_SIZE=16.0
-    LABEL_SIZE=12.0
     CLOCK_LABEL_SIZE=12.0
     STATUS_ICON_WIDTH=20
     STATUS_ICON_SCALE=0.25
-    BAR_HEIGHT=32
-    BLUR_RADIUS=30
-    BAR_PADDING=8
-    DEFAULT_PADDING=4
-    SPACE_ICON_PADDING=8
-    SPACE_BG_CORNER_RADIUS=4
-    SPACE_BG_HEIGHT=20
-    SHOW_BATTERY=true
     SHOW_FRONT_APP=false
+    SHOW_BATTERY=true
+    # Align bar edges with the Aerospace laptop outer gap (96). The left side
+    # subtracts the first workspace item's DEFAULT_PADDING (12).
+    BAR_PADDING_LEFT=84
+    BAR_PADDING_RIGHT=96
+    BAR_HEIGHT=64
+    ICON_SIZE=20.0
+    LABEL_SIZE=14.0
+    SPACE_ICON_PADDING=12
+    SPACE_BG_CORNER_RADIUS=8
+    SPACE_BG_HEIGHT=40
+    # Match the clock cluster: 16pt status icons (64px * 0.25, battery glyph)
+    # and CLOCK_LABEL_SIZE labels.
+    AGENT_ICON_SIZE=16.0
+    AGENT_LABEL_SIZE=$CLOCK_LABEL_SIZE
 fi
-export BAR_COLOR
 printf '%s\n' "$DISPLAY_PROFILE" > "/tmp/sketchybar-display-profile-${UID}"
+
+BAR_COLOR=0x1a000000
+BLUR_RADIUS=50
+DEFAULT_PADDING=12
+export BAR_COLOR
 
 # Bar appearance
 sketchybar --bar \
@@ -62,8 +72,8 @@ sketchybar --bar \
     blur_radius=$BLUR_RADIUS \
     position=top \
     sticky=on \
-    padding_left=$BAR_PADDING \
-    padding_right=$BAR_PADDING \
+    padding_left=$BAR_PADDING_LEFT \
+    padding_right=$BAR_PADDING_RIGHT \
     color=$BAR_COLOR \
     shadow=off
 
@@ -155,26 +165,13 @@ if [ "$SHOW_BATTERY" = true ]; then
     sketchybar --add item battery right \
         --set battery \
             update_freq=120 \
+            icon.font="$FONT:Bold:16.0" \
             icon.padding_right=6 \
             icon.color=$ACCENT_ORANGE \
+            label.font="$FONT:Medium:$CLOCK_LABEL_SIZE" \
+            label.padding_right=8 \
             script="$CONFIG_DIR/plugins/battery.sh" \
         --subscribe battery system_woke power_source_change
-
-    # Battery container
-    sketchybar --add bracket battery_container battery \
-        --set battery_container \
-            background.color=$CONTAINER_BG_COLOR \
-            background.corner_radius=6 \
-            background.height=24 \
-            background.drawing=on
-
-    # Spacer between containers
-    sketchybar --add item spacer right \
-        --set spacer \
-            width=8 \
-            background.drawing=off \
-            icon.drawing=off \
-            label.drawing=off
 fi
 
 # Date and time (right side)
@@ -201,8 +198,12 @@ sketchybar --add item calendar right \
         label.font="$FONT:Medium:$CLOCK_LABEL_SIZE" \
         label.padding_right=8
 
-# Date and time container
-sketchybar --add bracket clock_container calendar clock \
+# Date, time, and (laptop only) battery container
+STATUS_MEMBERS=(calendar clock)
+if [ "$SHOW_BATTERY" = true ]; then
+    STATUS_MEMBERS+=(battery)
+fi
+sketchybar --add bracket clock_container "${STATUS_MEMBERS[@]}" \
     --set clock_container \
         background.color=$CONTAINER_BG_COLOR \
         background.corner_radius=6 \
@@ -221,8 +222,7 @@ sketchybar --add bracket clock_container calendar clock \
 # The label is a count-based summary ("⏸ N awaiting  ✓ M done"), so the plugin
 # self-limits width via counts rather than listing names; `label.max_chars`
 # below is only a safety net that the counts stay well under.
-# The Copilot glyph reads a touch heavy, so render it ~2pt below ICON_SIZE.
-AGENT_ICON_SIZE=$(awk -v s="$ICON_SIZE" 'BEGIN { printf "%.1f", s - 2 }')
+# Icon and label sizes come from the display profile (AGENT_*_SIZE).
 sketchybar --add item agent right \
     --set agent \
         drawing=off \
@@ -232,7 +232,7 @@ sketchybar --add item agent right \
         icon.padding_left=8 \
         icon.padding_right=6 \
         label.drawing=off \
-        label.font="$FONT:Medium:$LABEL_SIZE" \
+        label.font="$FONT:Medium:$AGENT_LABEL_SIZE" \
         label.max_chars=42 \
         label.padding_left=2 \
         label.padding_right=10 \
