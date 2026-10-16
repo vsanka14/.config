@@ -4,8 +4,6 @@ local function notify(msg, level)
 	vim.notify(msg, level or vim.log.levels.INFO, { title = "NeetCode" })
 end
 
---- The problem id is the file name: a NeetCode slug (or a LeetCode slug, which `neetcode` resolves).
----@return string|nil
 local function problem_slug()
 	local slug = vim.fn.expand("%:t:r")
 	return slug:match("^[%w-]+$") and slug or nil
@@ -13,13 +11,8 @@ end
 
 local FZF_COLORS = "--color=bg:-1,gutter:-1,bg+:#292e42"
 
----@param dir string
----@param args string
----@param on_exit? fun()
----@param border? string
----@param keep_open? fun(code: integer): boolean
 local function run(dir, args, on_exit, border, keep_open)
-	local cmd = ("cd %s && export NEETCODE_DIR=%s FZF_DEFAULT_OPTS=\"$FZF_DEFAULT_OPTS %s\" && %s"):format(
+	local cmd = ('cd %s && export NEETCODE_DIR=%s FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS %s" && %s'):format(
 		vim.fn.shellescape(dir),
 		vim.fn.shellescape(dir),
 		FZF_COLORS,
@@ -44,8 +37,6 @@ local function snapshot(dir)
 	return files
 end
 
---- Run `neetcode <sub> <slug>` for the current file in a floating terminal.
----@param sub string neetcode subcommand (e.g. "exec", "test")
 function M.send(sub)
 	local slug = problem_slug()
 	if not slug then
@@ -60,8 +51,6 @@ end
 
 local LISTS = { "blind75", "neetcode150", "neetcode250", "all" }
 
---- Run `neetcode select` (fzf) in a floating terminal, then open the created/updated file.
----@param list? string One of LISTS; when nil, pick one with fzf first.
 function M.select(list)
 	local dir = vim.fn.getcwd()
 	local before = snapshot(dir)
@@ -74,27 +63,32 @@ function M.select(list)
 			table.concat(LISTS, " ")
 		)
 	end
-	run(dir, cmd, function()
-		local after = snapshot(dir)
-		local best, best_t
-		for name, t in pairs(after) do
-			if before[name] == nil or t > before[name] then
-				if not best_t or t > best_t then
-					best, best_t = name, t
+	run(
+		dir,
+		cmd,
+		function()
+			local after = snapshot(dir)
+			local best, best_t
+			for name, t in pairs(after) do
+				if before[name] == nil or t > before[name] then
+					if not best_t or t > best_t then
+						best, best_t = name, t
+					end
 				end
 			end
+			if not best then
+				return notify("No new solution file found in " .. dir, vim.log.levels.WARN)
+			end
+			vim.cmd.edit(vim.fn.fnameescape(dir .. "/" .. best))
+			if before[best] == nil then
+				vim.cmd("silent write")
+			end
+		end,
+		"none",
+		function(code)
+			return code ~= 0
 		end
-		if not best then
-			return notify("No new solution file found in " .. dir, vim.log.levels.WARN)
-		end
-		vim.cmd.edit(vim.fn.fnameescape(dir .. "/" .. best))
-		if before[best] == nil then
-			-- Writing triggers conform's format_on_save, so the starter code is formatted.
-			vim.cmd("silent write")
-		end
-	end, "none", function(code)
-		return code ~= 0
-	end)
+	)
 end
 
 function M.open_neetcode()
