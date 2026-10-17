@@ -51,7 +51,8 @@ function M.open(cmd, opts)
 		end
 	end
 
-	vim.fn.termopen(cmd, {
+	vim.fn.jobstart(cmd, {
+		term = true,
 		on_exit = function(_, code)
 			if opts.keep_open and opts.keep_open(code) and vim.api.nvim_buf_is_valid(buf) then
 				-- Leave the output visible until the user dismisses it.

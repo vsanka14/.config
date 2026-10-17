@@ -192,7 +192,7 @@ map("n", "<Esc>", "<cmd>nohlsearch | redrawstatus<cr>", { desc = "Clear highligh
 
 -- Drop Neovim's built-in gr-prefix defaults (grr/gra/... call vim.lsp.buf.*) so a
 -- bare `gr` fires the ripgrep references map below without a timeoutlen delay.
-for _, lhs in ipairs({ "grr", "gra", "grn", "gri", "grt" }) do
+for _, lhs in ipairs({ "grr", "gra", "grn", "gri", "grt", "grx" }) do
 	for _, mode in ipairs({ "n", "x" }) do
 		pcall(vim.keymap.del, mode, lhs)
 	end
