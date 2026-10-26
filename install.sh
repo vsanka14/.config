@@ -108,7 +108,14 @@ info "Installing Yazi git plugin..."
 ya pkg add yazi-rs/plugins:git 2>/dev/null || true
 success "Yazi plugin installed"
 
-# 9. Start services
+# 9. macOS defaults
+info "Setting screenshot location..."
+mkdir -p ~/Documents/screen-recordings
+defaults write com.apple.screencapture location "$HOME/Documents/screen-recordings"
+killall SystemUIServer 2>/dev/null || true
+success "Screenshots will be saved to ~/Documents/screen-recordings"
+
+# 10. Start services
 info "Starting services..."
 brew services start sketchybar 2>/dev/null || true
 open -a AeroSpace 2>/dev/null || true
