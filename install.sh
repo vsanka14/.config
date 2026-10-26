@@ -89,8 +89,9 @@ fi
 # 5. Symlinks and directories
 info "Creating symlinks and directories..."
 ln -sf ~/.config/zsh/.zshrc ~/.zshrc
-mkdir -p ~/.local/bin ~/.copilot/hooks ~/code ~/documents/docs
+mkdir -p ~/.local/bin ~/.copilot/hooks ~/Library/Fonts ~/code ~/documents/docs
 ln -sf ~/.config/copilot/hooks/tmux-agent-status.json ~/.copilot/hooks/tmux-agent-status.json
+cp -f ~/.config/kitty/fonts/CopilotStatus.ttf ~/Library/Fonts/CopilotStatus.ttf
 success "Symlinks and directories created"
 
 # 6. Git config
