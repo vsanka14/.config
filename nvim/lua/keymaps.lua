@@ -19,12 +19,44 @@ map("n", "<C-u>", "<C-u>zz", { desc = "Scroll up (centered)" })
 map("n", "<C-f>", "<C-f>zz", { desc = "Page down (centered)" })
 map("n", "<C-b>", "<C-b>zz", { desc = "Page up (centered)" })
 
+map("n", "<Leader>z", "<cmd>Zen<cr>", { desc = "Toggle zen mode" })
+
+-- NeetCode: run/submit current file's problem in a floating terminal
+map("n", "<Leader>ns", function()
+	require("helpers.neetcode").send("exec")
+end, { desc = "NeetCode submit" })
+
+map("n", "<Leader>nt", function()
+	require("helpers.neetcode").send("test")
+end, { desc = "NeetCode run tests" })
+
+map("n", "<Leader>nf", function()
+	require("helpers.neetcode").select()
+end, { desc = "NeetCode select problem (choose list)" })
+
+map("n", "<Leader>n7", function()
+	require("helpers.neetcode").select("blind75")
+end, { desc = "NeetCode select (Blind 75)" })
+
+map("n", "<Leader>n1", function()
+	require("helpers.neetcode").select("neetcode150")
+end, { desc = "NeetCode select (NeetCode 150)" })
+
+map("n", "<Leader>n2", function()
+	require("helpers.neetcode").select("neetcode250")
+end, { desc = "NeetCode select (NeetCode 250)" })
+
+map("n", "<Leader>no", function()
+	require("helpers.neetcode").open_neetcode()
+end, { desc = "Open problem on NeetCode" })
+
 -- Buffer navigation
 map("n", "<Leader>bj", function()
 	require("helpers.buffer-jump").jump()
 end, { desc = "Jump to buffer" })
 map("n", "<Leader>b.", "<cmd>bnext<cr>", { desc = "Next buffer" })
 map("n", "<Leader>b,", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
+map("n", "<Leader>ba", "<cmd>silent %bdelete<cr>", { desc = "Close all buffers" })
 map("n", "<Leader>bc", function()
 	local current = vim.api.nvim_get_current_buf()
 	for _, buf in ipairs(vim.api.nvim_list_bufs()) do
@@ -62,7 +94,15 @@ end, { desc = "Open blame PR in browser" })
 map("n", "<Leader>gd", "<cmd>CodeDiff<cr>", { desc = "Git diff view" })
 map("n", "<Leader>gh", "<cmd>CodeDiff history<cr>", { desc = "File git history" })
 map("n", "<Leader>gH", "<cmd>CodeDiff history<cr>", { desc = "Branch git history" })
-map("n", "<Leader>gx", "<cmd>CodeDiff q<cr>", { desc = "Close diff view" })
+map("n", "<Leader>gx", function()
+	local ok, lifecycle = pcall(require, "codediff.ui.lifecycle")
+	local tabpage = vim.api.nvim_get_current_tabpage()
+	if not ok or not lifecycle.get_session(tabpage) then
+		vim.notify("Current tab is not a CodeDiff view", vim.log.levels.WARN)
+		return
+	end
+	lifecycle.close(tabpage)
+end, { desc = "Close diff view" })
 
 -- Lazygit
 map("n", "<Leader>gl", function()
@@ -103,7 +143,7 @@ map("n", "<Leader>e", function()
 	})
 end, { desc = "File Explorer (yazi)" })
 
--- Yank helpers: yank file path, file path w/ code line(s), diagnostics, test module name, etc
+-- Yank helpers: yank file path, file path w/ code line(s), etc
 map("n", "<Leader>yp", function()
 	require("helpers.yank").copy_path()
 end, { desc = "Copy file path" })
@@ -113,12 +153,6 @@ end, { desc = "Copy absolute file path" })
 map("n", "<Leader>yc", function()
 	require("helpers.yank").copy_path_line()
 end, { desc = "Copy file path:line" })
-map("n", "<Leader>yd", function()
-	require("helpers.yank").copy_diagnostic()
-end, { desc = "Copy diagnostic" })
-map("n", "<Leader>yt", function()
-	require("helpers.ember").copy_test_module()
-end, { desc = "Yank test module name" })
 map("v", "<Leader>yc", function()
 	require("helpers.yank").copy_path_lines()
 end, { desc = "Copy file path:lines" })
@@ -127,12 +161,6 @@ end, { desc = "Copy file path:lines" })
 map("n", "<Leader>oa", function()
 	require("helpers.ember").go_to_alternate()
 end, { desc = "Alternate Ember file" })
-map("n", "<Leader>ot", function()
-	require("helpers.ember").open_test()
-end, { desc = "Open Ember test" })
-map("n", "<Leader>os", function()
-	require("helpers.ember").open_source()
-end, { desc = "Open source from test" })
 
 -- Mini.pick keymaps
 map("n", "<Leader>ff", function()
@@ -147,58 +175,33 @@ end, { desc = "Find buffers" })
 map("n", "<Leader>fh", function()
 	MiniPick.builtin.help()
 end, { desc = "Find help" })
-map("n", "<Leader>fd", function()
-	local items = {}
-	for _, d in ipairs(vim.diagnostic.get(nil)) do
-		local fname = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(d.bufnr), ":~:.")
-		local severity = vim.diagnostic.severity[d.severity]
-		table.insert(items, {
-			text = string.format("%s:%d:%d [%s] %s", fname, d.lnum + 1, d.col + 1, severity, d.message),
-			bufnr = d.bufnr,
-			lnum = d.lnum + 1,
-			col = d.col + 1,
-		})
-	end
-	MiniPick.start({
-		source = {
-			name = "Diagnostics",
-			items = items,
-			choose = function(item)
-				vim.api.nvim_set_current_buf(item.bufnr)
-				vim.api.nvim_win_set_cursor(0, { item.lnum, item.col - 1 })
-			end,
-		},
-	})
-end, { desc = "Find diagnostics" })
-
--- DAP (debug adapter)
-map("n", "<Leader>db", function()
-	require("dap").toggle_breakpoint()
-end, { desc = "Toggle breakpoint" })
-map("n", "<Leader>dc", function()
-	require("dap").continue()
-end, { desc = "Continue" })
-map("n", "<Leader>di", function()
-	require("dap").step_into()
-end, { desc = "Step into" })
-map("n", "<Leader>do", function()
-	require("dap").step_over()
-end, { desc = "Step over" })
-map("n", "<Leader>dO", function()
-	require("dap").step_out()
-end, { desc = "Step out" })
-map("n", "<Leader>dr", function()
-	require("dap").repl.open()
-end, { desc = "Open REPL" })
-map("n", "<Leader>dt", function()
-	require("dap").terminate()
-end, { desc = "Terminate" })
-map("n", "<Leader>du", function()
-	require("dapui").toggle()
-end, { desc = "Toggle DAP UI" })
 
 -- Clear search highlights
 map("n", "<Esc>", "<cmd>nohlsearch | redrawstatus<cr>", { desc = "Clear highlights" })
 
--- Zen mode (centered buffer, dimmed UI)
-map("n", "<Leader>z", "<cmd>ZenMode<cr>", { desc = "Toggle Zen Mode" })
+-- Navigation via ctags + ripgrep (no LSP on this branch).
+
+-- Drop Neovim's built-in gr-prefix defaults (grr/gra/... call vim.lsp.buf.*) so a
+-- bare `gr` fires the ripgrep references map below without a timeoutlen delay.
+for _, lhs in ipairs({ "grr", "gra", "grn", "gri", "grt", "grx" }) do
+	for _, mode in ipairs({ "n", "x" }) do
+		pcall(vim.keymap.del, mode, lhs)
+	end
+end
+
+map("n", "gd", function()
+	require("helpers.tags").goto_definition()
+end, { desc = "Go to definition (ctags)" })
+
+map("n", "<C-]>", function()
+	require("helpers.tags").goto_definition()
+end, { desc = "Go to definition (ctags)" })
+
+map("n", "gr", function()
+	local word = vim.fn.expand("<cword>")
+	if word ~= "" then
+		MiniPick.builtin.grep({ pattern = "\\b" .. word .. "\\b" })
+	end
+end, { desc = "Find references (ripgrep)" })
+
+map("n", "<Leader>ft", "<cmd>GutentagsUpdate!<cr>", { desc = "Regenerate tags" })

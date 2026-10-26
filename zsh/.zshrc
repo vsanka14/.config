@@ -38,6 +38,9 @@ export EDITOR='nvim'
 export VISUAL='nvim'
 alias vim='nvim'
 
+# leetcode-cli: `leetcode edit` creates the starter file without opening an editor
+leetcode() { EDITOR= VISUAL= command leetcode "$@"; }
+
 # Enable edit-command-line widget
 autoload -Uz edit-command-line
 zle -N edit-command-line
@@ -47,10 +50,6 @@ bindkey '^X^E' edit-command-line
 
 # Bind v in vi command mode to edit command in nvim (vi-style)
 bindkey -M vicmd 'v' edit-command-line
-
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 # Eza aliases for colorful file listings with icons (fallback to regular ls)
 if command -v eza &> /dev/null; then

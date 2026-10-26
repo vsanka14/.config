@@ -20,13 +20,13 @@ exec-on-workspace-change = ['/bin/bash', '-c',
 default-root-container-layout = 'accordion'
 default-root-container-orientation = 'horizontal'
 
-# Gaps (minimal for clean look)
+# Gaps: compact; top clears the 64px laptop SketchyBar plus a 6px gap
 [gaps]
 inner.horizontal = 6
 inner.vertical = 6
 outer.left = 6
 outer.bottom = 6
-outer.top = 40
+outer.top = 70
 outer.right = 6
 
 # ============================================
@@ -83,6 +83,9 @@ ctrl-alt-u = 'flatten-workspace-tree'
 # Resize mode
 ctrl-cmd-r = ['mode resize', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=resize']
 
+# Outer gap mode
+ctrl-cmd-g = ['mode gaps', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=gaps']
+
 # Close window (disabled to allow Neovim to use Ctrl+Q for quickfix)
 # ctrl-q = 'close'
 
@@ -109,6 +112,17 @@ esc = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change 
 enter = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 
 # ============================================
+# OUTER GAP MODE
+# ============================================
+[mode.gaps.binding]
+h = 'exec-and-forget $HOME/.config/aerospace/adjust-gaps.sh -8'
+l = 'exec-and-forget $HOME/.config/aerospace/adjust-gaps.sh 8'
+minus = 'exec-and-forget $HOME/.config/aerospace/adjust-gaps.sh -8'
+equal = 'exec-and-forget $HOME/.config/aerospace/adjust-gaps.sh 8'
+esc = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+enter = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+
+# ============================================
 # OPEN APP MODE (ctrl+o, then key)
 # ============================================
 [mode.open.binding]
@@ -125,7 +139,7 @@ w = ['exec-and-forget open -a "WhatsApp"', 'mode main', 'exec-and-forget sketchy
 i = ['exec-and-forget open -a "iSTB"', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 # Toggle screen recording (start/stop). On stop, prompts for a name and
 # re-encodes with ffmpeg to ~/Documents/screen-recordings/<name>.mov.
-r = ['exec-and-forget $HOME/.config/bin/screen-record-toggle', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
+r = ['exec-and-forget $HOME/.config/aerospace/screen-record-toggle.sh', 'mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 esc = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 enter = ['mode main', 'exec-and-forget sketchybar --trigger aerospace_mode_change MODE=main']
 

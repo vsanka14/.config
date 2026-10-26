@@ -72,17 +72,16 @@ local hl_defs = {
 	File = { fg = "#c0caf5", bg = "#24283b", bold = true },
 	Git = { fg = "#7aa2f7", bg = "#1a1b26" },
 	GitIcon = { fg = "#e0af68", bg = "#1a1b26" },
-	DiagError = { fg = "#f7768e", bg = "#1a1b26" },
-	DiagWarn = { fg = "#e0af68", bg = "#1a1b26" },
-	DiagInfo = { fg = "#7dcfff", bg = "#1a1b26" },
-	DiagHint = { fg = "#9ece6a", bg = "#1a1b26" },
-	Lsp = { fg = "#565f89", bg = "#1a1b26" },
 	Search = { fg = "#1a1b26", bg = "#ff9e64", bold = true },
 	PosIcon = { fg = "#7aa2f7", bg = "#24283b" },
 	PosLine = { fg = "#c0caf5", bg = "#24283b" },
 	PosSep = { fg = "#565f89", bg = "#24283b" },
 	PosCol = { fg = "#9ece6a", bg = "#24283b" },
 	PosPct = { fg = "#bb9af7", bg = "#24283b" },
+	RdevSyncHealthy = { fg = "#9ece6a", bg = "#24283b" },
+	RdevSyncWarn = { fg = "#e0af68", bg = "#24283b" },
+	RdevSyncError = { fg = "#f7768e", bg = "#24283b" },
+	RdevSyncMissing = { fg = "#565f89", bg = "#24283b" },
 }
 
 local function setup_highlights()
@@ -99,7 +98,11 @@ end
 -- ============================================================================
 -- Cached state (updated via autocmds, never computed in render)
 -- ============================================================================
-local cache = { git_branch = "", lsp_progress = "", lsp_clients = "", diag = "" }
+local cache = {
+	git_branch = "",
+	rdev_sync_hl = "RdevSyncMissing",
+	rdev_sync_text = "",
+}
 
 local function update_git_branch()
 	local dir = vim.fn.expand("%:p:h")
@@ -123,72 +126,95 @@ local function update_git_branch()
 	})
 end
 
-local icons = require("helpers.icons")
-local diag_icons = {
-	{ vim.diagnostic.severity.ERROR, "DiagError", icons[vim.diagnostic.severity.ERROR] .. " " },
-	{ vim.diagnostic.severity.WARN, "DiagWarn", icons[vim.diagnostic.severity.WARN] .. " " },
-	{ vim.diagnostic.severity.INFO, "DiagInfo", icons[vim.diagnostic.severity.INFO] .. " " },
-	{ vim.diagnostic.severity.HINT, "DiagHint", icons[vim.diagnostic.severity.HINT] .. " " },
+local rdev_sync_display = {
+	healthy = "RdevSyncHealthy",
+	syncing = "RdevSyncWarn",
+	connecting = "RdevSyncWarn",
+	paused = "RdevSyncError",
+	disconnected = "RdevSyncError",
+	["wrong-mode"] = "RdevSyncError",
+	halted = "RdevSyncError",
+	error = "RdevSyncError",
+	missing = "RdevSyncMissing",
 }
 
-local function update_diagnostics()
-	local parts = {}
-	for _, d in ipairs(diag_icons) do
-		local count = #vim.diagnostic.get(0, { severity = d[1] })
-		if count > 0 then
-			parts[#parts + 1] = hl(d[2], d[3] .. count .. " ")
-		end
+local function set_rdev_sync_status(category, name)
+	local display = rdev_sync_display[category] or rdev_sync_display.error
+	local label = name ~= "" and name or "sync error"
+	local text = category == "missing" and "" or (" 󰍹 " .. label:gsub("%%", "%%%%") .. " ")
+
+	if cache.rdev_sync_hl ~= display or cache.rdev_sync_text ~= text then
+		cache.rdev_sync_hl = display
+		cache.rdev_sync_text = text
+		vim.cmd.redrawstatus()
 	end
-	cache.diag = table.concat(parts)
-	vim.cmd.redrawstatus()
 end
 
-local function update_lsp_clients()
-	local clients = vim.lsp.get_clients({ bufnr = 0 })
-	if #clients > 0 then
-		local names = {}
-		for _, c in ipairs(clients) do
-			names[#names + 1] = c.name
+local function current_rdev_sync_path()
+	local buffer_name = vim.api.nvim_buf_get_name(0)
+	if buffer_name ~= "" and vim.bo.buftype == "" then
+		local directory = vim.fs.dirname(buffer_name)
+		if directory and vim.uv.fs_stat(directory) then
+			return vim.uv.fs_realpath(directory) or directory
 		end
-		cache.lsp_clients = table.concat(names, ", ")
-	else
-		cache.lsp_clients = ""
 	end
-	vim.cmd.redrawstatus()
+
+	local cwd = vim.fn.getcwd()
+	return vim.uv.fs_realpath(cwd) or cwd
 end
 
-local lsp_progress_map = {}
+local rdev_sync_job
+local requested_rdev_sync_path
+local rdev_sync_stopping = false
+local start_rdev_sync_job
 
-local function update_lsp_progress(args)
-	local data = args.data
-	if not data or not data.params then
+start_rdev_sync_job = function(path)
+	local output = {}
+	local job = vim.fn.jobstart({ "rdev-info", "--sync-status", "--path", path }, {
+		stdout_buffered = true,
+		on_stdout = function(_, data)
+			output = data or {}
+		end,
+		on_exit = function(_, code)
+			vim.schedule(function()
+				rdev_sync_job = nil
+				if rdev_sync_stopping then
+					return
+				end
+
+				if requested_rdev_sync_path == path then
+					if code == 0 then
+						local raw = table.concat(output, "\n")
+						local ok, result = pcall(vim.json.decode, raw)
+						if ok and type(result) == "table" then
+							set_rdev_sync_status(result.category or "error", result.shortName or "")
+						else
+							set_rdev_sync_status("error", "")
+						end
+					else
+						set_rdev_sync_status("error", "")
+					end
+				end
+
+				if requested_rdev_sync_path ~= path then
+					start_rdev_sync_job(requested_rdev_sync_path)
+				end
+			end)
+		end,
+	})
+
+	if job <= 0 then
+		set_rdev_sync_status("error", "")
 		return
 	end
-	local val = data.params.value
-	local id = data.client_id
-	if not val or not id then
-		return
-	end
+	rdev_sync_job = job
+end
 
-	if val.kind == "end" then
-		lsp_progress_map[id] = nil
-	else
-		local msg = val.title or ""
-		if val.message then
-			msg = msg .. ": " .. val.message
-		end
-		if val.percentage then
-			msg = msg .. " (" .. val.percentage .. "%%%%)"
-		end
-		lsp_progress_map[id] = msg
+local function update_rdev_sync_status()
+	requested_rdev_sync_path = current_rdev_sync_path()
+	if not rdev_sync_job then
+		start_rdev_sync_job(requested_rdev_sync_path)
 	end
-
-	local msgs = {}
-	for _, msg in pairs(lsp_progress_map) do
-		msgs[#msgs + 1] = msg
-	end
-	cache.lsp_progress = table.concat(msgs, " | ")
-	vim.cmd.redrawstatus()
 end
 
 -- ============================================================================
@@ -200,14 +226,27 @@ local au = function(events, cb)
 end
 
 au({ "BufEnter", "FocusGained", "DirChanged" }, update_git_branch)
-au("DiagnosticChanged", update_diagnostics)
-au({ "LspAttach", "LspDetach", "BufEnter" }, update_lsp_clients)
-au("LspProgress", update_lsp_progress)
+au({ "BufEnter", "FocusGained", "DirChanged" }, update_rdev_sync_status)
 au({ "RecordingEnter", "RecordingLeave" }, function()
 	vim.cmd.redrawstatus()
 end)
 
 update_git_branch()
+update_rdev_sync_status()
+
+local rdev_sync_timer = vim.uv.new_timer()
+rdev_sync_timer:start(5000, 5000, vim.schedule_wrap(update_rdev_sync_status))
+
+au("VimLeavePre", function()
+	rdev_sync_stopping = true
+	if rdev_sync_job then
+		vim.fn.jobstop(rdev_sync_job)
+	end
+	if not rdev_sync_timer:is_closing() then
+		rdev_sync_timer:stop()
+		rdev_sync_timer:close()
+	end
+end)
 
 -- ============================================================================
 -- Render (pure string concat, minimal API calls)
@@ -237,18 +276,14 @@ function M.render()
 		left = left .. hl("GitIcon", " \u{e725} ") .. hl("Git", cache.git_branch .. " ")
 	end
 
-	-- Right: diagnostics + lsp + position
-	local right = cache.diag
-	if cache.lsp_progress ~= "" then
-		right = right .. hl("Lsp", " " .. cache.lsp_progress .. " ")
-	elseif cache.lsp_clients ~= "" then
-		right = right .. hl("Lsp", " " .. cache.lsp_clients .. " ")
-	end
+	-- Right: rdev sync + position
+	local right = ""
 
 	local cur = vim.fn.line(".")
 	local total = vim.fn.line("$")
 	local pct = cur == 1 and "Top" or cur == total and "Bot" or (math.floor(cur / total * 100) .. "%%")
 	right = right
+		.. hl(cache.rdev_sync_hl, cache.rdev_sync_text)
 		.. hl("PosIcon", " \u{f0c9} ")
 		.. hl("PosLine", "%l")
 		.. hl("PosSep", ":")

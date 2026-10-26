@@ -38,6 +38,22 @@ opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
 opt.foldlevel = 99
 opt.foldlevelstart = 99
 
+-- No-LSP navigation: ripgrep for :grep, ctags for tag jumps (gutentags appends
+-- its cached per-repo tagfile to &tags automatically; this is the fallback path).
+if vim.fn.executable("rg") == 1 then
+	opt.grepprg = "rg --vimgrep --smart-case"
+	opt.grepformat = "%f:%l:%c:%m"
+end
+opt.tags = "./tags;,tags"
+
+-- Formatter binaries (stylua, sql_formatter, ...) live under this dir. Prepend it
+-- to PATH so conform.nvim can find them now that the mason.nvim plugin (which used
+-- to add this automatically) has been removed from the no-LSP setup.
+local formatter_bin = vim.fn.stdpath("data") .. "/mason/bin"
+if vim.fn.isdirectory(formatter_bin) == 1 and not string.find(vim.env.PATH or "", formatter_bin, 1, true) then
+	vim.env.PATH = formatter_bin .. ":" .. (vim.env.PATH or "")
+end
+
 -- Filetype registration
 vim.filetype.add({
 	extension = {

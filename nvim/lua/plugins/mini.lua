@@ -48,6 +48,7 @@ return {
 				mdx = { glyph = "\u{f0354}", hl = "MiniIconsAzure" },
 				hbs = { glyph = "\u{e60f}", hl = "MiniIconsOrange" },
 				conf = { glyph = "\u{f013}", hl = "MiniIconsGreen" },
+				rs = { glyph = "\u{e68b}", hl = "MiniIconsOrange" },
 			},
 		})
 

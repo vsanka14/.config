@@ -32,7 +32,6 @@ require("lazy").setup({
 require("keymaps")
 require("statusline")
 require("tabline")
-require("lsp")
 
 -- Show startup time as a notification (only when launched directly, not as shell editor)
 vim.api.nvim_create_autocmd("VimEnter", {

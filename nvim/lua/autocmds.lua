@@ -13,6 +13,26 @@ autocmd({ "FocusGained", "BufEnter", "CursorHold", "CursorHoldI" }, {
 	desc = "Auto refresh buffer if file changed on disk",
 })
 
+-- Refresh ctags on focus, at most once every 30 seconds in gutentags-managed buffers.
+local tags_refresh_group = augroup("tags_auto_refresh", { clear = true })
+local last_tags_refresh = 0
+
+autocmd("FocusGained", {
+	group = tags_refresh_group,
+	callback = function()
+		if vim.fn.exists(":GutentagsUpdate") == 0 then
+			return
+		end
+		local now = os.time()
+		if now - last_tags_refresh < 30 then
+			return
+		end
+		last_tags_refresh = now
+		vim.cmd("silent! GutentagsUpdate!")
+	end,
+	desc = "Background ctags refresh on focus (debounced)",
+})
+
 -- Reapply italic highlights on colorscheme change
 autocmd("ColorScheme", {
 	group = augroup("italic_highlights", { clear = true }),

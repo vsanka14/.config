@@ -12,8 +12,7 @@ lua/
   autocmds.lua    -- Autocommands
   statusline.lua  -- Custom statusline
   tabline.lua     -- Custom tabline
-  lsp.lua         -- LSP configuration
-  helpers/        -- Utility modules (git blame, floating terminal, icons, etc.)
+  helpers/        -- Utility modules (git blame, floating terminal, etc.)
   plugins/        -- Plugin specs loaded by lazy.nvim
 ```
 
@@ -21,12 +20,10 @@ lua/
 
 Managed with [lazy.nvim](https://github.com/folke/lazy.nvim). Key plugins:
 
-- **blink-cmp** -- Completion
+- **blink-cmp** -- Completion (buffer + ctags sources)
 - **conform** -- Formatting
-- **mason** -- LSP/tool installer
-- **nvim-jdtls** -- Java LSP
-- **nvim-dap** -- Java Debugging
-- **treesitter** -- Syntax highlighting
-- **mini** -- Collection of small utilities
+- **gutentags** -- Background ctags indexer for no-LSP navigation
+- **treesitter** -- Syntax highlighting / indent / folds / textobjects (`main` branch)
+- **mini** -- Collection of small utilities (pick, diff, surround, ...)
 - **diffview** -- Git diff viewer
 - **tokyonight** -- Colorscheme

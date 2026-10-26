@@ -3,4 +3,5 @@
 [mgr]
 prepend_keymap = [
   { on = ["g", "r"], run = "cd ~/documents/screen-recordings", desc = "Go to screen recordings" },
+  { on = ["g", "s"], run = "cd ~/Documents/Screenshots", desc = "Go to screenshots" },
 ]

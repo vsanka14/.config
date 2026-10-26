@@ -3,8 +3,10 @@
 ## Scope
 
 These instructions apply to everything under `sketchybar/`. Preserve the
-Tokyo Night Moon styling and the separate laptop/external display profiles
-unless a task explicitly requests a visual redesign.
+Tokyo Night Moon styling and the laptop/external display profiles unless a
+task explicitly requests a visual redesign. The laptop profile is a slightly
+smaller bar, hides the front app, shows the battery in the clock block, and
+aligns its edges with the Aerospace laptop outer gap.
 
 ## Configuration Map
 
@@ -23,30 +25,33 @@ The `agent` item propagates Copilot agent status from tmux to the menu bar as an
 inline label next to the agent icon (no popup). It is intentionally a thin
 consumer:
 
-- **Producer**: `../bin/tmux-agent-status` (a Copilot hook) fires
-  `sketchybar --trigger agent_notify` on every real status transition, plus once
-  more when a completion "done" flash expires. `../bin/tmux-agent-engine` also
-  fires `agent_notify` from its `--refresh --notify` path (the same background
-  refresh that redraws the tmux status-right), so footer-detected states that
-  never reach the Copilot hook — e.g. a blocking permission prompt — surface on
-  the bar at tmux speed instead of waiting out `agent`'s slow `update_freq`. All
-  SketchyBar calls in both are guarded by `command -v sketchybar` (and the
-  `TMUX_AGENT_ENGINE_SKETCHYBAR` / `TMUX_AGENT_STATUS_SKETCHYBAR` switches for
-  hermetic tests), so machines without SketchyBar are unaffected.
+- **Producer**: `../tmux/plugins/agent-radar/` runs the generic command in
+  `@agent-radar-on-change` on real status transitions and polling-driven changes.
+  This dotfiles config sets it to `sketchybar --trigger agent_notify`; Agent Radar
+  itself does not know about SketchyBar.
 - **Source of truth**: `plugins/agent.sh` re-derives the icon colour and the
-  notable session list from `../bin/tmux-agent-engine --notify-lines` (which
-  reuses the tmux pill/radar scan and priority folding). Do **not** reimplement
-  the pane scan in the plugin — extend `--notify-lines` instead so the bar and
-  tmux stay in lockstep.
+  notable session counts from
+  `../tmux/plugins/agent-radar/bin/agent-radar --notify-lines` (which
+  reuses the tmux pill/radar scan and priority folding, emitting one `LINE` per
+  session). Do **not** reimplement the pane scan in the plugin — extend
+  `--notify-lines` instead so the bar and tmux stay in lockstep.
+- **Label**: a compact, count-based summary of the notable sessions rather than a
+  list of names, so it never overflows the bar regardless of how many agents are
+  tracked: `⏸ N awaiting` (awaiting only), `✓ M done` (done only), or
+  `⏸ N awaiting  ✓ M done` (both, awaiting first). The plugin counts the engine's
+  `LINE` records; the `label.max_chars` in `sketchybarrc` is just a safety net the
+  counts stay well under.
 - **Item contract**: `agent` is hidden (`drawing=off`) unless there is a
   **notable** agent (awaiting or done). Idle/working-only agents draw nothing, so
   the icon only appears when it needs attention. `plugins/agent.sh` is its single
   owner.
 - **Transient vs blocking** is derived from state, not a trigger flag:
-  - a completion ("done") shows a **transient** green label; it clears itself
-    because the underlying `flash.kind=done` expires after `DONE_FLASH_TTL` in
-    `../bin/tmux-agent-status`, which also re-fires `agent_notify` so the label
-    drops promptly;
+  - a completion ("done") shows a **transient** green label; in the notify view
+    `effective_status` drops the completion once `flash.kind=done` passes its
+    done TTL. Nothing re-fires the on-change command at that expiry, so the
+    `agent` item relies on its short `update_freq` poll (re-deriving from
+    `--notify-lines`) to clear the label promptly, matching the tmux pill's own
+    poll cadence;
   - an awaiting-permission agent shows a **blocking** red label with a red-tinted
     item background, and it persists until the agent leaves the awaiting state.
 - **Colours** mirror the tmux mapping: awaiting `#f7768e`, done `#3fb950`,
@@ -54,8 +59,8 @@ consumer:
   background tint. Idle/working-only agents are not notable, so the item is
   hidden for them.
 
-If the `agent_notify` contract changes, update all three:
-`../bin/tmux-agent-status`, `../bin/tmux-agent-engine`, and `plugins/agent.sh`.
+If the `agent_notify` contract changes, update Agent Radar's `--notify-lines`
+API, the `@agent-radar-on-change` setting, and `plugins/agent.sh`.
 
 ## Event and Animation Architecture
 
@@ -75,9 +80,15 @@ the active queue for that property, producing visible restarts and choppiness.
 
 The implementation intentionally uses two SketchyBar calls:
 
-- One non-animated call switches workspace backgrounds immediately.
-- One animated call updates all icon colors/offsets and appends every bounce
-  keyframe to the same queue.
+- One non-animated call keeps every workspace pill drawn and resets the
+  focused pill to its small pop-start height.
+- One animated call updates all icon colors/offsets and pill colors/heights,
+  and appends every bounce keyframe to the same queue.
+
+Workspace pills are always `background.drawing=on`. Unfocused pills are
+transparent (`0x001e2030`), so they can fade and shrink instead of snapping
+off. `sketchybarrc` passes the profile's `SPACE_BG_HEIGHT` to
+`plugins/aerospace.sh` through the observer's `script` string.
 
 Do not split bounce keyframes across background processes, shell loops, sleeps,
 or multiple event subscribers.
@@ -92,14 +103,27 @@ rate.
 the same integer position across several frames and can look like a pause.
 Keep each keyframe duration roughly proportional to its travel distance:
 
-- Rise: `0 -> BOUNCE_HEIGHT`
-- Drop: `BOUNCE_HEIGHT -> BOUNCE_REBOUND`
-- Settle: `BOUNCE_REBOUND -> BOUNCE_SETTLE`
-- Finish: `BOUNCE_SETTLE -> 0`
+The bounce is a keyframe table (`BOUNCE_CURVES`, `BOUNCE_DURATIONS`,
+`BOUNCE_FOCUSED`, `BOUNCE_NEIGHBOR`) at the top of `plugins/aerospace.sh`:
+hop, dip, rebound, rest. The `tanh` hop and rebound launch fast and ease out;
+the `sin` legs ease in and out so landings stay soft. Keep the rebound large
+enough to see (about a third of the hop), or the motion reads as a float. Avoid `quadratic` falls and
+anticipation dips, because they look jarring. `BOUNCE_NEIGHBOR` can make the
+adjacent icons hop when the focused icon lands; it is all `0` now (no ripple).
+Each column in the keyframe arrays is one `--animate` group, so all items stay
+on the same timeline.
 
-The current `sin` curve eases into each target. When tuning the bounce:
+The focused pill moves with the icon: it starts opaque at `SPACE_BG_HEIGHT +
+BG_POP_START`, follows `BOUNCE_BG` (overshoot during the hop, squash when the
+icon lands, spring back), and rests at `SPACE_BG_HEIGHT`. Do not fade the
+focused pill in, because the fade hides the pop. A pill that loses focus fades
+to transparent and shrinks back to the pop-start height.
 
-- Change the constants at the top of `plugins/aerospace.sh`.
+When tuning the bounce:
+
+- Change the keyframe arrays at the top of `plugins/aerospace.sh`, and keep
+  all five arrays (including `BOUNCE_BG`) the same length.
+- Keep the peak inside the workspace background (`SPACE_BG_HEIGHT`).
 - Keep the total motion short enough to finish before normal rapid workspace
   switching queues another event.
 - Prefer fewer meaningful frames over increasing duration for “smoothness.”
@@ -156,15 +180,16 @@ sketchybar --query workspace_observer
 sketchybar --query "space.$focused"
 ```
 
-The observer should be subscribed with `drawing=off`, the focused background
-should be on, and the focused icon should settle at `y_offset=0`.
+The observer should be subscribed with `drawing=off`. The focused pill should
+settle at `SPACE_BG_HEIGHT` with color `0xcc1e2030`, other pills should be
+transparent, and the focused icon should settle at `y_offset=0`.
 
 For the agent notification feature:
 
 ```bash
-bash -n bin/tmux-agent-status bin/tmux-agent-engine sketchybar/plugins/agent.sh
-bash tests/tmux-agent-engine-test.sh          # covers --notify-lines
-bin/tmux-agent-engine --notify-lines          # COLOR + LINE rows, or empty
+bash -n tmux/plugins/agent-radar/bin/* sketchybar/plugins/agent.sh
+bash tmux/plugins/agent-radar/tests/engine-test.sh
+tmux/plugins/agent-radar/bin/agent-radar --notify-lines
 sketchybar --reload
 sketchybar --trigger agent_notify
 sketchybar --query agent                      # drawing reflects tracked agents
