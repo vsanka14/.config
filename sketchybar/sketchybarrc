@@ -28,6 +28,7 @@ if [ "$DISPLAY_PROFILE" = "external" ]; then
     BAR_PADDING_LEFT=120
     BAR_PADDING_RIGHT=120
     BAR_MARGIN=0
+    FIRST_SPACE_PADDING_LEFT=12
     BAR_HEIGHT=80
     ICON_SIZE=24.0
     LABEL_SIZE=15.0
@@ -44,10 +45,12 @@ else
     STATUS_ICON_SCALE=0.25
     SHOW_FRONT_APP=false
     SHOW_BATTERY=true
-    # Inset the bar by the Aerospace outer gap so its edges line up with windows.
+    # Inset the bar by the Aerospace outer gap so the first workspace pill and
+    # the clock pill sit flush with window edges.
     BAR_MARGIN=56
     BAR_PADDING_LEFT=0
-    BAR_PADDING_RIGHT=6
+    BAR_PADDING_RIGHT=0
+    FIRST_SPACE_PADDING_LEFT=0
     BAR_HEIGHT=64
     ICON_SIZE=20.0
     LABEL_SIZE=14.0
@@ -116,6 +119,7 @@ for sid in 1 2 3; do
             background.drawing=on \
             label.drawing=off
 done
+sketchybar --set space.1 padding_left=$FIRST_SPACE_PADDING_LEFT
 
 # Keep one event owner: subscribing every space would run the all-space update
 # five times and repeatedly cancel/restart the same animation queue.
