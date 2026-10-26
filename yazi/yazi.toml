@@ -23,11 +23,11 @@ max_height = 1920
 
 # Git plugin fetchers - shows git status next to files
 [[plugin.prepend_fetchers]]
-id = "git"
+group = "git"
 url = "*"
 run = "git"
 
 [[plugin.prepend_fetchers]]
-id = "git"
+group = "git"
 url = "*/"
 run = "git"
