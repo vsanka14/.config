@@ -27,6 +27,7 @@ if [ "$DISPLAY_PROFILE" = "external" ]; then
     SHOW_BATTERY=false
     BAR_PADDING_LEFT=120
     BAR_PADDING_RIGHT=120
+    BAR_MARGIN=0
     BAR_HEIGHT=80
     ICON_SIZE=24.0
     LABEL_SIZE=15.0
@@ -43,8 +44,8 @@ else
     STATUS_ICON_SCALE=0.25
     SHOW_FRONT_APP=false
     SHOW_BATTERY=true
-    # Align bar edges with the compact Aerospace outer gap (6). The first
-    # workspace item's DEFAULT_PADDING (12) already exceeds it on the left.
+    # Inset the bar by the Aerospace outer gap so its edges line up with windows.
+    BAR_MARGIN=56
     BAR_PADDING_LEFT=0
     BAR_PADDING_RIGHT=6
     BAR_HEIGHT=64
@@ -72,6 +73,7 @@ sketchybar --bar \
     blur_radius=$BLUR_RADIUS \
     position=top \
     sticky=on \
+    margin=$BAR_MARGIN \
     padding_left=$BAR_PADDING_LEFT \
     padding_right=$BAR_PADDING_RIGHT \
     color=$BAR_COLOR \

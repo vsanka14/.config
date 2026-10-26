@@ -20,14 +20,14 @@ exec-on-workspace-change = ['/bin/bash', '-c',
 default-root-container-layout = 'accordion'
 default-root-container-orientation = 'horizontal'
 
-# Gaps: compact; top clears the 64px laptop SketchyBar plus a 6px gap
+# Gaps: outer 56 matches the laptop SketchyBar margin; top clears the 64px bar
 [gaps]
 inner.horizontal = 6
 inner.vertical = 6
-outer.left = 6
-outer.bottom = 6
-outer.top = 70
-outer.right = 6
+outer.left = 56
+outer.bottom = 56
+outer.top = 118
+outer.right = 56
 
 # ============================================
 # MAIN KEYBINDINGS (using ctrl modifier)
