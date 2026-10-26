@@ -112,7 +112,7 @@ success "Yazi plugin installed"
 info "Setting screenshot location..."
 mkdir -p ~/Documents/screen-recordings
 defaults write com.apple.screencapture location "$HOME/Documents/screen-recordings"
-killall SystemUIServer 2>/dev/null || true
+killall SystemUIServer screencaptureui 2>/dev/null || true
 success "Screenshots will be saved to ~/Documents/screen-recordings"
 
 # 10. Start services
